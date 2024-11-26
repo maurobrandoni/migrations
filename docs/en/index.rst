@@ -1177,6 +1177,20 @@ for instance when deploying on your production environment, by using the
 
     bin/cake bake migration_snapshot MyMigration --no-lock
 
+Alert of missing migrations
+---------------------------
+
+You can use the ``Migrations.Migrations`` middleware in local development
+to alert developers about new migrations that are not yet being applied::
+
+    use Migrations\Middleware\MigrationsMiddleware;
+
+    $middlewareQueue
+        ... // ErrorHandler middleware
+        ->add(new MigrationsMiddleware($yourConfig))
+        ... // rest
+
+
 IDE autocomplete support
 ------------------------
 
