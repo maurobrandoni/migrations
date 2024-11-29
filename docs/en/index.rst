@@ -1180,14 +1180,14 @@ for instance when deploying on your production environment, by using the
 Alert of missing migrations
 ---------------------------
 
-You can use the ``Migrations.Migrations`` middleware in local development
+You can use the ``Migrations.PendingMigrations`` middleware in local development
 to alert developers about new migrations that are not yet being applied::
 
-    use Migrations\Middleware\MigrationsMiddleware;
+    use Migrations\Middleware\PendingMigrationsMiddleware;
 
     $middlewareQueue
         ... // ErrorHandler middleware
-        ->add(new MigrationsMiddleware($yourConfig))
+        ->add(new PendingMigrationsMiddleware($yourConfig))
         ... // rest
 
 
