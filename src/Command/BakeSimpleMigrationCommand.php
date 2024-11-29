@@ -127,11 +127,6 @@ abstract class BakeSimpleMigrationCommand extends SimpleBakeCommand
         $this->args = $args;
         if ($this->isReservedKeyword($name)) {
             $prefix = $io->ask('Reserved keywords cannot be used for class names. What prefix would you like to use? Defaults to `Migration`.', 'Migration');
-            if (!$prefix) {
-                $io->err('You must provide a prefix when using a reserved keyword as name.');
-                $this->abort();
-            }
-
             $name = $prefix . ucfirst($name);
         }
 
