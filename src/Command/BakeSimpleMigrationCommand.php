@@ -30,6 +30,14 @@ abstract class BakeSimpleMigrationCommand extends SimpleBakeCommand
 {
     public const DEFAULT_MIGRATION_FOLDER = 'Migrations';
 
+    protected const RESERVED_KEYWORDS = [
+        'abstract', 'and', 'array', 'as', 'break', 'callable', 'case', 'catch', 'class', 'clone', 'const',
+        'continue', 'declare', 'default', 'die', 'do', 'echo', 'else', 'elseif', 'empty', 'enddeclare', 'endfor',
+        'endforeach', 'endif', 'endswitch', 'endwhile', 'eval', 'exit', 'extends', 'final', 'finally', 'for', 'foreach',
+        'function', 'global', 'goto', 'if', 'implements', 'include', 'include_once', 'instanceof', 'insteadof', 'interface',
+        'isset', 'list', 'namespace', 'new', 'or', 'parent', 'private', 'protected', 'public', 'return','static',
+    ];
+
     /**
      * path to Migration directory
      *
@@ -117,8 +125,18 @@ abstract class BakeSimpleMigrationCommand extends SimpleBakeCommand
     {
         $this->io = $io;
         $this->args = $args;
+        if ($this->isReservedKeyword($name)) {
+            $prefix = $io->ask('Reserved keywords cannot be used for class names. What prefix would you like to use, defaults to `Migration`', 'Migration');
+            if (!$prefix) {
+                $io->err('You must provide a prefix when using a reserved keyword as name');
+                $this->abort();
+            }
+
+            $name = $prefix . ucfirst($name);
+        }
+
         $migrationWithSameName = glob($this->getPath($args) . '*_' . $name . '.php');
-        if (!empty($migrationWithSameName)) {
+        if ($migrationWithSameName) {
             $force = $args->getOption('force');
             if (!$force) {
                 $io->abort(
@@ -217,5 +235,16 @@ abstract class BakeSimpleMigrationCommand extends SimpleBakeCommand
         ]);
 
         return $parser;
+    }
+
+    /**
+     * If reserved PHP keyword.
+     *
+     * @param string $name
+     * @return bool
+     */
+    protected function isReservedKeyword(string $name): bool
+    {
+        return in_array(strtolower($name), static::RESERVED_KEYWORDS);
     }
 }
