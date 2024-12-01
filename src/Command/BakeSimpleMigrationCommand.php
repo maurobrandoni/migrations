@@ -79,7 +79,7 @@ abstract class BakeSimpleMigrationCommand extends SimpleBakeCommand
         /** @psalm-suppress PossiblyNullArgument */
         $path = $this->getPath($this->args);
         $offset = 0;
-        while (glob($path . $timestamp . '_*\\.php')) {
+        while (glob($path . $timestamp . '_*.php')) {
             $timestamp = Util::getCurrentTimestamp(++$offset);
         }
 
