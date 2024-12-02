@@ -9,9 +9,9 @@ use Cake\Core\Exception\CakeException;
 use Cake\Core\InstanceConfigTrait;
 use Cake\Core\Plugin;
 use Cake\Datasource\ConnectionManager;
-use Cake\Utility\Inflector;
 use Migrations\Config\Config;
 use Migrations\Migration\Manager;
+use Migrations\Util\Util;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Server\MiddlewareInterface;
@@ -129,11 +129,7 @@ class PendingMigrationsMiddleware implements MiddlewareInterface
             ],
         ] + $this->_config;
 
-        //TODO: reuse refactored own method in ManagerFactory etc
-        $table = 'phinxlog';
-        $prefix = Inflector::underscore($plugin) . '_';
-        $prefix = str_replace(['\\', '/', '.'], '_', $prefix);
-        $table = $prefix . $table;
+        $table = Util::tableName($plugin);
 
         $config['environment']['migration_table'] = $table;
 
