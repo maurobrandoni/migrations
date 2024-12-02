@@ -1185,9 +1185,15 @@ to alert developers about new migrations that are not yet being applied::
 
     use Migrations\Middleware\PendingMigrationsMiddleware;
 
+    $config = [
+        'plugins' => [
+            ... // Optionally include a list of plugins with migrations to check.
+        ],
+    ];
+
     $middlewareQueue
         ... // ErrorHandler middleware
-        ->add(new PendingMigrationsMiddleware($yourConfig))
+        ->add(new PendingMigrationsMiddleware($config))
         ... // rest
 
 
