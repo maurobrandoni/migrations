@@ -118,6 +118,10 @@ class PendingMigrationsMiddleware implements MiddlewareInterface
      */
     protected function checkPluginMigrations(string $plugin): bool
     {
+        $connection = ConnectionManager::get($this->_config['environment']['connection']);
+        $database = $connection->config()['database'];
+        $this->_config['environment']['database'] = $database;
+
         $pluginPath = Plugin::path($plugin);
         if (!is_dir($pluginPath . 'config' . DS . 'Migrations' . DS)) {
             return true;
