@@ -1196,7 +1196,7 @@ to alert developers about new migrations that are not yet being applied::
         ->add(new PendingMigrationsMiddleware($config))
         ... // rest
 
-You can set `app` config to false if you are only interested in plugin migrations to be checked.
+You can add `'app'` config key set to `false` if you are only interested in plugin migrations to be checked.
 
 In case you run into the exception and need to skip it for a moment, you can temporarily disable
 it using the query string `...?skip-migration-check=1`.
