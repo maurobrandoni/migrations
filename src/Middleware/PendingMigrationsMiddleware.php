@@ -9,6 +9,7 @@ use Cake\Core\Exception\CakeException;
 use Cake\Core\InstanceConfigTrait;
 use Cake\Core\Plugin;
 use Cake\Datasource\ConnectionManager;
+use Cake\Utility\Hash;
 use Migrations\Config\Config;
 use Migrations\Migration\Manager;
 use Migrations\Util\Util;
@@ -21,6 +22,8 @@ class PendingMigrationsMiddleware implements MiddlewareInterface
 {
     use InstanceConfigTrait;
 
+    protected const SKIP_QUERY_KEY = 'skip-middleware-check';
+
     protected array $_defaultConfig = [
         'paths' => [
             'migrations' => ROOT . DS . 'config' . DS . 'Migrations' . DS,
@@ -29,6 +32,7 @@ class PendingMigrationsMiddleware implements MiddlewareInterface
             'connection' => 'default',
             'migration_table' => 'phinxlog',
         ],
+        'app' => null,
         'plugins' => null,
     ];
 
@@ -54,7 +58,7 @@ class PendingMigrationsMiddleware implements MiddlewareInterface
      */
     public function process(ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface
     {
-        if (!Configure::read('debug')) {
+        if (!Configure::read('debug') || $this->isSkipped($request)) {
             return $handler->handle($request);
         }
 
@@ -95,6 +99,10 @@ class PendingMigrationsMiddleware implements MiddlewareInterface
      */
     protected function checkAppMigrations(): bool
     {
+        if ($this->_config['app'] === false) {
+            return true;
+        }
+
         $connection = ConnectionManager::get($this->_config['environment']['connection']);
         $database = $connection->config()['database'];
         $this->_config['environment']['database'] = $database;
@@ -148,5 +156,14 @@ class PendingMigrationsMiddleware implements MiddlewareInterface
         }
 
         return true;
+    }
+
+    /**
+     * @param \Psr\Http\Message\ServerRequestInterface $request
+     * @return bool
+     */
+    protected function isSkipped(ServerRequestInterface $request): bool
+    {
+        return (bool)Hash::get($request->getQueryParams(), static::SKIP_QUERY_KEY);
     }
 }
