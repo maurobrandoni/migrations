@@ -75,6 +75,7 @@ class PendingMigrationsMiddlewareTest extends TestCase
                'migrations' => ROOT . DS . 'config' . DS . 'Migrations' . DS,
             ],
             'environment' => [
+               'database' => 'cakephp_test',
                'connection' => 'default',
                'migration_table' => 'phinxlog',
             ],
@@ -131,6 +132,7 @@ class PendingMigrationsMiddlewareTest extends TestCase
             ],
             'environment' => [
                 'connection' => 'default',
+                'database' => 'cakephp_test',
                 'migration_table' => 'migrator_phinxlog',
             ],
         ];
