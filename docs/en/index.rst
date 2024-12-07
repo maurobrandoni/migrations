@@ -1149,7 +1149,7 @@ Alert of missing migrations
 ---------------------------
 
 You can use the ``Migrations.PendingMigrations`` middleware in local development
-to alert developers about new migrations that are not yet being applied::
+to alert developers about new migrations that have not been applied::
 
     use Migrations\Middleware\PendingMigrationsMiddleware;
 
@@ -1164,10 +1164,11 @@ to alert developers about new migrations that are not yet being applied::
         ->add(new PendingMigrationsMiddleware($config))
         ... // rest
 
-You can add `'app'` config key set to `false` if you are only interested in plugin migrations to be checked.
+You can add `'app'` config key set to `false` if you are only interested in
+checking plugin migrations.
 
-In case you run into the exception and need to skip it for a moment, you can temporarily disable
-it using the query string `...?skip-migration-check=1`.
+You can temporarily disable the migration check by adding
+``skip-migration-check=1`` to the URL query string
 
 IDE autocomplete support
 ------------------------
