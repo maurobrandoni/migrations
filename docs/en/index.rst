@@ -1145,6 +1145,30 @@ for instance when deploying on your production environment, by using the
 
     bin/cake bake migration_snapshot MyMigration --no-lock
 
+Alert of missing migrations
+---------------------------
+
+You can use the ``Migrations.PendingMigrations`` middleware in local development
+to alert developers about new migrations that are not yet being applied::
+
+    use Migrations\Middleware\PendingMigrationsMiddleware;
+
+    $config = [
+        'plugins' => [
+            ... // Optionally include a list of plugins with migrations to check.
+        ],
+    ];
+
+    $middlewareQueue
+        ... // ErrorHandler middleware
+        ->add(new PendingMigrationsMiddleware($config))
+        ... // rest
+
+You can add `'app'` config key set to `false` if you are only interested in plugin migrations to be checked.
+
+In case you run into the exception and need to skip it for a moment, you can temporarily disable
+it using the query string `...?skip-migration-check=1`.
+
 IDE autocomplete support
 ------------------------
 
