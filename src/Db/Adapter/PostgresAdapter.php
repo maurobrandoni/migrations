@@ -1023,6 +1023,7 @@ class PostgresAdapter extends PdoAdapter
             case static::PHINX_TYPE_DATETIME:
                 return ['name' => 'timestamp'];
             case static::PHINX_TYPE_BINARYUUID:
+            case static::PHINX_TYPE_NATIVEUUID:
                 return ['name' => 'uuid'];
             case static::PHINX_TYPE_BLOB:
             case static::PHINX_TYPE_BINARY:
