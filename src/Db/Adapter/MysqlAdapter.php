@@ -1062,6 +1062,11 @@ class MysqlAdapter extends PdoAdapter
             case static::PHINX_TYPE_UUID:
                 return ['name' => 'char', 'limit' => 36];
             case static::PHINX_TYPE_NATIVEUUID:
+                if (!$this->hasNativeUuid()) {
+                    throw new UnsupportedColumnTypeException(
+                        'Column type "' . $type . '" is not supported by this version of MySQL.'
+                    );
+                }
                 return ['name' => 'uuid'];
             case static::PHINX_TYPE_YEAR:
                 if (!$limit || in_array($limit, [2, 4])) {
@@ -1493,15 +1498,25 @@ class MysqlAdapter extends PdoAdapter
      */
     public function getColumnTypes(): array
     {
-        $connection = $this->getConnection();
-        $version = $connection->getDriver()->version();
-
         $types = array_merge(parent::getColumnTypes(), static::$specificColumnTypes);
 
-        if (version_compare($version, '10.7', '>=')) {
+        if ($this->hasNativeUuid()) {
             $types[] = self::PHINX_TYPE_NATIVEUUID;
         }
 
         return $types;
+    }
+
+    /**
+     * Whether the server has a native uuid type.
+     * (MariaDB 10.7.0+)
+     * @return bool
+     */
+    protected function hasNativeUuid(): bool
+    {
+        $connection = $this->getConnection();
+        $version = $connection->getDriver()->version();
+
+        return version_compare($version, '10.7', '>=');
     }
 }
