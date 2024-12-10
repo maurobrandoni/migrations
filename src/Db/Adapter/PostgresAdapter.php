@@ -549,7 +549,7 @@ class PostgresAdapter extends PdoAdapter
                 $quotedColumnName
             );
         }
-        if ($newColumn->getType() === 'uuid') {
+        if (in_array($newColumn->getType(), ['uuid', 'nativeuuid', 'binaryuuid'])) {
             $sql .= sprintf(
                 ' USING (%s::uuid)',
                 $quotedColumnName
