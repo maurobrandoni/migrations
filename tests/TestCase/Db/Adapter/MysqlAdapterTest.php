@@ -12,6 +12,7 @@ use Cake\Datasource\ConnectionManager;
 use InvalidArgumentException;
 use Migrations\Db\Adapter\AdapterInterface;
 use Migrations\Db\Adapter\MysqlAdapter;
+use Migrations\Db\Adapter\UnsupportedColumnTypeException;
 use Migrations\Db\Literal;
 use Migrations\Db\Table;
 use Migrations\Db\Table\Column;
@@ -80,6 +81,13 @@ class MysqlAdapterTest extends TestCase
         $version = $this->adapter->getConnection()->getDriver()->version();
 
         return version_compare($version, '8.0.0', '>=');
+    }
+
+    private function usingMariaDbWithUuid(): bool
+    {
+        $version = $this->adapter->getConnection()->getDriver()->version();
+
+        return version_compare($version, '10.7.0', '>=');
     }
 
     public function testConnection()
@@ -323,6 +331,27 @@ class MysqlAdapterTest extends TestCase
         ];
         $table = new Table('ztable', $options, $this->adapter);
         $table->addColumn('id', 'binaryuuid', ['null' => false])->save();
+        $table->addColumn('user_id', 'integer')->save();
+        $this->assertTrue($this->adapter->hasColumn('ztable', 'id'));
+        $this->assertTrue($this->adapter->hasIndex('ztable', 'id'));
+        $this->assertTrue($this->adapter->hasColumn('ztable', 'user_id'));
+    }
+
+    /**
+     * @return void
+     */
+    public function testCreateTableWithPrimaryKeyAsNativeUuid()
+    {
+        if (!$this->usingMariaDbWithUuid()) {
+            $this->markTestSkipped('Database does not have a native uuid type');
+        }
+
+        $options = [
+            'id' => false,
+            'primary_key' => 'id',
+        ];
+        $table = new Table('ztable', $options, $this->adapter);
+        $table->addColumn('id', 'nativeuuid', ['null' => false])->save();
         $table->addColumn('user_id', 'integer')->save();
         $this->assertTrue($this->adapter->hasColumn('ztable', 'id'));
         $this->assertTrue($this->adapter->hasIndex('ztable', 'id'));
@@ -2521,5 +2550,13 @@ INPUT;
 
         $this->assertSame($expectedResponse['name'], $result['name'], "Type mismatch - got '{$result['name']}' when expecting '{$expectedResponse['name']}'");
         $this->assertSame($expectedResponse['limit'], $result['limit'], "Field upper boundary mismatch - got '{$result['limit']}' when expecting '{$expectedResponse['limit']}'");
+    }
+
+    public function testGetPhinxType()
+    {
+        if (!$this->usingMariaDbWithUuid()) {
+            $this->expectException(UnsupportedColumnTypeException::class);
+        }
+        $this->assertSame('uuid', $this->adapter->getSqlType('nativeuuid'));
     }
 }

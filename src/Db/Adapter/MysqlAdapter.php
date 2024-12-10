@@ -32,7 +32,6 @@ class MysqlAdapter extends PdoAdapter
         self::PHINX_TYPE_YEAR,
         self::PHINX_TYPE_JSON,
         self::PHINX_TYPE_BINARYUUID,
-        self::PHINX_TYPE_NATIVEUUID,
         self::PHINX_TYPE_TINYBLOB,
         self::PHINX_TYPE_MEDIUMBLOB,
         self::PHINX_TYPE_LONGBLOB,
@@ -1494,6 +1493,15 @@ class MysqlAdapter extends PdoAdapter
      */
     public function getColumnTypes(): array
     {
-        return array_merge(parent::getColumnTypes(), static::$specificColumnTypes);
+        $connection = $this->getConnection();
+        $version = $connection->getDriver()->version();
+
+        $types = array_merge(parent::getColumnTypes(), static::$specificColumnTypes);
+
+        if (version_compare($version, '10.7', '>=')) {
+            $types[] = self::PHINX_TYPE_NATIVEUUID;
+        }
+
+        return $types;
     }
 }
