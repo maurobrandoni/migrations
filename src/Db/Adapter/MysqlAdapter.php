@@ -1067,6 +1067,7 @@ class MysqlAdapter extends PdoAdapter
                         'Column type "' . $type . '" is not supported by this version of MySQL.'
                     );
                 }
+
                 return ['name' => 'uuid'];
             case static::PHINX_TYPE_YEAR:
                 if (!$limit || in_array($limit, [2, 4])) {
@@ -1510,6 +1511,7 @@ class MysqlAdapter extends PdoAdapter
     /**
      * Whether the server has a native uuid type.
      * (MariaDB 10.7.0+)
+     *
      * @return bool
      */
     protected function hasNativeUuid(): bool
