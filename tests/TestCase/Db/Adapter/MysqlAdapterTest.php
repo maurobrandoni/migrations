@@ -2552,7 +2552,7 @@ INPUT;
         $this->assertSame($expectedResponse['limit'], $result['limit'], "Field upper boundary mismatch - got '{$result['limit']}' when expecting '{$expectedResponse['limit']}'");
     }
 
-    public function testGetPhinxType()
+    public function testGetSqlType()
     {
         if (!$this->usingMariaDbWithUuid()) {
             $this->expectException(UnsupportedColumnTypeException::class);

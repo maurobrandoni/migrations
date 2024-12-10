@@ -1187,6 +1187,10 @@ class MysqlAdapter extends PdoAdapter
                     $type = static::PHINX_TYPE_BINARYUUID;
                 }
                 break;
+            case 'uuid':
+                $type = static::PHINX_TYPE_NATIVEUUID;
+                $limit = null;
+                break;
         }
 
         try {
