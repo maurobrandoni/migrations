@@ -2557,6 +2557,6 @@ INPUT;
         if (!$this->usingMariaDbWithUuid()) {
             $this->expectException(UnsupportedColumnTypeException::class);
         }
-        $this->assertSame('uuid', $this->adapter->getSqlType('nativeuuid'));
+        $this->assertSame(['name' => 'uuid'], $this->adapter->getSqlType('nativeuuid'));
     }
 }
