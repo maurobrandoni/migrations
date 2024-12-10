@@ -29,6 +29,7 @@ class SqlserverAdapter extends PdoAdapter
     protected static array $specificColumnTypes = [
         self::PHINX_TYPE_FILESTREAM,
         self::PHINX_TYPE_BINARYUUID,
+        self::PHINX_TYPE_NATIVEUUID,
     ];
 
     /**
