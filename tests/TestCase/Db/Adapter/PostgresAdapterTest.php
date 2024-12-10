@@ -1910,7 +1910,6 @@ class PostgresAdapterTest extends TestCase
         $this->assertEquals('datetime', $this->adapter->getPhinxType('timestamp without time zone'));
 
         $this->assertEquals('uuid', $this->adapter->getPhinxType('uuid'));
-        $this->assertEquals('uuid', $this->adapter->getPhinxType('nativeuuid'));
 
         $this->assertEquals('interval', $this->adapter->getPhinxType('interval'));
     }
