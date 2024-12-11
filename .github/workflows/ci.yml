@@ -57,6 +57,8 @@ jobs:
           mariadb version: '10.11.10'
           mysql database: 'cakephp_test'
           mysql root password: 'root'
+      - name: Setup MariaDB (part 2)
+        if: matrix.db-type == 'mariadb'
         run: |
           mariadb -h 127.0.0.1 -u root -proot -e 'CREATE DATABASE cakephp_comparisons;'
           mariadb -h 127.0.0.1 -u root -proot -e 'CREATE DATABASE cakephp_snapshot;'
