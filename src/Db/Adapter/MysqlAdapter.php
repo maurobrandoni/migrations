@@ -424,8 +424,9 @@ class MysqlAdapter extends PdoAdapter
 
             if ($columnInfo['Extra'] === 'auto_increment') {
                 $column->setIdentity(true);
-            }
-            if ($columnInfo['Extra'] === 'on update CURRENT_TIMESTAMP') {
+            } elseif ($columnInfo['Extra'] === 'on update CURRENT_TIMESTAMP') {
+                $column->setUpdate('CURRENT_TIMESTAMP');
+            } elseif ($columnInfo['Extra'] === 'on update current_timestamp()') {
                 $column->setUpdate('CURRENT_TIMESTAMP');
             }
 
