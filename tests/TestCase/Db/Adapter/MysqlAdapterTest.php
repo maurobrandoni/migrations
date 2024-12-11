@@ -2493,6 +2493,15 @@ INPUT;
     #[DataProvider('defaultsCastAsExpressions')]
     public function testDefaultsCastAsExpressionsForCertainTypes(string $type, string $default): void
     {
+        if ($this->usingMariaDbWithUuid() && in_array($type, [
+            MysqlAdapter::PHINX_TYPE_GEOMETRY,
+            MysqlAdapter::PHINX_TYPE_POINT,
+            MysqlAdapter::PHINX_TYPE_LINESTRING,
+            MysqlAdapter::PHINX_TYPE_POLYGON,
+        ])) {
+            $this->markTestSkipped('GIS is broken with MariaDB');
+        }
+
         $this->adapter->connect();
 
         $table = new Table('table1', ['id' => false], $this->adapter);
