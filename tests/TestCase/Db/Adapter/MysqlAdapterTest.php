@@ -80,7 +80,8 @@ class MysqlAdapterTest extends TestCase
     {
         $version = $this->adapter->getConnection()->getDriver()->version();
 
-        return version_compare($version, '8.0.0', '>=');
+        return version_compare($version, '8.0.0', '>=')
+            && version_compare($version, '10.0.0', '<');
     }
 
     private function usingMariaDbWithUuid(): bool
@@ -2495,7 +2496,7 @@ INPUT;
         $this->adapter->connect();
 
         $table = new Table('table1', ['id' => false], $this->adapter);
-        if (!$this->usingMysql8()) {
+        if (!$this->usingMysql8() && !$this->usingMariaDbWithUuid()) {
             $this->expectException(PDOException::class);
         }
         $table
@@ -2505,7 +2506,12 @@ INPUT;
         $columns = $this->adapter->getColumns('table1');
         $this->assertCount(1, $columns);
         $this->assertSame('col_1', $columns[0]->getName());
-        $this->assertSame($default, $columns[0]->getDefault());
+
+        if ($this->usingMariaDbWithUuid()) {
+            $this->assertSame("'{$default}'", $columns[0]->getDefault());
+        } else {
+            $this->assertSame($default, $columns[0]->getDefault());
+        }
     }
 
     public function testCreateTableWithPrecisionCurrentTimestamp()
