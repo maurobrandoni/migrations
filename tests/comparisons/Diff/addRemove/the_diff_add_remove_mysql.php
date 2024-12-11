@@ -5,13 +5,6 @@ use Migrations\BaseMigration;
 
 class TheDiffAddRemoveMysql extends BaseMigration
 {
-    private function isMariaDB(): bool
-    {
-        $version = $this->adapter->getConnection()->getDriver()->version();
-
-        return version_compare($version, '10.0', '>=');
-    }
-
     /**
      * Up Method.
      *
@@ -36,7 +29,7 @@ class TheDiffAddRemoveMysql extends BaseMigration
         $this->table('articles')
             ->addColumn('the_text', 'text', [
                 'after' => 'title',
-                'collation' => $this->isMariaDB() ? 'utf8mb4_unicode_520_ci' : 'utf8mb4_0900_ai_ci',
+                'collation' => 'utf8mb4_0900_ai_ci',
                 'default' => null,
                 'length' => null,
                 'null' => false,

@@ -531,11 +531,11 @@ class MysqlAdapterTest extends TestCase
         $this->assertEquals('datetime', $columns[1]->getType());
         $this->assertEquals('', $columns[1]->getUpdate());
         $this->assertFalse($columns[1]->isNull());
-        $this->assertEquals('CURRENT_TIMESTAMP', $columns[1]->getDefault());
+        $this->assertContains($columns[1]->getDefault(), ['CURRENT_TIMESTAMP', 'current_timestamp()']);
 
         $this->assertEquals('updated', $columns[2]->getName());
         $this->assertEquals('datetime', $columns[2]->getType());
-        $this->assertEquals('CURRENT_TIMESTAMP', $columns[2]->getUpdate());
+        $this->assertContains($columns[2]->getUpdate(), ['CURRENT_TIMESTAMP', 'current_timestamp()']);
         $this->assertTrue($columns[2]->isNull());
         $this->assertNull($columns[2]->getDefault());
     }
