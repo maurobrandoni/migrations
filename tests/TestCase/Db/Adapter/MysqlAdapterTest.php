@@ -76,6 +76,13 @@ class MysqlAdapterTest extends TestCase
         unset($this->adapter, $this->out, $this->io);
     }
 
+    private function getDefaultCollation(): string
+    {
+        return $this->usingMariaDbWithUuid() ?
+            'utf8mb4_general_ci' :
+            'utf8mb4_0900_ai_ci';
+    }
+
     private function usingMysql8(): bool
     {
         $version = $this->adapter->getConnection()->getDriver()->version();
@@ -427,7 +434,7 @@ class MysqlAdapterTest extends TestCase
               ->save();
         $this->assertTrue($adapter->hasTable('table_with_default_collation'));
         $row = $adapter->fetchRow(sprintf("SHOW TABLE STATUS WHERE Name = '%s'", 'table_with_default_collation'));
-        $this->assertContains($row['Collation'], ['utf8mb4_0900_ai_ci', 'utf8mb4_unicode_520_ci']);
+        $this->assertEquals($row['Collation'], $this->getDefaultCollation());
     }
 
     public function testCreateTableWithLatin1Collate()
@@ -2182,11 +2189,7 @@ class MysqlAdapterTest extends TestCase
             ->addColumn('column3', 'string', ['default' => 'test', 'null' => false])
             ->save();
 
-        if ($this->usingMariaDbWithUuid()) {
-            $collation = 'utf8mb4_unicode_520_ci';
-        } else {
-            $collation = 'utf8mb4_0900_ai_ci';
-        }
+        $collation = $this->getDefaultCollation();
 
         $expectedOutput = <<<OUTPUT
 CREATE TABLE `table1` (`id` INT(11) unsigned NOT NULL AUTO_INCREMENT, `column1` VARCHAR(255) NOT NULL, `column2` INT(11) NULL, `column3` VARCHAR(255) NOT NULL DEFAULT 'test', PRIMARY KEY (`id`)) ENGINE = InnoDB CHARACTER SET utf8mb4 COLLATE {$collation};
@@ -2293,11 +2296,7 @@ OUTPUT;
             'column2' => 1,
         ])->save();
 
-        if ($this->usingMariaDbWithUuid()) {
-            $collation = 'utf8mb4_unicode_520_ci';
-        } else {
-            $collation = 'utf8mb4_0900_ai_ci';
-        }
+        $collation = $this->getDefaultCollation();
 
         $expectedOutput = <<<OUTPUT
 CREATE TABLE `table1` (`column1` VARCHAR(255) NOT NULL, `column2` INT(11) NULL, PRIMARY KEY (`column1`)) ENGINE = InnoDB CHARACTER SET utf8mb4 COLLATE {$collation};
