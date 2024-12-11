@@ -15,6 +15,7 @@ namespace Migrations\Test\TestCase;
 
 use Cake\Core\Configure;
 use Cake\Core\Plugin;
+use Cake\Database\Driver\Mysql;
 use Cake\Database\Driver\Sqlserver;
 use Cake\Datasource\ConnectionManager;
 use Cake\TestSuite\TestCase;
@@ -232,7 +233,10 @@ class MigrationsTest extends TestCase
         $this->assertEquals($expected, $columns);
         $createdColumn = $storesTable->getSchema()->getColumn('created');
         $expected = 'CURRENT_TIMESTAMP';
-        if ($this->Connection->getDriver() instanceof Sqlserver) {
+        $driver = $this->Connection->getDriver();
+        if ($driver instanceof Mysql && $driver->isMariadb()) {
+            $expected = 'current_timestamp()';
+        } elseif ($driver instanceof Sqlserver) {
             $expected = 'getdate()';
         }
         $this->assertEquals($expected, $createdColumn['default']);

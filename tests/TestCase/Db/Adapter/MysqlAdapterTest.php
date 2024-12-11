@@ -426,7 +426,7 @@ class MysqlAdapterTest extends TestCase
               ->save();
         $this->assertTrue($adapter->hasTable('table_with_default_collation'));
         $row = $adapter->fetchRow(sprintf("SHOW TABLE STATUS WHERE Name = '%s'", 'table_with_default_collation'));
-        $this->assertEquals('utf8mb4_0900_ai_ci', $row['Collation']);
+        $this->assertContains($row['Collation'], ['utf8mb4_0900_ai_ci', 'utf8mb4_unicode_520_ci']);
     }
 
     public function testCreateTableWithLatin1Collate()
@@ -2181,8 +2181,14 @@ class MysqlAdapterTest extends TestCase
             ->addColumn('column3', 'string', ['default' => 'test', 'null' => false])
             ->save();
 
-        $expectedOutput = <<<'OUTPUT'
-CREATE TABLE `table1` (`id` INT(11) unsigned NOT NULL AUTO_INCREMENT, `column1` VARCHAR(255) NOT NULL, `column2` INT(11) NULL, `column3` VARCHAR(255) NOT NULL DEFAULT 'test', PRIMARY KEY (`id`)) ENGINE = InnoDB CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+        if ($this->usingMariaDbWithUuid()) {
+            $collation = 'utf8mb4_unicode_520_ci';
+        } else {
+            $collation = 'utf8mb4_0900_ai_ci';
+        }
+
+        $expectedOutput = <<<OUTPUT
+CREATE TABLE `table1` (`id` INT(11) unsigned NOT NULL AUTO_INCREMENT, `column1` VARCHAR(255) NOT NULL, `column2` INT(11) NULL, `column3` VARCHAR(255) NOT NULL DEFAULT 'test', PRIMARY KEY (`id`)) ENGINE = InnoDB CHARACTER SET utf8mb4 COLLATE {$collation};
 OUTPUT;
         $actualOutput = join("\n", $this->out->messages());
         $this->assertStringContainsString($expectedOutput, $actualOutput, 'Passing the --dry-run option does not dump create table query to the output');
@@ -2286,8 +2292,14 @@ OUTPUT;
             'column2' => 1,
         ])->save();
 
-        $expectedOutput = <<<'OUTPUT'
-CREATE TABLE `table1` (`column1` VARCHAR(255) NOT NULL, `column2` INT(11) NULL, PRIMARY KEY (`column1`)) ENGINE = InnoDB CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+        if ($this->usingMariaDbWithUuid()) {
+            $collation = 'utf8mb4_unicode_520_ci';
+        } else {
+            $collation = 'utf8mb4_0900_ai_ci';
+        }
+
+        $expectedOutput = <<<OUTPUT
+CREATE TABLE `table1` (`column1` VARCHAR(255) NOT NULL, `column2` INT(11) NULL, PRIMARY KEY (`column1`)) ENGINE = InnoDB CHARACTER SET utf8mb4 COLLATE {$collation};
 INSERT INTO `table1` (`column1`, `column2`) VALUES ('id1', 1);
 OUTPUT;
         $actualOutput = join("\n", $this->out->messages());
