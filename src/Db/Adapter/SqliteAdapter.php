@@ -326,8 +326,16 @@ class SqliteAdapter extends PdoAdapter
             } else {
                 $master = sprintf('%s.%s', $this->quoteColumnName($schema), 'sqlite_master');
             }
+            $rows = [];
             try {
-                $rows = $this->fetchAll(sprintf("SELECT name FROM %s WHERE type='table' AND lower(name) = %s", $master, $this->quoteString($table)));
+                $result = $this->query(
+                    "SELECT name FROM {$master} WHERE type = 'table' AND lower(name) = ?",
+                    [$table]
+                );
+                // null on error
+                if ($result !== null) {
+                    $rows = $result->fetchAll('assoc');
+                }
             } catch (PDOException $e) {
                 // an exception can occur if the schema part of the table refers to a database which is not attached
                 break;
@@ -797,19 +805,17 @@ PCRE_PATTERN;
             $state['indices'] = [];
             $state['triggers'] = [];
 
-            $rows = $this->fetchAll(
-                sprintf(
-                    "
-                        SELECT *
-                        FROM sqlite_master
-                        WHERE
-                            (`type` = 'index' OR `type` = 'trigger')
-                            AND tbl_name = %s
-                            AND sql IS NOT NULL
-                    ",
-                    $this->quoteValue($tableName)
-                )
-            );
+            $params = [$tableName];
+            $rows = $this->query(
+                "SELECT *
+                FROM sqlite_master
+                WHERE
+                    (`type` = 'index' OR `type` = 'trigger')
+                    AND tbl_name = ?
+                    AND sql IS NOT NULL
+                ",
+                $params
+            )->fetchAll('assoc');
 
             $schema = $this->getSchemaName($tableName, true)['schema'];
 
