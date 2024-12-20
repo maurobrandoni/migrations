@@ -1329,6 +1329,9 @@ class PostgresAdapter extends PdoAdapter
         if ($foreignKey->getOnUpdate()) {
             $def .= " ON UPDATE {$foreignKey->getOnUpdate()}";
         }
+        if ($foreignKey->getDeferrableMode()) {
+            $def .= " {$foreignKey->getDeferrableMode()}";
+        }
 
         return $def;
     }

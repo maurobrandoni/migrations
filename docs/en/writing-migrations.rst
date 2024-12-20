@@ -881,6 +881,7 @@ Option     Description
 update     set an action to be triggered when the row is updated
 delete     set an action to be triggered when the row is deleted
 constraint set a name to be used by foreign key constraint
+deferrable define deferred constraint application (postgres only)
 ========== ===========
 
 You can pass one or more of these options to any column with the optional
