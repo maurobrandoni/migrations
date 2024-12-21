@@ -97,4 +97,41 @@ class ForeignKeyTest extends TestCase
 
         $this->fk->setOptions(['update']);
     }
+
+    #[DataProvider('deferrableProvider')]
+    public function testDeferrableCanBeSetThroughSetters(string $dirtyValue, string $valueOfConstant): void
+    {
+        $this->fk->setDeferrableMode($dirtyValue);
+        $this->assertEquals($valueOfConstant, $this->fk->getDeferrableMode());
+    }
+
+    #[DataProvider('deferrableProvider')]
+    public function testDeferrableCanBeSetThroughOptions(string $dirtyValue, string $valueOfConstant): void
+    {
+        $this->fk->setOptions([
+            'deferrable' => $dirtyValue,
+        ]);
+        $this->assertEquals($valueOfConstant, $this->fk->getDeferrableMode());
+    }
+
+    public static function deferrableProvider(): array
+    {
+        return [
+            ['DEFERRED', ForeignKey::DEFERRED],
+            ['IMMEDIATE', ForeignKey::IMMEDIATE],
+            ['NOT_DEFERRED', ForeignKey::NOT_DEFERRED],
+            ['Deferred', ForeignKey::DEFERRED],
+            ['Immediate', ForeignKey::IMMEDIATE],
+            ['Not_deferred', ForeignKey::NOT_DEFERRED],
+            [ForeignKey::DEFERRED, ForeignKey::DEFERRED],
+            [ForeignKey::IMMEDIATE, ForeignKey::IMMEDIATE],
+            [ForeignKey::NOT_DEFERRED, ForeignKey::NOT_DEFERRED],
+        ];
+    }
+
+    public function testThrowsErrorForInvalidDeferrableValue(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->fk->setDeferrableMode('invalid_value');
+    }
 }
