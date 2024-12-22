@@ -63,14 +63,12 @@ class TheDiffSimpleMysql extends BaseMigration
 
         $this->table('articles')
             ->addForeignKey(
-                'user_id',
-                'users',
-                'id',
-                [
-                    'update' => 'RESTRICT',
-                    'delete' => 'RESTRICT',
-                    'constraint' => 'articles_ibfk_1'
-                ]
+                $this->foriegnKey('user_id')
+                    ->setReferencedTable('users')
+                    ->setReferencedColumns('id')
+                    ->setOnDelete('RESTRICT')
+                    ->setOnUpdate('RESTRICT')
+                    ->setName('articles_ibfk_1')
             )
             ->update();
     }

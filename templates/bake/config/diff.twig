@@ -14,7 +14,6 @@
 */
 #}
 {% set tables = data['fullTables'] %}
-{# unset($data['fullTables']) #}
 {% set constraints = [] %}
 {% set autoId = not Migration.hasAutoIdIncompatiblePrimaryKey(tables['add'] + tables['remove']) %}
 <?php
@@ -112,7 +111,7 @@ not empty %}
 
 {{ Migration.element(
                 'Migrations.add-foreign-keys',
-                {'constraints': tableDiff['constraints']['add'], 'table': tableName}
+                {'constraints': tableDiff['constraints']['add'], 'table': tableName, 'backend': backend}
             ) | raw -}}
 {%        endif -%}
 {%    endfor -%}

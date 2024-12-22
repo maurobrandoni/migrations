@@ -15,6 +15,7 @@ use Migrations\Db\Adapter\SqliteAdapter;
 use Migrations\Db\Adapter\SqlserverAdapter;
 use Migrations\Db\Table;
 use Migrations\Db\Table\Column;
+use Migrations\Db\Table\ForeignKey;
 use Migrations\Db\Table\Index;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -138,8 +139,9 @@ class TableTest extends TestCase
     {
         $adapter = new MysqlAdapter([]);
         $table = new Table('ntable', [], $adapter);
+        $key = new ForeignKey();
         $table->addForeignKey(
-            $table->foreignKey('user_id')
+            $key->setColumns('user_id')
                 ->setReferencedTable('users')
                 ->setReferencedColumns(['id'])
                 ->setOnDelete('CASCADE')
@@ -178,8 +180,9 @@ class TableTest extends TestCase
     {
         $adapter = new MysqlAdapter([]);
         $table = new Table('ntable', [], $adapter);
+        $key = new ForeignKey();
         $table->addForeignKeyWithName(
-            $table->foreignKey('user_id')
+            $key->setColumns('user_id')
                 ->setReferencedTable('users')
                 ->setReferencedColumns(['id'])
                 ->setOnDelete('CASCADE')

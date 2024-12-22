@@ -97,14 +97,12 @@ class TheDiffDefaultMysql extends BaseMigration
 
         $this->table('categories')
             ->addForeignKey(
-                'user_id',
-                'users',
-                'id',
-                [
-                    'update' => 'RESTRICT',
-                    'delete' => 'RESTRICT',
-                    'constraint' => 'categories_ibfk_1'
-                ]
+                $this->foriegnKey('user_id')
+                    ->setReferencedTable('users')
+                    ->setReferencedColumns('id')
+                    ->setOnDelete('RESTRICT')
+                    ->setOnUpdate('RESTRICT')
+                    ->setName('categories_ibfk_1')
             )
             ->update();
 
@@ -152,14 +150,12 @@ class TheDiffDefaultMysql extends BaseMigration
 
         $this->table('articles')
             ->addForeignKey(
-                'category_id',
-                'categories',
-                'id',
-                [
-                    'update' => 'NO_ACTION',
-                    'delete' => 'NO_ACTION',
-                    'constraint' => 'articles_ibfk_1'
-                ]
+                $this->foriegnKey('category_id')
+                    ->setReferencedTable('categories')
+                    ->setReferencedColumns('id')
+                    ->setOnDelete('NO_ACTION')
+                    ->setOnUpdate('NO_ACTION')
+                    ->setName('articles_ibfk_1')
             )
             ->update();
 
@@ -274,14 +270,12 @@ class TheDiffDefaultMysql extends BaseMigration
 
         $this->table('articles')
             ->addForeignKey(
-                'user_id',
-                'users',
-                'id',
-                [
-                    'update' => 'CASCADE',
-                    'delete' => 'CASCADE',
-                    'constraint' => 'articles_ibfk_1'
-                ]
+                $this->foriegnKey('user_id')
+                    ->setReferencedTable('users')
+                    ->setReferencedColumns('id')
+                    ->setOnDelete('CASCADE')
+                    ->setOnUpdate('CASCADE')
+                    ->setName('articles_ibfk_1')
             )
             ->update();
 

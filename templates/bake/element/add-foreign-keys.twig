@@ -22,6 +22,16 @@
         {{ statement | raw }}
 {%             set statement = null %}
 {%         endif %}
+{%         if backend == 'builtin' %}
+            ->addForeignKey(
+                $this->foriegnKey({{ columnsList | raw }})
+                    ->setReferencedTable('{{ constraint['references'][0] }}')
+                    ->setReferencedColumns({{ columnsReference | raw }})
+                    ->setOnDelete('{{ Migration.formatConstraintAction(constraint['delete']) | raw }}')
+                    ->setOnUpdate('{{ Migration.formatConstraintAction(constraint['update']) | raw }}')
+                    ->setName('{{ constraintName }}')
+            )
+{%          else %}
             ->addForeignKey(
                 {{ columnsList  | raw }},
                 '{{ constraint['references'][0] }}',
@@ -32,6 +42,7 @@
                     'constraint' => '{{ constraintName }}'
                 ]
             )
+{%          endif %}
 {%     endif %}
 {% endfor %}
 {% if Migration.wasTableStatementGeneratedFor(table) and hasProcessedConstraint %}

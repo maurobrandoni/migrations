@@ -17,6 +17,7 @@ use function Cake\Core\deprecationWarning;
  *
  * Used to define foreign keys that are added to tables as part of migrations.
  *
+ * @see \Migrations\Db\Table::foreignKey()
  * @see \Migrations\Db\Table::addForeignKey()
  */
 class ForeignKey
@@ -121,11 +122,12 @@ class ForeignKey
     /**
      * Sets the foreign key referenced columns.
      *
-     * @param string[] $referencedColumns Referenced columns
+     * @param string|string[] $referencedColumns Referenced columns
      * @return $this
      */
-    public function setReferencedColumns(array $referencedColumns)
+    public function setReferencedColumns(array|string $referencedColumns)
     {
+        $referencedColumns = is_string($referencedColumns) ? [$referencedColumns] : $referencedColumns;
         $this->referencedColumns = $referencedColumns;
 
         return $this;
