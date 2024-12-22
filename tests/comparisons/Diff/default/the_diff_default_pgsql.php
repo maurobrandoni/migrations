@@ -60,13 +60,11 @@ class TheDiffDefaultPgsql extends AbstractMigration
 
         $this->table('categories')
             ->addForeignKey(
-                'user_id',
-                'users',
-                'id',
-                [
-                    'update' => 'RESTRICT',
-                    'delete' => 'RESTRICT',
-                ]
+                $this->foreignKey('user_id')
+                    ->setReferencedTable('users')
+                    ->setReferencedColumns('id')
+                    ->setOnDelete('RESTRICT')
+                    ->setOnUpdate('RESTRICT')
             )
             ->update();
 
@@ -112,13 +110,11 @@ class TheDiffDefaultPgsql extends AbstractMigration
 
         $this->table('articles')
             ->addForeignKey(
-                'category_id',
-                'categories',
-                'id',
-                [
-                    'update' => 'NO_ACTION',
-                    'delete' => 'NO_ACTION',
-                ]
+                $this->foreignKey('category_id')
+                    ->setReferencedTable('categories')
+                    ->setReferencedColumns('id')
+                    ->setOnDelete('NO_ACTION')
+                    ->setOnUpdate('NO_ACTION')
             )
             ->update();
 
@@ -206,13 +202,11 @@ class TheDiffDefaultPgsql extends AbstractMigration
 
         $this->table('articles')
             ->addForeignKey(
-                'user_id',
-                'users',
-                'id',
-                [
-                    'update' => 'CASCADE',
-                    'delete' => 'CASCADE',
-                ]
+                $this->foreignKey('user_id')
+                    ->setReferencedTable('users')
+                    ->setReferencedColumns('id')
+                    ->setOnDelete('CASCADE')
+                    ->setOnUpdate('CASCADE')
             )
             ->update();
 

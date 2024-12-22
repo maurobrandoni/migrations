@@ -330,46 +330,40 @@ class TestSnapshotNotEmptyPgsql extends BaseMigration
 
         $this->table('articles')
             ->addForeignKey(
-                'category_id',
-                'categories',
-                'id',
-                [
-                    'update' => 'NO_ACTION',
-                    'delete' => 'NO_ACTION',
-                    'constraint' => 'articles_category_fk'
-                ]
+                $this->foreignKey('category_id')
+                    ->setReferencedTable('categories')
+                    ->setReferencedColumns('id')
+                    ->setOnDelete('NO_ACTION')
+                    ->setOnUpdate('NO_ACTION')
+                    ->setName('articles_category_fk')
             )
             ->update();
 
         $this->table('orders')
             ->addForeignKey(
-                [
-                    'product_category',
-                    'product_id',
-                ],
-                'products',
-                [
-                    'category_id',
-                    'id',
-                ],
-                [
-                    'update' => 'CASCADE',
-                    'delete' => 'CASCADE',
-                    'constraint' => 'orders_product_fk'
-                ]
+                $this->foreignKey([
+                        'product_category',
+                        'product_id',
+                    ])
+                    ->setReferencedTable('products')
+                    ->setReferencedColumns([
+                        'category_id',
+                        'id',
+                    ])
+                    ->setOnDelete('CASCADE')
+                    ->setOnUpdate('CASCADE')
+                    ->setName('orders_product_fk')
             )
             ->update();
 
         $this->table('products')
             ->addForeignKey(
-                'category_id',
-                'categories',
-                'id',
-                [
-                    'update' => 'CASCADE',
-                    'delete' => 'CASCADE',
-                    'constraint' => 'products_category_fk'
-                ]
+                $this->foreignKey('category_id')
+                    ->setReferencedTable('categories')
+                    ->setReferencedColumns('id')
+                    ->setOnDelete('CASCADE')
+                    ->setOnUpdate('CASCADE')
+                    ->setName('products_category_fk')
             )
             ->update();
     }

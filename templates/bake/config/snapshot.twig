@@ -48,7 +48,8 @@ class {{ name }} extends AbstractMigration
 {{~ element('Migrations.create-tables', {
     tables: tables,
     autoId: autoId,
-    useSchema: false
+    useSchema: false,
+    backend: backend
 })
 }}    }
 

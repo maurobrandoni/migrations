@@ -130,14 +130,12 @@ class TestSnapshotPluginBlogSqlserver extends BaseMigration
 
         $this->table('articles')
             ->addForeignKey(
-                'category_id',
-                'categories',
-                'id',
-                [
-                    'update' => 'NO_ACTION',
-                    'delete' => 'NO_ACTION',
-                    'constraint' => 'articles_category_fk'
-                ]
+                $this->foreignKey('category_id')
+                    ->setReferencedTable('categories')
+                    ->setReferencedColumns('id')
+                    ->setOnDelete('NO_ACTION')
+                    ->setOnUpdate('NO_ACTION')
+                    ->setName('articles_category_fk')
             )
             ->update();
     }

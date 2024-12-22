@@ -63,7 +63,7 @@ class TheDiffSimpleMysql extends BaseMigration
 
         $this->table('articles')
             ->addForeignKey(
-                $this->foriegnKey('user_id')
+                $this->foreignKey('user_id')
                     ->setReferencedTable('users')
                     ->setReferencedColumns('id')
                     ->setOnDelete('RESTRICT')
