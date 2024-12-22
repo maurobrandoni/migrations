@@ -24,7 +24,7 @@
 {%         endif %}
 {%         if backend == 'builtin' %}
             ->addForeignKey(
-                $this->foriegnKey({{ columnsList | raw }})
+                $this->foreignKey({{ columnsList | raw }})
                     ->setReferencedTable('{{ constraint['references'][0] }}')
                     ->setReferencedColumns({{ columnsReference | raw }})
                     ->setOnDelete('{{ Migration.formatConstraintAction(constraint['delete']) | raw }}')
