@@ -1438,73 +1438,66 @@ Let's add a foreign key to an example table:
         }
 
 "On delete" and "On update" actions are defined with a 'delete' and 'update' options array. Possibles values are 'SET_NULL', 'NO_ACTION', 'CASCADE' and 'RESTRICT'.  If 'SET_NULL' is used then the column must be created as nullable with the option ``['null' => true]``.
-Constraint name can be changed with the 'constraint' option.
 
-It is also possible to pass ``addForeignKey()`` an array of columns.
-This allows us to establish a foreign key relationship to a table which uses a combined key.
+Foreign keys can be defined with arrays of columns to build constraints between
+tables with composite keys::
 
-.. code-block:: php
+    <?php
 
-        <?php
+    use Migrations\BaseMigration;
 
-        use Migrations\BaseMigration;
-
-        class MyNewMigration extends BaseMigration
+    class MyNewMigration extends BaseMigration
+    {
+        public function up()
         {
-            /**
-             * Migrate Up.
-             */
-            public function up()
-            {
-                $table = $this->table('follower_events');
-                $table->addColumn('user_id', 'integer')
-                      ->addColumn('follower_id', 'integer')
-                      ->addColumn('event_id', 'integer')
-                      ->addForeignKey(['user_id', 'follower_id'],
-                                      'followers',
-                                      ['user_id', 'follower_id'],
-                                      ['delete'=> 'NO_ACTION', 'update'=> 'NO_ACTION', 'constraint' => 'user_follower_id'])
-                      ->save();
-            }
-
-            /**
-             * Migrate Down.
-             */
-            public function down()
-            {
-
-            }
+            $table = $this->table('follower_events');
+            $table->addColumn('user_id', 'integer')
+                ->addColumn('follower_id', 'integer')
+                ->addColumn('event_id', 'integer')
+                ->addForeignKey(
+                    ['user_id', 'follower_id'],
+                    'followers',
+                    ['user_id', 'follower_id'],
+                    [
+                        'delete'=> 'NO_ACTION',
+                        'update'=> 'NO_ACTION',
+                        'constraint' => 'user_follower_id'
+                    ]
+                )
+                ->save();
         }
+    }
 
-We can add named foreign keys using the ``constraint`` parameter.
+Using the ``foreignKey()`` method provides a fluent builder to define a foreign
+key::
 
-.. code-block:: php
+    <?php
 
-        <?php
+    use Migrations\BaseMigration;
+    use Migrations\Db\Table\ForeignKey;
 
-        use Migrations\BaseMigration;
-
-        class MyNewMigration extends BaseMigration
+    class MyNewMigration extends BaseMigration
+    {
+        /**
+         * Migrate Up.
+         */
+        public function up()
         {
-            /**
-             * Migrate Up.
-             */
-            public function up()
-            {
-                $table = $this->table('your_table');
-                $table->addForeignKey('foreign_id', 'reference_table', ['id'],
-                                    ['constraint' => 'your_foreign_key_name']);
-                      ->save();
-            }
-
-            /**
-             * Migrate Down.
-             */
-            public function down()
-            {
-
-            }
+            $table = $this->table('articles');
+            $table->addForeignKey(
+                $this->foreignKey()
+                    ->setColumns('user_id')
+                    ->setReferencedTable('users')
+                    ->setReferencedColumns('user_id')
+                    ->setDelete(ForeignKey::CASCADE)
+                    ->setName('article_user_fk')
+            )
+            ->save();
         }
+    }
+
+.. versionadded:: 4.6.0
+   The ``foreignKey`` method was added.
 
 We can also easily check if a foreign key exists:
 
