@@ -371,46 +371,40 @@ class TestSnapshotAutoIdDisabledSqlite extends BaseMigration
 
         $this->table('articles')
             ->addForeignKey(
-                'category_id',
-                'categories',
-                'id',
-                [
-                    'update' => 'NO_ACTION',
-                    'delete' => 'NO_ACTION',
-                    'constraint' => 'category_id_0_fk'
-                ]
+                $this->foreignKey('category_id')
+                    ->setReferencedTable('categories')
+                    ->setReferencedColumns('id')
+                    ->setOnDelete('NO_ACTION')
+                    ->setOnUpdate('NO_ACTION')
+                    ->setName('category_id_0_fk')
             )
             ->update();
 
         $this->table('orders')
             ->addForeignKey(
-                [
-                    'product_category',
-                    'product_id',
-                ],
-                'products',
-                [
-                    'category_id',
-                    'id',
-                ],
-                [
-                    'update' => 'CASCADE',
-                    'delete' => 'CASCADE',
-                    'constraint' => 'product_category_product_id_0_fk'
-                ]
+                $this->foreignKey([
+                        'product_category',
+                        'product_id',
+                    ])
+                    ->setReferencedTable('products')
+                    ->setReferencedColumns([
+                        'category_id',
+                        'id',
+                    ])
+                    ->setOnDelete('CASCADE')
+                    ->setOnUpdate('CASCADE')
+                    ->setName('product_category_product_id_0_fk')
             )
             ->update();
 
         $this->table('products')
             ->addForeignKey(
-                'category_id',
-                'categories',
-                'id',
-                [
-                    'update' => 'CASCADE',
-                    'delete' => 'CASCADE',
-                    'constraint' => 'category_id_0_fk'
-                ]
+                $this->foreignKey('category_id')
+                    ->setReferencedTable('categories')
+                    ->setReferencedColumns('id')
+                    ->setOnDelete('CASCADE')
+                    ->setOnUpdate('CASCADE')
+                    ->setName('category_id_0_fk')
             )
             ->update();
     }

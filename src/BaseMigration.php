@@ -17,6 +17,7 @@ use Cake\Database\Query\UpdateQuery;
 use Migrations\Config\ConfigInterface;
 use Migrations\Db\Adapter\AdapterInterface;
 use Migrations\Db\Table;
+use Migrations\Db\Table\ForeignKey;
 use RuntimeException;
 
 /**
@@ -422,6 +423,17 @@ class BaseMigration implements MigrationInterface
         $this->tables[] = $table;
 
         return $table;
+    }
+
+    /**
+     * Create a new ForeignKey object.
+     *
+     * @params string|string[] $columns Columns
+     * @return \Migrations\Db\Table\ForeignKey
+     */
+    public function foreignKey(string|array $columns): ForeignKey
+    {
+        return (new ForeignKey())->setColumns($columns);
     }
 
     /**

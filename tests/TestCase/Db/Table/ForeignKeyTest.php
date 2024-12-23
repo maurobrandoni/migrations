@@ -28,6 +28,16 @@ class ForeignKeyTest extends TestCase
         $this->assertEquals('fk_name', $this->fk->getName());
     }
 
+    public function testReferencedColumns(): void
+    {
+        $this->assertEquals([], $this->fk->getReferencedColumns());
+        $this->assertSame($this->fk, $this->fk->setReferencedColumns('user_id'));
+        $this->assertEquals(['user_id'], $this->fk->getReferencedColumns());
+
+        $this->assertSame($this->fk, $this->fk->setReferencedColumns(['user_id', 'tenant_id']));
+        $this->assertEquals(['user_id', 'tenant_id'], $this->fk->getReferencedColumns());
+    }
+
     public function testOnDeleteSetNullCanBeSetThroughOptions()
     {
         $this->assertEquals(

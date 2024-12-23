@@ -5,12 +5,15 @@
 {%     if constraint['type'] != 'unique' %}
 {%         set hasProcessedConstraint = true %}
 {%         set columnsList = '\'' ~ constraint['columns'][0] ~ '\'' %}
+{%         set storedColumnList = columnsList %}
+{%         set indent = backend == 'builtin' ? 6 : 5 %}
 {%         if constraint['columns']|length > 1 %}
-{%             set columnsList = '[' ~ Migration.stringifyList(constraint['columns'], {'indent': 5}) ~ ']' %}
+{%             set storedColumnList = '[' ~ Migration.stringifyList(constraint['columns'], {'indent': 5}) ~ ']' %}
+{%             set columnsList = '[' ~ Migration.stringifyList(constraint['columns'], {'indent': indent}) ~ ']' %}
 {%         endif %}
-{%         set record = Migration.storeReturnedData(table, columnsList) %}
+{%         set record = Migration.storeReturnedData(table, storedColumnList) %}
 {%         if constraint['references'][1] is iterable %}
-{%             set columnsReference = '[' ~ Migration.stringifyList(constraint['references'][1], {'indent': 5}) ~ ']' %}
+{%             set columnsReference = '[' ~ Migration.stringifyList(constraint['references'][1], {'indent': indent}) ~ ']' %}
 {%         else %}
 {%             set columnsReference = '\'' ~ constraint['references'][1] ~ '\'' %}
 {%         endif %}
@@ -22,6 +25,16 @@
         {{ statement | raw }}
 {%             set statement = null %}
 {%         endif %}
+{%         if backend == 'builtin' %}
+            ->addForeignKey(
+                $this->foreignKey({{ columnsList | raw }})
+                    ->setReferencedTable('{{ constraint['references'][0] }}')
+                    ->setReferencedColumns({{ columnsReference | raw }})
+                    ->setOnDelete('{{ Migration.formatConstraintAction(constraint['delete']) | raw }}')
+                    ->setOnUpdate('{{ Migration.formatConstraintAction(constraint['update']) | raw }}')
+                    ->setName('{{ constraintName }}')
+            )
+{%          else %}
             ->addForeignKey(
                 {{ columnsList  | raw }},
                 '{{ constraint['references'][0] }}',
@@ -32,6 +45,7 @@
                     'constraint' => '{{ constraintName }}'
                 ]
             )
+{%          endif %}
 {%     endif %}
 {% endfor %}
 {% if Migration.wasTableStatementGeneratedFor(table) and hasProcessedConstraint %}

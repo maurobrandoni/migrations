@@ -502,17 +502,6 @@ class Table
     }
 
     /**
-     * Create a new ForeignKey object.
-     *
-     * @params string|string[] $columns Columns
-     * @return \Migrations\Db\Table\ForeignKey
-     */
-    public function foreignKey(string|array $columns): ForeignKey
-    {
-        return (new ForeignKey())->setColumns($columns);
-    }
-
-    /**
      * Add a foreign key to a database table with a given name.
      *
      * In $options you can specify on_delete|on_delete = cascade|no_action ..,
