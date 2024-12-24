@@ -61,12 +61,8 @@ class TestSnapshotPluginBlogPgsql extends BaseMigration
                 'scale' => 6,
             ])
             ->addIndex(
-                [
-                    'title',
-                ],
-                [
-                    'name' => 'articles_title_idx',
-                ]
+                $this->index('title')
+                    ->setName('articles_title_idx')
             )
             ->create();
 
@@ -101,13 +97,9 @@ class TestSnapshotPluginBlogPgsql extends BaseMigration
                 'scale' => 6,
             ])
             ->addIndex(
-                [
-                    'slug',
-                ],
-                [
-                    'name' => 'categories_slug_unique',
-                    'unique' => true,
-                ]
+                $this->index('slug')
+                    ->setName('categories_slug_unique')
+                    ->setType('unique')
             )
             ->create();
 

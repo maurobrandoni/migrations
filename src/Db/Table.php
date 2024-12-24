@@ -33,6 +33,8 @@ use Migrations\Db\Table\Index;
 use Migrations\Db\Table\Table as TableValue;
 use RuntimeException;
 
+use function Cake\Core\deprecationWarning;
+
 /**
  * This object is based loosely on: https://api.rubyonrails.org/classes/ActiveRecord/ConnectionAdapters/Table.html.
  */
@@ -513,6 +515,8 @@ class Table
      * @param string|string[] $referencedColumns Referenced Columns
      * @param array<string, mixed> $options Options
      * @return $this
+     * @deprecated 4.6.0 Use addForeignKey() instead. Use `BaseMigration::foreignKey()` to get
+     *   a fluent interface for building foreign keys.
      */
     public function addForeignKeyWithName(
         string|ForeignKey $name,
@@ -521,6 +525,11 @@ class Table
         string|array $referencedColumns = ['id'],
         array $options = []
     ) {
+        deprecationWarning(
+            '4.6.0',
+            'Use addForeignKey() instead. Use `BaseMigration::foreignKey()` to get a fluent' .
+                ' interface for building foreign keys.'
+        );
         if (is_string($name)) {
             if ($columns === null || $referencedTable === null) {
                 throw new InvalidArgumentException(

@@ -17,7 +17,7 @@ use function Cake\Core\deprecationWarning;
  *
  * Used to define foreign keys that are added to tables as part of migrations.
  *
- * @see \Migrations\Db\Table::foreignKey()
+ * @see \Migrations\BaseMigration::foreignKey()
  * @see \Migrations\Db\Table::addForeignKey()
  */
 class ForeignKey

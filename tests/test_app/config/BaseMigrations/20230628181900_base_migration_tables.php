@@ -11,7 +11,12 @@ class BaseMigrationTables extends BaseMigration
             ->addColumn('name', 'string')
             ->addTimestamps()
             ->addPrimaryKey('id')
+            ->addIndex(
+                $this->index('name')
+                    ->setName('base_stores_name_idx')
+            )
             ->create();
+
         $io = $this->getIo();
 
         $res = $this->query('SELECT 121 as val');

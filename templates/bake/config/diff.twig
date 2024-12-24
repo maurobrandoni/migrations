@@ -99,7 +99,7 @@ not empty %}
 {{                Migration.element('Migrations.add-columns', {'columns': tableDiff['columns']['add']}) | raw -}}
 {%            endif -%}
 {%            if tableDiff['indexes']['add'] is not empty %}
-{{                Migration.element('Migrations.add-indexes', {'indexes': tableDiff['indexes']['add']}) | raw -}}
+{{                Migration.element('Migrations.add-indexes', {'backend': backend, 'indexes': tableDiff['indexes']['add']}) | raw -}}
 {%            endif -%}
 {%            if Migration.wasTableStatementGeneratedFor(tableName) %}
             ->update();
