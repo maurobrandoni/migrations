@@ -209,8 +209,8 @@ class TestSnapshotNotEmptySqlserver extends BaseMigration
             ])
             ->addIndex(
                 $this->index([
-                        'id',
                         'category_id',
+                        'id',
                     ])
                     ->setName('products_category_unique')
                     ->setType('unique')

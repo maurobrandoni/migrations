@@ -185,10 +185,10 @@ class TestSnapshotAutoIdDisabledSqlserver extends BaseMigration
             ])
             ->addIndex(
                 $this->index([
-                    'product_category',
-                    'product_id',
-                ])
-                ->setName('orders_product_category_idx')
+                        'product_category',
+                        'product_id',
+                    ])
+                    ->setName('orders_product_category_idx')
             )
             ->create();
 
@@ -322,13 +322,9 @@ class TestSnapshotAutoIdDisabledSqlserver extends BaseMigration
                 'scale' => 7,
             ])
             ->addIndex(
-                [
-                    'article_id',
-                ],
-                [
-                    'name' => 'special_tags_article_unique',
-                    'unique' => true,
-                ]
+                $this->index('article_id')
+                    ->setName('special_tags_article_unique')
+                    ->setType('unique')
             )
             ->create();
 
