@@ -78,20 +78,12 @@ class TheDiffDefaultMysql extends BaseMigration
                 'signed' => true,
             ])
             ->addIndex(
-                [
-                    'user_id',
-                ],
-                [
-                    'name' => 'categories_ibfk_1',
-                ]
+                $this->index('user_id')
+                    ->setName('categories_ibfk_1')
             )
             ->addIndex(
-                [
-                    'name',
-                ],
-                [
-                    'name' => 'name',
-                ]
+                $this->index('name')
+                    ->setName('name')
             )
             ->create();
 
@@ -123,28 +115,16 @@ class TheDiffDefaultMysql extends BaseMigration
                 'signed' => true,
             ])
             ->addIndex(
-                [
-                    'slug',
-                ],
-                [
-                    'name' => 'UNIQUE_SLUG',
-                ]
+                $this->index('slug')
+                    ->setName('UNIQUE_SLUG')
             )
             ->addIndex(
-                [
-                    'category_id',
-                ],
-                [
-                    'name' => 'category_id',
-                ]
+                $this->index('category_id')
+                    ->setName('category_id')
             )
             ->addIndex(
-                [
-                    'name',
-                ],
-                [
-                    'name' => 'rating_index',
-                ]
+                $this->index('name')
+                    ->setName('rating_index')
             )
             ->update();
 
@@ -233,29 +213,17 @@ class TheDiffDefaultMysql extends BaseMigration
             ->removeColumn('category_id')
             ->removeColumn('average_note')
             ->addIndex(
-                [
-                    'slug',
-                ],
-                [
-                    'name' => 'UNIQUE_SLUG',
-                    'unique' => true,
-                ]
+                $this->index('slug')
+                    ->setName('UNIQUE_SLUG')
+                    ->setType('unique')
             )
             ->addIndex(
-                [
-                    'rating',
-                ],
-                [
-                    'name' => 'rating_index',
-                ]
+                $this->index('rating')
+                    ->setName('rating_index')
             )
             ->addIndex(
-                [
-                    'name',
-                ],
-                [
-                    'name' => 'BY_NAME',
-                ]
+                $this->index('name')
+                    ->setName('BY_NAME')
             )
             ->update();
 

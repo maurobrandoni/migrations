@@ -169,10 +169,10 @@ class TestSnapshotAutoIdDisabledSqlite extends BaseMigration
             ])
             ->addIndex(
                 $this->index([
-                    'product_category',
-                    'product_id',
-                ])
-                ->setName('orders_product_category_idx')
+                        'product_category',
+                        'product_id',
+                    ])
+                    ->setName('orders_product_category_idx')
             )
             ->create();
 
@@ -297,7 +297,7 @@ class TestSnapshotAutoIdDisabledSqlite extends BaseMigration
             ])
             ->addIndex(
                 $this->index('article_id')
-                    ->setName('special_tags_article_idx')
+                    ->setName('special_tags_article_unique')
                     ->setType('unique')
             )
             ->create();

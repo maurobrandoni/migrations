@@ -60,20 +60,12 @@ class TestSnapshotPluginBlog extends BaseMigration
                 'null' => true,
             ])
             ->addIndex(
-                [
-                    'category_id',
-                ],
-                [
-                    'name' => 'articles_category_fk',
-                ]
+                $this->index('category_id')
+                    ->setName('articles_category_fk')
             )
             ->addIndex(
-                [
-                    'title',
-                ],
-                [
-                    'name' => 'articles_title_idx',
-                ]
+                $this->index('title')
+                    ->setName('articles_title_idx')
             )
             ->create();
 
@@ -105,13 +97,9 @@ class TestSnapshotPluginBlog extends BaseMigration
                 'null' => true,
             ])
             ->addIndex(
-                [
-                    'slug',
-                ],
-                [
-                    'name' => 'categories_slug_unique',
-                    'unique' => true,
-                ]
+                $this->index('slug')
+                    ->setName('categories_slug_unique')
+                    ->setType('unique')
             )
             ->create();
 
