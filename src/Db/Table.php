@@ -32,7 +32,6 @@ use Migrations\Db\Table\ForeignKey;
 use Migrations\Db\Table\Index;
 use Migrations\Db\Table\Table as TableValue;
 use RuntimeException;
-
 use function Cake\Core\deprecationWarning;
 
 /**
