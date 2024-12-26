@@ -446,6 +446,28 @@ class PostgresAdapterTest extends TestCase
         $this->assertStringContainsString('CREATE UNIQUE INDEX CONCURRENTLY "table1_email"', $indexQuery);
     }
 
+    public function testCreateTableIndexWithWhere(): void
+    {
+        $options = $this->adapter->getOptions();
+        $options['dryrun'] = true;
+        $this->adapter->setOptions($options);
+
+        $index = new Index();
+        $index->setColumns('email')
+            ->setType(Index::UNIQUE)
+            ->setWhere('is_verified = true');
+
+        $table = new Table('table1', [], $this->adapter);
+        $table->addColumn('email', 'string')
+              ->addColumn('is_verified', 'boolean')
+              ->addIndex($index)
+              ->save();
+        $queries = $this->out->messages();
+        $indexQuery = $queries[3];
+        $this->assertStringContainsString('CREATE UNIQUE INDEX "table1_email"', $indexQuery);
+        $this->assertStringContainsString('("email") WHERE is_verified = true', $indexQuery);
+    }
+
     public function testAddPrimaryKey()
     {
         $table = new Table('table1', ['id' => false], $this->adapter);

@@ -1288,13 +1288,17 @@ class PostgresAdapter extends PdoAdapter
         }, $columnNames);
 
         $include = $index->getInclude();
-        $includedColumns = $include ? sprintf('INCLUDE ("%s")', implode('","', $include)) : '';
+        $includedColumns = $include ? sprintf(' INCLUDE ("%s")', implode('","', $include)) : '';
 
         $createIndexSentence = 'CREATE %sINDEX%s %s ON %s ';
         if ($index->getType() === self::GIN_INDEX_TYPE) {
             $createIndexSentence .= ' USING ' . $index->getType() . '(%s) %s;';
         } else {
-            $createIndexSentence .= '(%s) %s;';
+            $createIndexSentence .= '(%s)%s%s;';
+        }
+        $where = (string)$index->getWhere();
+        if ($where) {
+            $where = ' WHERE ' . $where;
         }
 
         return sprintf(
@@ -1304,7 +1308,8 @@ class PostgresAdapter extends PdoAdapter
             $this->quoteColumnName((string)$indexName),
             $this->quoteTableName($tableName),
             implode(',', $columnNames),
-            $includedColumns
+            $includedColumns,
+            $where,
         );
     }
 

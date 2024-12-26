@@ -17,10 +17,6 @@ use RuntimeException;
  *
  * @see \Migrations\BaseMigration::index()
  * @see \Migrations\Db\Table::addIndex()
- *
- * TODO expand functionality of Index:
- * - Add ifnotexists
- * - Add where for partial indexes
  */
 class Index
 {
@@ -73,6 +69,11 @@ class Index
      * @var bool
      */
     protected bool $concurrent = false;
+
+    /**
+     * @var string|null The where clause for partial indexes.
+     */
+    protected ?string $where = null;
 
     /**
      * Sets the index columns.
@@ -246,6 +247,29 @@ class Index
     }
 
     /**
+     * Set the where clause for partial indexes.
+     *
+     * @param ?string $where The where clause for partial indexes.
+     * @return $this
+     */
+    public function setWhere(?string $where)
+    {
+        $this->where = $where;
+
+        return $this;
+    }
+
+    /**
+     * Get the where clause for partial indexes.
+     *
+     * @return ?string
+     */
+    public function getWhere(): ?string
+    {
+        return $this->where;
+    }
+
+    /**
      * Utility method that maps an array of index options to this objects methods.
      *
      * @param array<string, mixed> $options Options
@@ -255,7 +279,7 @@ class Index
     public function setOptions(array $options)
     {
         // Valid Options
-        $validOptions = ['type', 'unique', 'name', 'limit', 'order', 'include'];
+        $validOptions = ['concurrently', 'type', 'unique', 'name', 'limit', 'order', 'include', 'where'];
         foreach ($options as $option => $value) {
             if (!in_array($option, $validOptions, true)) {
                 throw new RuntimeException(sprintf('"%s" is not a valid index option.', $option));
