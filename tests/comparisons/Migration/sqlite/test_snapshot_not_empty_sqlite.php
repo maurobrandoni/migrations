@@ -56,12 +56,8 @@ class TestSnapshotNotEmptySqlite extends BaseMigration
                 'null' => true,
             ])
             ->addIndex(
-                [
-                    'title',
-                ],
-                [
-                    'name' => 'articles_title_idx',
-                ]
+                $this->index('title')
+                    ->setName('articles_title_idx')
             )
             ->create();
 
@@ -92,13 +88,9 @@ class TestSnapshotNotEmptySqlite extends BaseMigration
                 'null' => true,
             ])
             ->addIndex(
-                [
-                    'slug',
-                ],
-                [
-                    'name' => 'categories_slug_unique',
-                    'unique' => true,
-                ]
+                $this->index('slug')
+                    ->setName('categories_slug_unique')
+                    ->setType('unique')
             )
             ->create();
 
@@ -145,13 +137,11 @@ class TestSnapshotNotEmptySqlite extends BaseMigration
                 'null' => false,
             ])
             ->addIndex(
-                [
-                    'product_category',
-                    'product_id',
-                ],
-                [
-                    'name' => 'orders_product_category_idx',
-                ]
+                $this->index([
+                        'product_category',
+                        'product_id',
+                    ])
+                    ->setName('orders_product_category_idx')
             )
             ->create();
 
@@ -195,31 +185,21 @@ class TestSnapshotNotEmptySqlite extends BaseMigration
                 'null' => true,
             ])
             ->addIndex(
-                [
-                    'category_id',
-                    'id',
-                ],
-                [
-                    'name' => 'products_category_unique',
-                    'unique' => true,
-                ]
+                $this->index([
+                        'category_id',
+                        'id',
+                    ])
+                    ->setName('products_category_unique')
+                    ->setType('unique')
             )
             ->addIndex(
-                [
-                    'slug',
-                ],
-                [
-                    'name' => 'products_slug_unique',
-                    'unique' => true,
-                ]
+                $this->index('slug')
+                    ->setName('products_slug_unique')
+                    ->setType('unique')
             )
             ->addIndex(
-                [
-                    'title',
-                ],
-                [
-                    'name' => 'products_title_idx',
-                ]
+                $this->index('title')
+                    ->setName('products_title_idx')
             )
             ->create();
 
@@ -263,13 +243,9 @@ class TestSnapshotNotEmptySqlite extends BaseMigration
                 'null' => true,
             ])
             ->addIndex(
-                [
-                    'article_id',
-                ],
-                [
-                    'name' => 'special_tags_article_unique',
-                    'unique' => true,
-                ]
+                $this->index('article_id')
+                    ->setName('special_tags_article_unique')
+                    ->setType('unique')
             )
             ->create();
 

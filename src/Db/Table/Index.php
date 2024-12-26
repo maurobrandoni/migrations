@@ -10,6 +10,19 @@ namespace Migrations\Db\Table;
 
 use RuntimeException;
 
+/**
+ * Index value object
+ *
+ * Used to define indexes that are added to tables as part of migrations.
+ *
+ * @see \Migrations\BaseMigration::index()
+ * @see \Migrations\Db\Table::addIndex()
+ *
+ * TODO expand functionality of Index:
+ * - Add ifnotexists
+ * - Add nullsfirst/nullslast
+ * - Add where for partial indexes
+ */
 class Index
 {
     /**
@@ -129,6 +142,9 @@ class Index
     /**
      * Sets the index limit.
      *
+     * In MySQL indexes can have limit clauses to control the number of
+     * characters indexed in text and char columns.
+     *
      * @param int|array $limit limit value or array of limit value
      * @return $this
      */
@@ -173,7 +189,12 @@ class Index
     }
 
     /**
-     * Sets the index included columns.
+     * Sets the index included columns for a 'covering index'.
+     *
+     * In postgres and sqlserver, indexes can define additional non-key
+     * columns to build 'covering indexes'. This feature allows you to
+     * further optimize well-crafted queries that leverage specific
+     * indexes by reading all data from the index.
      *
      * @param string[] $includedColumns Columns
      * @return $this

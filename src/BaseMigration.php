@@ -18,6 +18,7 @@ use Migrations\Config\ConfigInterface;
 use Migrations\Db\Adapter\AdapterInterface;
 use Migrations\Db\Table;
 use Migrations\Db\Table\ForeignKey;
+use Migrations\Db\Table\Index;
 use RuntimeException;
 
 /**
@@ -434,6 +435,17 @@ class BaseMigration implements MigrationInterface
     public function foreignKey(string|array $columns): ForeignKey
     {
         return (new ForeignKey())->setColumns($columns);
+    }
+
+    /**
+     * Create a new Index object.
+     *
+     * @params string|string[] $columns Columns
+     * @return \Migrations\Db\Table\Index
+     */
+    public function index(string|array $columns): Index
+    {
+        return (new Index())->setColumns($columns);
     }
 
     /**

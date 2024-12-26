@@ -52,12 +52,8 @@ class TheDiffSimpleMysql extends BaseMigration
                 'signed' => false,
             ])
             ->addIndex(
-                [
-                    'user_id',
-                ],
-                [
-                    'name' => 'user_id',
-                ]
+                $this->index('user_id')
+                    ->setName('user_id')
             )
             ->update();
 
