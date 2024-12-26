@@ -16,6 +16,7 @@ use Migrations\Db\Adapter\UnsupportedColumnTypeException;
 use Migrations\Db\Literal;
 use Migrations\Db\Table;
 use Migrations\Db\Table\Column;
+use Migrations\Db\Table\Index;
 use PDO;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Depends;
@@ -403,6 +404,26 @@ class PostgresAdapterTest extends TestCase
         $this->assertTrue($this->adapter->hasIndex('table1', ['email']));
         $this->assertFalse($this->adapter->hasIndex('table1', ['email', 'user_email']));
         $this->assertTrue($this->adapter->hasIndexByName('table1', 'myemailindex'));
+    }
+
+    public function testCreateTableWithIndexNullOrdering(): void
+    {
+        $options = $this->adapter->getOptions();
+        $options['dryrun'] = true;
+        $this->adapter->setOptions($options);
+
+        $index = new Index();
+        $index->setColumns('email')
+            ->setOrder(['email' => 'ASC NULLS FIRST']);
+
+        $table = new Table('table1', [], $this->adapter);
+        $table->addColumn('email', 'string')
+              ->addIndex($index)
+              ->save();
+        $queries = $this->out->messages();
+        $indexQuery = $queries[3];
+        $this->assertStringContainsString('CREATE INDEX "table1_email"', $indexQuery);
+        $this->assertStringContainsString('("email" ASC NULLS FIRST)', $indexQuery);
     }
 
     public function testAddPrimaryKey()
