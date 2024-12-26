@@ -20,7 +20,6 @@ use RuntimeException;
  *
  * TODO expand functionality of Index:
  * - Add ifnotexists
- * - Add nullsfirst/nullslast
  * - Add where for partial indexes
  */
 class Index
@@ -69,6 +68,11 @@ class Index
      * @var string[]|null
      */
     protected ?array $includedColumns = null;
+
+    /**
+     * @var bool
+     */
+    protected bool $concurrent = false;
 
     /**
      * Sets the index columns.
@@ -214,6 +218,31 @@ class Index
     public function getInclude(): ?array
     {
         return $this->includedColumns;
+    }
+
+    /**
+     * Set the concurrent mode for an index
+     *
+     * In postgres, concurrent indexes don't take locks, but cannot be run within transactions.
+     *
+     * @param bool $value The concurrent mode for an index.
+     * @return $this
+     */
+    public function setConcurrently(bool $value)
+    {
+        $this->concurrent = $value;
+
+        return $this;
+    }
+
+    /**
+     * Get the concurrent value for an index.
+     *
+     * @return bool
+     */
+    public function getConcurrently(): bool
+    {
+        return $this->concurrent;
     }
 
     /**
