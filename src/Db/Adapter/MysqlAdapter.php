@@ -98,6 +98,7 @@ class MysqlAdapter extends PdoAdapter
      */
     public function connect(): void
     {
+
         $this->getConnection()->getDriver()->connect();
         $this->setConnection($this->getConnection());
     }
@@ -1526,6 +1527,10 @@ class MysqlAdapter extends PdoAdapter
      */
     protected function hasNativeUuid(): bool
     {
+        // Prevent infinite connect() loop when MysqlAdapter is used as a stub.
+        if ($this->connection === null || !$this->getOption('connection')) {
+            return false;
+        }
         $connection = $this->getConnection();
         $version = $connection->getDriver()->version();
 
