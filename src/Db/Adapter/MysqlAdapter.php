@@ -98,7 +98,6 @@ class MysqlAdapter extends PdoAdapter
      */
     public function connect(): void
     {
-
         $this->getConnection()->getDriver()->connect();
         $this->setConnection($this->getConnection());
     }

@@ -1249,44 +1249,62 @@ table object.
             }
         }
 
-By default Migrations instructs the database adapter to create a normal index. We
+By default Migrations instructs the database adapter to create a simple index. We
 can pass an additional parameter ``unique`` to the ``addIndex()`` method to
 specify a unique index. We can also explicitly specify a name for the index
 using the ``name`` parameter, the index columns sort order can also be specified using
-the ``order`` parameter. The order parameter takes an array of column names and sort order key/value pairs.
+the ``order`` parameter. The order parameter takes an array of column names and sort order key/value pairs::
 
-.. code-block:: php
+    <?php
 
-        <?php
+    use Migrations\BaseMigration;
 
-        use Migrations\BaseMigration;
-
-        class MyNewMigration extends BaseMigration
+    class MyNewMigration extends BaseMigration
+    {
+        /**
+         * Migrate Up.
+         */
+        public function up()
         {
-            /**
-             * Migrate Up.
-             */
-            public function up()
-            {
-                $table = $this->table('users');
-                $table->addColumn('email', 'string')
-                      ->addColumn('username','string')
-                      ->addIndex(['email', 'username'], [
-                            'unique' => true,
-                            'name' => 'idx_users_email',
-                            'order' => ['email' => 'DESC', 'username' => 'ASC']]
-                            )
-                      ->save();
-            }
-
-            /**
-             * Migrate Down.
-             */
-            public function down()
-            {
-
-            }
+            $table = $this->table('users');
+            $table->addColumn('email', 'string')
+                  ->addColumn('username','string')
+                  ->addIndex(['email', 'username'], [
+                        'unique' => true,
+                        'name' => 'idx_users_email',
+                        'order' => ['email' => 'DESC', 'username' => 'ASC']]
+                  )
+                  ->save();
         }
+    }
+
+As of 4.6.0, you can use ``BaseMigration::index()`` to get a fluent builder to
+define indexes::
+
+    <?php
+
+    use Migrations\BaseMigration;
+
+    class MyNewMigration extends BaseMigration
+    {
+        /**
+         * Migrate Up.
+         */
+        public function up()
+        {
+            $table = $this->table('users');
+            $table->addColumn('email', 'string')
+                  ->addColumn('username','string')
+                  ->addIndex(
+                      $this->index(['email', 'username'])
+                          ->setType('unique')
+                          ->setName('idx_users_email')
+                          ->setOrder(['email' => 'DESC', 'username' => 'ASC'])
+                  )
+                  ->save();
+        }
+    }
+
 
 The MySQL adapter also supports ``fulltext`` indexes. If you are using a version before 5.6 you must
 ensure the table uses the ``MyISAM`` engine.
@@ -1308,103 +1326,145 @@ ensure the table uses the ``MyISAM`` engine.
             }
         }
 
-In addition, MySQL adapter also supports setting the index length defined by limit option.
+MySQL adapter supports setting the index length defined by limit option.
 When you are using a multi-column index, you are able to define each column index length.
-The single column index can define its index length with or without defining column name in limit option.
+The single column index can define its index length with or without defining column name in limit option::
 
-.. code-block:: php
+    <?php
 
-        <?php
+    use Migrations\BaseMigration;
 
-        use Migrations\BaseMigration;
-
-        class MyNewMigration extends BaseMigration
+    class MyNewMigration extends BaseMigration
+    {
+        public function change()
         {
-            public function change()
-            {
-                $table = $this->table('users');
-                $table->addColumn('email', 'string')
-                      ->addColumn('username','string')
-                      ->addColumn('user_guid', 'string', ['limit' => 36])
-                      ->addIndex(['email','username'], ['limit' => ['email' => 5, 'username' => 2]])
-                      ->addIndex('user_guid', ['limit' => 6])
-                      ->create();
-            }
+            $table = $this->table('users');
+            $table->addColumn('email', 'string')
+                  ->addColumn('username','string')
+                  ->addColumn('user_guid', 'string', ['limit' => 36])
+                  ->addIndex(['email','username'], ['limit' => ['email' => 5, 'username' => 2]])
+                  ->addIndex('user_guid', ['limit' => 6])
+                  ->create();
         }
+    }
 
-The SQL Server and PostgreSQL adapters also supports ``include`` (non-key) columns on indexes.
+The SQL Server and PostgreSQL adapters support ``include`` (non-key) columns on indexes::
 
-.. code-block:: php
+    <?php
 
-        <?php
+    use Migrations\BaseMigration;
 
-        use Migrations\BaseMigration;
-
-        class MyNewMigration extends BaseMigration
+    class MyNewMigration extends BaseMigration
+    {
+        public function change()
         {
-            public function change()
-            {
-                $table = $this->table('users');
-                $table->addColumn('email', 'string')
-                      ->addColumn('firstname','string')
-                      ->addColumn('lastname','string')
-                      ->addIndex(['email'], ['include' => ['firstname', 'lastname']])
-                      ->create();
-            }
+            $table = $this->table('users');
+            $table->addColumn('email', 'string')
+                  ->addColumn('firstname','string')
+                  ->addColumn('lastname','string')
+                  ->addIndex(['email'], ['include' => ['firstname', 'lastname']])
+                  ->create();
         }
+    }
 
-In addition PostgreSQL adapters also supports Generalized Inverted Index ``gin`` indexes.
+PostgreSQL, SQLServer, and SQLite support partial indexes by defining where
+clauses for the index::
 
-.. code-block:: php
+    <?php
 
-        <?php
+    use Migrations\BaseMigration;
 
-        use Migrations\BaseMigration;
-
-        class MyNewMigration extends BaseMigration
+    class MyNewMigration extends BaseMigration
+    {
+        public function change()
         {
-            public function change()
-            {
-                $table = $this->table('users');
-                $table->addColumn('address', 'string')
-                      ->addIndex('address', ['type' => 'gin'])
-                      ->create();
-            }
+            $table = $this->table('users');
+            $table->addColumn('email', 'string')
+                  ->addColumn('is_verified','boolean')
+                  ->addIndex(
+                      $this->index('email')
+                          ->setName('user_email_verified_idx')
+                          ->setType('unique')
+                          ->setWhere('is_verified = true')
+                  )
+                  ->create();
         }
+    }
+
+PostgreSQL can create indexes concurrently which avoids taking disruptive locks
+during index creation::
+
+    <?php
+
+    use Migrations\BaseMigration;
+
+    class MyNewMigration extends BaseMigration
+    {
+        public function change()
+        {
+            $table = $this->table('users');
+            $table->addColumn('email', 'string')
+                  ->addIndex(
+                      $this->index('email')
+                          ->setName('user_email_unique_idx')
+                          ->setType('unique')
+                          ->setConcurrently(true)
+                  )
+                  ->create();
+        }
+    }
+
+PostgreSQL adapters also supports Generalized Inverted Index ``gin`` indexes::
+
+    <?php
+
+    use Migrations\BaseMigration;
+
+    class MyNewMigration extends BaseMigration
+    {
+        public function change()
+        {
+            $table = $this->table('users');
+            $table->addColumn('address', 'string')
+                  ->addIndex('address', ['type' => 'gin'])
+                  ->create();
+        }
+    }
 
 Removing indexes is as easy as calling the ``removeIndex()`` method. You must
-call this method for each index.
+call this method for each index::
 
-.. code-block:: php
+    <?php
 
-        <?php
+    use Migrations\BaseMigration;
 
-        use Migrations\BaseMigration;
-
-        class MyNewMigration extends BaseMigration
+    class MyNewMigration extends BaseMigration
+    {
+        /**
+         * Migrate Up.
+         */
+        public function up()
         {
-            /**
-             * Migrate Up.
-             */
-            public function up()
-            {
-                $table = $this->table('users');
-                $table->removeIndex(['email'])
-                    ->save();
+            $table = $this->table('users');
+            $table->removeIndex(['email'])
+                ->save();
 
-                // alternatively, you can delete an index by its name, ie:
-                $table->removeIndexByName('idx_users_email')
-                    ->save();
-            }
-
-            /**
-             * Migrate Down.
-             */
-            public function down()
-            {
-
-            }
+            // alternatively, you can delete an index by its name, ie:
+            $table->removeIndexByName('idx_users_email')
+                ->save();
         }
+
+        /**
+         * Migrate Down.
+         */
+        public function down()
+        {
+
+        }
+    }
+
+.. versionadded:: 4.6.0
+    ``Index::setWhere()``, and ``Index::setConcurrently()`` were added.
 
 
 Working With Foreign Keys
