@@ -324,8 +324,8 @@ WHERE t.name='ntable'");
               ->addIndex($index)
               ->save();
         $queries = $this->out->messages();
-        $indexQuery = $queries[2];
-        $this->assertStringContainsString('CREATE UNIQUE INDEX [active_email_index]', $indexQuery);
+        $indexQuery = $queries[1];
+        $this->assertStringContainsString('CREATE UNIQUE INDEX active_email_index', $indexQuery);
         $this->assertStringContainsString('([email]) WHERE is_verified = true', $indexQuery);
     }
 
