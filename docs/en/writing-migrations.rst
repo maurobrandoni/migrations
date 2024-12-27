@@ -746,13 +746,22 @@ Column types are specified as strings and can be one of:
 -  time
 -  timestamp
 -  uuid
+-  binaryuuid
+-  nativeuuid
 
-In addition, the MySQL adapter supports ``enum``, ``set``, ``blob``, ``tinyblob``, ``mediumblob``, ``longblob``, ``bit`` and ``json`` column types
-(``json`` in MySQL 5.7 and above). When providing a limit value and using ``binary``, ``varbinary`` or ``blob`` and its subtypes, the retained column
-type will be based on required length (see `Limit Option and MySQL`_ for details);
+In addition, the MySQL adapter supports ``enum``, ``set``, ``blob``,
+``tinyblob``, ``mediumblob``, ``longblob``, ``bit`` and ``json`` column types
+(``json`` in MySQL 5.7 and above). When providing a limit value and using
+``binary``, ``varbinary`` or ``blob`` and its subtypes, the retained column type
+will be based on required length (see `Limit Option and MySQL`_ for details).
 
-In addition, the Postgres adapter supports ``interval``, ``json``, ``jsonb``, ``uuid``, ``cidr``, ``inet`` and ``macaddr`` column types
-(PostgreSQL 9.3 and above).
+With most adapters, the ``uuid`` and ``nativeuuid`` column types are aliases,
+however with the MySQL adapter + MariaDB, the ``nativeuuid`` type maps to
+a native uuid column instead of ``CHAR(36)`` like ``uuid`` does.
+
+In addition, the Postgres adapter supports ``interval``, ``json``, ``jsonb``,
+``uuid``, ``cidr``, ``inet`` and ``macaddr`` column types (PostgreSQL 9.3 and
+above).
 
 Valid Column Options
 --------------------
@@ -812,14 +821,14 @@ update   set an action to be triggered when the row is updated (use with ``CURRE
 timezone enable or disable the ``with time zone`` option for ``time`` and ``timestamp`` columns *(only applies to Postgres)*
 ======== ===========
 
-You can add ``created_at`` and ``updated_at`` timestamps to a table using the ``addTimestamps()`` method. This method accepts
+You can add ``created`` and ``updated`` timestamps to a table using the ``addTimestamps()`` method. This method accepts
 three arguments, where the first two allow setting alternative names for the columns while the third argument allows you to
-enable the ``timezone`` option for the columns. The defaults for these arguments are ``created_at``, ``updated_at``, and ``false``
+enable the ``timezone`` option for the columns. The defaults for these arguments are ``created``, ``updated``, and ``false``
 respectively. For the first and second argument, if you provide ``null``, then the default name will be used, and if you provide
 ``false``, then that column will not be created. Please note that attempting to set both to ``false`` will throw a
 ``\RuntimeException``. Additionally, you can use the ``addTimestampsWithTimezone()`` method, which is an alias to
-``addTimestamps()`` that will always set the third argument to ``true`` (see examples below). The ``created_at`` column will
-have a default set to ``CURRENT_TIMESTAMP``. For MySQL only, ``update_at`` column will have update set to
+``addTimestamps()`` that will always set the third argument to ``true`` (see examples below). The ``created`` column will
+have a default set to ``CURRENT_TIMESTAMP``. For MySQL only, ``updated`` column will have update set to
 ``CURRENT_TIMESTAMP``.
 
 .. code-block:: php
