@@ -29,7 +29,7 @@ class TheDiffAddRemoveMysql extends BaseMigration
         $this->table('articles')
             ->addColumn('the_text', 'text', [
                 'after' => 'title',
-                'collation' => 'utf8mb4_0900_ai_ci',
+                'collation' => 'utf8mb4_unicode_520_ci',
                 'default' => null,
                 'length' => null,
                 'null' => false,

@@ -424,8 +424,9 @@ class MysqlAdapter extends PdoAdapter
 
             if ($columnInfo['Extra'] === 'auto_increment') {
                 $column->setIdentity(true);
-            }
-            if ($columnInfo['Extra'] === 'on update CURRENT_TIMESTAMP') {
+            } elseif ($columnInfo['Extra'] === 'on update CURRENT_TIMESTAMP') {
+                $column->setUpdate('CURRENT_TIMESTAMP');
+            } elseif ($columnInfo['Extra'] === 'on update current_timestamp()') {
                 $column->setUpdate('CURRENT_TIMESTAMP');
             }
 
@@ -1071,6 +1072,14 @@ class MysqlAdapter extends PdoAdapter
                 return ['name' => 'tinyint', 'limit' => 1];
             case static::PHINX_TYPE_UUID:
                 return ['name' => 'char', 'limit' => 36];
+            case static::PHINX_TYPE_NATIVEUUID:
+                if (!$this->hasNativeUuid()) {
+                    throw new UnsupportedColumnTypeException(
+                        'Column type "' . $type . '" is not supported by this version of MySQL.'
+                    );
+                }
+
+                return ['name' => 'uuid'];
             case static::PHINX_TYPE_YEAR:
                 if (!$limit || in_array($limit, [2, 4])) {
                     $limit = 4;
@@ -1188,6 +1197,10 @@ class MysqlAdapter extends PdoAdapter
                 if ($limit === 16) {
                     $type = static::PHINX_TYPE_BINARYUUID;
                 }
+                break;
+            case 'uuid':
+                $type = static::PHINX_TYPE_NATIVEUUID;
+                $limit = null;
                 break;
         }
 
@@ -1496,6 +1509,26 @@ class MysqlAdapter extends PdoAdapter
      */
     public function getColumnTypes(): array
     {
-        return array_merge(parent::getColumnTypes(), static::$specificColumnTypes);
+        $types = array_merge(parent::getColumnTypes(), static::$specificColumnTypes);
+
+        if ($this->hasNativeUuid()) {
+            $types[] = self::PHINX_TYPE_NATIVEUUID;
+        }
+
+        return $types;
+    }
+
+    /**
+     * Whether the server has a native uuid type.
+     * (MariaDB 10.7.0+)
+     *
+     * @return bool
+     */
+    protected function hasNativeUuid(): bool
+    {
+        $connection = $this->getConnection();
+        $version = $connection->getDriver()->version();
+
+        return version_compare($version, '10.7', '>=');
     }
 }

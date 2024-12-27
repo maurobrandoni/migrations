@@ -39,6 +39,7 @@ class PostgresAdapter extends PdoAdapter
         self::PHINX_TYPE_MACADDR,
         self::PHINX_TYPE_INTERVAL,
         self::PHINX_TYPE_BINARYUUID,
+        self::PHINX_TYPE_NATIVEUUID,
     ];
 
     private const GIN_INDEX_TYPE = 'gin';
@@ -547,7 +548,7 @@ class PostgresAdapter extends PdoAdapter
                 $quotedColumnName
             );
         }
-        if ($newColumn->getType() === 'uuid') {
+        if (in_array($newColumn->getType(), ['uuid', 'nativeuuid', 'binaryuuid'])) {
             $sql .= sprintf(
                 ' USING (%s::uuid)',
                 $quotedColumnName
@@ -1028,6 +1029,7 @@ class PostgresAdapter extends PdoAdapter
             case static::PHINX_TYPE_DATETIME:
                 return ['name' => 'timestamp'];
             case static::PHINX_TYPE_BINARYUUID:
+            case static::PHINX_TYPE_NATIVEUUID:
                 return ['name' => 'uuid'];
             case static::PHINX_TYPE_BLOB:
             case static::PHINX_TYPE_BINARY:

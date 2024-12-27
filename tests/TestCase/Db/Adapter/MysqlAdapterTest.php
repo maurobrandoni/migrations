@@ -12,6 +12,7 @@ use Cake\Datasource\ConnectionManager;
 use InvalidArgumentException;
 use Migrations\Db\Adapter\AdapterInterface;
 use Migrations\Db\Adapter\MysqlAdapter;
+use Migrations\Db\Adapter\UnsupportedColumnTypeException;
 use Migrations\Db\Literal;
 use Migrations\Db\Table;
 use Migrations\Db\Table\Column;
@@ -75,11 +76,26 @@ class MysqlAdapterTest extends TestCase
         unset($this->adapter, $this->out, $this->io);
     }
 
+    private function getDefaultCollation(): string
+    {
+        return $this->usingMariaDbWithUuid() ?
+            'utf8mb4_general_ci' :
+            'utf8mb4_0900_ai_ci';
+    }
+
     private function usingMysql8(): bool
     {
         $version = $this->adapter->getConnection()->getDriver()->version();
 
-        return version_compare($version, '8.0.0', '>=');
+        return version_compare($version, '8.0.0', '>=')
+            && version_compare($version, '10.0.0', '<');
+    }
+
+    private function usingMariaDbWithUuid(): bool
+    {
+        $version = $this->adapter->getConnection()->getDriver()->version();
+
+        return version_compare($version, '10.7.0', '>=');
     }
 
     public function testConnection()
@@ -329,6 +345,27 @@ class MysqlAdapterTest extends TestCase
         $this->assertTrue($this->adapter->hasColumn('ztable', 'user_id'));
     }
 
+    /**
+     * @return void
+     */
+    public function testCreateTableWithPrimaryKeyAsNativeUuid()
+    {
+        if (!$this->usingMariaDbWithUuid()) {
+            $this->markTestSkipped('Database does not have a native uuid type');
+        }
+
+        $options = [
+            'id' => false,
+            'primary_key' => 'id',
+        ];
+        $table = new Table('ztable', $options, $this->adapter);
+        $table->addColumn('id', 'nativeuuid', ['null' => false])->save();
+        $table->addColumn('user_id', 'integer')->save();
+        $this->assertTrue($this->adapter->hasColumn('ztable', 'id'));
+        $this->assertTrue($this->adapter->hasIndex('ztable', 'id'));
+        $this->assertTrue($this->adapter->hasColumn('ztable', 'user_id'));
+    }
+
     public function testCreateTableWithMultipleIndexes()
     {
         $table = new Table('table1', [], $this->adapter);
@@ -397,7 +434,7 @@ class MysqlAdapterTest extends TestCase
               ->save();
         $this->assertTrue($adapter->hasTable('table_with_default_collation'));
         $row = $adapter->fetchRow(sprintf("SHOW TABLE STATUS WHERE Name = '%s'", 'table_with_default_collation'));
-        $this->assertEquals('utf8mb4_0900_ai_ci', $row['Collation']);
+        $this->assertEquals($row['Collation'], $this->getDefaultCollation());
     }
 
     public function testCreateTableWithLatin1Collate()
@@ -502,11 +539,11 @@ class MysqlAdapterTest extends TestCase
         $this->assertEquals('datetime', $columns[1]->getType());
         $this->assertEquals('', $columns[1]->getUpdate());
         $this->assertFalse($columns[1]->isNull());
-        $this->assertEquals('CURRENT_TIMESTAMP', $columns[1]->getDefault());
+        $this->assertContains($columns[1]->getDefault(), ['CURRENT_TIMESTAMP', 'current_timestamp()']);
 
         $this->assertEquals('updated', $columns[2]->getName());
         $this->assertEquals('datetime', $columns[2]->getType());
-        $this->assertEquals('CURRENT_TIMESTAMP', $columns[2]->getUpdate());
+        $this->assertContains($columns[2]->getUpdate(), ['CURRENT_TIMESTAMP', 'current_timestamp()']);
         $this->assertTrue($columns[2]->isNull());
         $this->assertNull($columns[2]->getDefault());
     }
@@ -2152,8 +2189,10 @@ class MysqlAdapterTest extends TestCase
             ->addColumn('column3', 'string', ['default' => 'test', 'null' => false])
             ->save();
 
-        $expectedOutput = <<<'OUTPUT'
-CREATE TABLE `table1` (`id` INT(11) unsigned NOT NULL AUTO_INCREMENT, `column1` VARCHAR(255) NOT NULL, `column2` INT(11) NULL, `column3` VARCHAR(255) NOT NULL DEFAULT 'test', PRIMARY KEY (`id`)) ENGINE = InnoDB CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+        $collation = $this->getDefaultCollation();
+
+        $expectedOutput = <<<OUTPUT
+CREATE TABLE `table1` (`id` INT(11) unsigned NOT NULL AUTO_INCREMENT, `column1` VARCHAR(255) NOT NULL, `column2` INT(11) NULL, `column3` VARCHAR(255) NOT NULL DEFAULT 'test', PRIMARY KEY (`id`)) ENGINE = InnoDB CHARACTER SET utf8mb4 COLLATE {$collation};
 OUTPUT;
         $actualOutput = join("\n", $this->out->messages());
         $this->assertStringContainsString($expectedOutput, $actualOutput, 'Passing the --dry-run option does not dump create table query to the output');
@@ -2257,8 +2296,10 @@ OUTPUT;
             'column2' => 1,
         ])->save();
 
-        $expectedOutput = <<<'OUTPUT'
-CREATE TABLE `table1` (`column1` VARCHAR(255) NOT NULL, `column2` INT(11) NULL, PRIMARY KEY (`column1`)) ENGINE = InnoDB CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+        $collation = $this->getDefaultCollation();
+
+        $expectedOutput = <<<OUTPUT
+CREATE TABLE `table1` (`column1` VARCHAR(255) NOT NULL, `column2` INT(11) NULL, PRIMARY KEY (`column1`)) ENGINE = InnoDB CHARACTER SET utf8mb4 COLLATE {$collation};
 INSERT INTO `table1` (`column1`, `column2`) VALUES ('id1', 1);
 OUTPUT;
         $actualOutput = join("\n", $this->out->messages());
@@ -2451,10 +2492,21 @@ INPUT;
     #[DataProvider('defaultsCastAsExpressions')]
     public function testDefaultsCastAsExpressionsForCertainTypes(string $type, string $default): void
     {
+        if (
+            $this->usingMariaDbWithUuid() && in_array($type, [
+            MysqlAdapter::PHINX_TYPE_GEOMETRY,
+            MysqlAdapter::PHINX_TYPE_POINT,
+            MysqlAdapter::PHINX_TYPE_LINESTRING,
+            MysqlAdapter::PHINX_TYPE_POLYGON,
+            ])
+        ) {
+            $this->markTestSkipped('GIS is broken with MariaDB');
+        }
+
         $this->adapter->connect();
 
         $table = new Table('table1', ['id' => false], $this->adapter);
-        if (!$this->usingMysql8()) {
+        if (!$this->usingMysql8() && !$this->usingMariaDbWithUuid()) {
             $this->expectException(PDOException::class);
         }
         $table
@@ -2464,7 +2516,12 @@ INPUT;
         $columns = $this->adapter->getColumns('table1');
         $this->assertCount(1, $columns);
         $this->assertSame('col_1', $columns[0]->getName());
-        $this->assertSame($default, $columns[0]->getDefault());
+
+        if ($this->usingMariaDbWithUuid()) {
+            $this->assertSame("'{$default}'", $columns[0]->getDefault());
+        } else {
+            $this->assertSame($default, $columns[0]->getDefault());
+        }
     }
 
     public function testCreateTableWithPrecisionCurrentTimestamp()
@@ -2521,5 +2578,13 @@ INPUT;
 
         $this->assertSame($expectedResponse['name'], $result['name'], "Type mismatch - got '{$result['name']}' when expecting '{$expectedResponse['name']}'");
         $this->assertSame($expectedResponse['limit'], $result['limit'], "Field upper boundary mismatch - got '{$result['limit']}' when expecting '{$expectedResponse['limit']}'");
+    }
+
+    public function testGetSqlType()
+    {
+        if (!$this->usingMariaDbWithUuid()) {
+            $this->expectException(UnsupportedColumnTypeException::class);
+        }
+        $this->assertSame(['name' => 'uuid'], $this->adapter->getSqlType('nativeuuid'));
     }
 }

@@ -343,6 +343,23 @@ class PostgresAdapterTest extends TestCase
         $this->assertTrue($this->adapter->hasColumn('ztable', 'user_id'));
     }
 
+    /**
+     * @return void
+     */
+    public function testCreateTableWithPrimaryKeyAsNativeUuid()
+    {
+        $options = [
+            'id' => false,
+            'primary_key' => 'id',
+        ];
+        $table = new Table('ztable', $options, $this->adapter);
+        $table->addColumn('id', 'nativeuuid')->save();
+        $table->addColumn('user_id', 'integer')->save();
+        $this->assertTrue($this->adapter->hasColumn('ztable', 'id'));
+        $this->assertTrue($this->adapter->hasIndex('ztable', 'id'));
+        $this->assertTrue($this->adapter->hasColumn('ztable', 'user_id'));
+    }
+
     public function testCreateTableWithMultipleIndexes()
     {
         $table = new Table('table1', [], $this->adapter);
@@ -1054,6 +1071,24 @@ class PostgresAdapterTest extends TestCase
         $table->addColumn('column1', 'char', ['default' => null, 'limit' => 36])
               ->save();
         $table->changeColumn('column1', 'uuid', ['default' => null, 'null' => true])
+        ->save();
+        $columns = $this->adapter->getColumns('t');
+        foreach ($columns as $column) {
+            if ($column->getName() === 'column1') {
+                $this->assertTrue($column->isNull());
+                $this->assertNull($column->getDefault());
+                $columnType = $table->getColumn('column1')->getType();
+                $this->assertSame($columnType, 'uuid');
+            }
+        }
+    }
+
+    public function testChangeColumnCharToNativeUuid()
+    {
+        $table = new Table('t', [], $this->adapter);
+        $table->addColumn('column1', 'char', ['default' => null, 'limit' => 36])
+              ->save();
+        $table->changeColumn('column1', 'nativeuuid', ['default' => null, 'null' => true])
         ->save();
         $columns = $this->adapter->getColumns('t');
         foreach ($columns as $column) {

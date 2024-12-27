@@ -20,7 +20,7 @@ jobs:
       fail-fast: false
       matrix:
         php-version: ['8.1', '8.2', '8.3', '8.4']
-        db-type: [mysql, pgsql, sqlite]
+        db-type: [mariadb, mysql, pgsql, sqlite]
         prefer-lowest: ['']
         cake_version: ['']
         include:
@@ -51,6 +51,19 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+
+      - name: Setup MariaDB
+        uses: getong/mariadb-action@v1.11
+        if: matrix.db-type == 'mariadb'
+        with:
+          mariadb version: '10.11.10'
+          mysql database: 'cakephp_test'
+          mysql root password: 'root'
+      - name: Setup MariaDB (part 2)
+        if: matrix.db-type == 'mariadb'
+        run: |
+          mysql -h 127.0.0.1 -u root -proot -e 'CREATE DATABASE cakephp_comparisons;'
+          mysql -h 127.0.0.1 -u root -proot -e 'CREATE DATABASE cakephp_snapshot;'
 
       - name: Setup MySQL
         if: matrix.db-type == 'mysql'
@@ -107,6 +120,12 @@ jobs:
         run: |
           if [[ ${{ matrix.db-type }} == 'sqlite' ]]; then
             export DB='sqlite'
+          fi
+          if [[ ${{ matrix.db-type }} == 'mariadb' ]]; then
+            export DB='mysql'
+            export DB_URL='mysql://root:root@127.0.0.1/cakephp_test'
+            export DB_URL_COMPARE='mysql://root:root@127.0.0.1/cakephp_comparisons'
+            export DB_URL_SNAPSHOT='mysql://root:root@127.0.0.1/cakephp_snapshot'
           fi
           if [[ ${{ matrix.db-type }} == 'mysql' ]]; then
             export DB='mysql'
