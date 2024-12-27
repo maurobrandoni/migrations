@@ -35,6 +35,13 @@ use RuntimeException;
 use function Cake\Core\deprecationWarning;
 
 /**
+ * Migration Table
+ *
+ * Table instances allow you to define schema changes
+ * to be made on a table. You can manipulate columns,
+ * indexes and foreign keys. You can also manipulate table
+ * data with row operations.
+ *
  * This object is based loosely on: https://api.rubyonrails.org/classes/ActiveRecord/ConnectionAdapters/Table.html.
  */
 class Table

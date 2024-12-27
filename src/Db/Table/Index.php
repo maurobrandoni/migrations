@@ -17,11 +17,6 @@ use RuntimeException;
  *
  * @see \Migrations\BaseMigration::index()
  * @see \Migrations\Db\Table::addIndex()
- *
- * TODO expand functionality of Index:
- * - Add ifnotexists
- * - Add nullsfirst/nullslast
- * - Add where for partial indexes
  */
 class Index
 {
@@ -69,6 +64,16 @@ class Index
      * @var string[]|null
      */
     protected ?array $includedColumns = null;
+
+    /**
+     * @var bool
+     */
+    protected bool $concurrent = false;
+
+    /**
+     * @var string|null The where clause for partial indexes.
+     */
+    protected ?string $where = null;
 
     /**
      * Sets the index columns.
@@ -217,6 +222,54 @@ class Index
     }
 
     /**
+     * Set the concurrent mode for an index
+     *
+     * In postgres, concurrent indexes don't take locks, but cannot be run within transactions.
+     *
+     * @param bool $value The concurrent mode for an index.
+     * @return $this
+     */
+    public function setConcurrently(bool $value)
+    {
+        $this->concurrent = $value;
+
+        return $this;
+    }
+
+    /**
+     * Get the concurrent value for an index.
+     *
+     * @return bool
+     */
+    public function getConcurrently(): bool
+    {
+        return $this->concurrent;
+    }
+
+    /**
+     * Set the where clause for partial indexes.
+     *
+     * @param ?string $where The where clause for partial indexes.
+     * @return $this
+     */
+    public function setWhere(?string $where)
+    {
+        $this->where = $where;
+
+        return $this;
+    }
+
+    /**
+     * Get the where clause for partial indexes.
+     *
+     * @return ?string
+     */
+    public function getWhere(): ?string
+    {
+        return $this->where;
+    }
+
+    /**
      * Utility method that maps an array of index options to this objects methods.
      *
      * @param array<string, mixed> $options Options
@@ -226,7 +279,7 @@ class Index
     public function setOptions(array $options)
     {
         // Valid Options
-        $validOptions = ['type', 'unique', 'name', 'limit', 'order', 'include'];
+        $validOptions = ['concurrently', 'type', 'unique', 'name', 'limit', 'order', 'include', 'where'];
         foreach ($options as $option => $value) {
             if (!in_array($option, $validOptions, true)) {
                 throw new RuntimeException(sprintf('"%s" is not a valid index option.', $option));

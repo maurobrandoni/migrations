@@ -18,6 +18,7 @@ use Migrations\Db\Literal;
 use Migrations\Db\Table;
 use Migrations\Db\Table\Column;
 use Migrations\Db\Table\ForeignKey;
+use Migrations\Db\Table\Index;
 use PDOException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -356,6 +357,28 @@ class SqliteAdapterTest extends TestCase
             'CONSTRAINT `fk_master_id` FOREIGN KEY (`master_id`) REFERENCES `tbl_master` (`id`) ON DELETE NO ACTION ON UPDATE NO ACTION',
             $row['sql']
         );
+    }
+
+    public function testCreateTableIndexWithWhere(): void
+    {
+        $options = $this->adapter->getOptions();
+        $options['dryrun'] = true;
+        $this->adapter->setOptions($options);
+
+        $index = new Index();
+        $index->setColumns('email')
+            ->setType(Index::UNIQUE)
+            ->setWhere('is_verified = true');
+
+        $table = new Table('table1', [], $this->adapter);
+        $table->addColumn('email', 'string')
+              ->addColumn('is_verified', 'boolean')
+              ->addIndex($index)
+              ->save();
+        $queries = $this->out->messages();
+        $indexQuery = $queries[2];
+        $this->assertStringContainsString('CREATE UNIQUE INDEX `table1_email_index`', $indexQuery);
+        $this->assertStringContainsString('(`email` ASC) WHERE is_verified = true', $indexQuery);
     }
 
     public function testAddPrimaryKey()

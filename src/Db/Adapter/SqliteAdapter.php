@@ -1378,11 +1378,16 @@ PCRE_PATTERN;
             $indexColumnArray[] = sprintf('`%s` ASC', $column);
         }
         $indexColumns = implode(',', $indexColumnArray);
+        $where = (string)$index->getWhere();
+        if ($where) {
+            $where = ' WHERE ' . $where;
+        }
         $sql = sprintf(
-            'CREATE %s ON %s (%s)',
+            'CREATE %s ON %s (%s)%s',
             $this->getIndexSqlDefinition($table, $index),
             $this->quoteTableName($table->getName()),
-            $indexColumns
+            $indexColumns,
+            $where
         );
 
         return new AlterInstructions([], [$sql]);

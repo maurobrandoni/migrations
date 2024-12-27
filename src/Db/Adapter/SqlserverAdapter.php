@@ -1201,15 +1201,20 @@ SQL;
         }, $columnNames);
 
         $include = $index->getInclude();
-        $includedColumns = $include ? sprintf('INCLUDE ([%s])', implode('],[', $include)) : '';
+        $includedColumns = $include ? sprintf(' INCLUDE ([%s])', implode('],[', $include)) : '';
+        $where = (string)$index->getWhere();
+        if ($where) {
+            $where = ' WHERE ' . $where;
+        }
 
         return sprintf(
-            'CREATE %s INDEX %s ON %s (%s) %s;',
+            'CREATE %s INDEX %s ON %s (%s)%s%s;',
             ($index->getType() === Index::UNIQUE ? 'UNIQUE' : ''),
             $indexName,
             $this->quoteTableName($tableName),
             implode(',', $columnNames),
-            $includedColumns
+            $includedColumns,
+            $where
         );
     }
 

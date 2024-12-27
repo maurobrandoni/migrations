@@ -21,9 +21,13 @@ use Phinx\Db\Table\Column;
 use Phinx\Util\Literal;
 
 /**
- * TODO figure out how to update this for built-in backend.
+ * Migration Table
+ *
+ * This class enhances the phinx provided Table class
+ * with additional CakePHP related logic.
  *
  * @method \Migrations\CakeAdapter getAdapter()
+ * @deprecated 4.6.0 Use \Migrations\Db\Table instead with the builtin backend.
  */
 class Table extends BaseTable
 {
