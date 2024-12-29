@@ -210,7 +210,9 @@ class SqliteAdapter extends PdoAdapter
      */
     public function quoteTableName($tableName): string
     {
-        return str_replace('.', '`.`', $this->quoteColumnName($tableName));
+        $driver = $this->getConnection()->getDriver();
+
+        return $driver->quoteIdentifier($tableName);
     }
 
     /**
@@ -218,6 +220,9 @@ class SqliteAdapter extends PdoAdapter
      */
     public function quoteColumnName($columnName): string
     {
+        // $driver = $this->getConnection()->getDriver();
+
+        // return $driver->quoteIdentifier($columnName);
         return '`' . str_replace('`', '``', $columnName) . '`';
     }
 

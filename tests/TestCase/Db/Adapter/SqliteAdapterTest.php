@@ -138,7 +138,7 @@ class SqliteAdapterTest extends TestCase
 
     public function testQuoteTableName()
     {
-        $this->assertEquals('`test_table`', $this->adapter->quoteTableName('test_table'));
+        $this->assertEquals('"test_table"', $this->adapter->quoteTableName('test_table'));
     }
 
     public function testQuoteColumnName()
@@ -327,7 +327,7 @@ class SqliteAdapterTest extends TestCase
             "SELECT * FROM sqlite_master WHERE `type` = 'table' AND `tbl_name` = 'tbl_child'"
         );
         $this->assertStringContainsString(
-            'CONSTRAINT `fk_master_id` FOREIGN KEY (`master_id`) REFERENCES `tbl_master` (`id`) ON DELETE NO ACTION ON UPDATE NO ACTION',
+            'CONSTRAINT `fk_master_id` FOREIGN KEY (`master_id`) REFERENCES "tbl_master" (`id`) ON DELETE NO ACTION ON UPDATE NO ACTION',
             $row['sql']
         );
     }
@@ -354,7 +354,7 @@ class SqliteAdapterTest extends TestCase
             "SELECT * FROM sqlite_master WHERE `type` = 'table' AND `tbl_name` = 'tbl_child'"
         );
         $this->assertStringContainsString(
-            'CONSTRAINT `fk_master_id` FOREIGN KEY (`master_id`) REFERENCES `tbl_master` (`id`) ON DELETE NO ACTION ON UPDATE NO ACTION',
+            'CONSTRAINT `fk_master_id` FOREIGN KEY (`master_id`) REFERENCES "tbl_master" (`id`) ON DELETE NO ACTION ON UPDATE NO ACTION',
             $row['sql']
         );
     }
@@ -1907,7 +1907,7 @@ class SqliteAdapterTest extends TestCase
             ->save();
 
         $expectedOutput = <<<'OUTPUT'
-CREATE TABLE `table1` (`id` INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, `column1` VARCHAR NOT NULL, `column2` INTEGER NULL, `column3` VARCHAR NULL DEFAULT 'test');
+CREATE TABLE "table1" (`id` INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, `column1` VARCHAR NOT NULL, `column2` INTEGER NULL, `column3` VARCHAR NULL DEFAULT 'test');
 OUTPUT;
         $actualOutput = join("\n", $this->out->messages());
         $this->assertStringContainsString($expectedOutput, $actualOutput, 'Passing the --dry-run option does not dump create table query to the output');
@@ -1939,9 +1939,9 @@ OUTPUT;
         ]);
 
         $expectedOutput = <<<'OUTPUT'
-INSERT INTO `table1` (`string_col`) VALUES ('test data');
-INSERT INTO `table1` (`string_col`) VALUES (null);
-INSERT INTO `table1` (`int_col`) VALUES (23);
+INSERT INTO "table1" (`string_col`) VALUES ('test data');
+INSERT INTO "table1" (`string_col`) VALUES (null);
+INSERT INTO "table1" (`int_col`) VALUES (23);
 OUTPUT;
         $actualOutput = join("\n", $this->out->messages());
         $actualOutput = preg_replace("/\r\n|\r/", "\n", $actualOutput); // normalize line endings for Windows
@@ -1978,7 +1978,7 @@ OUTPUT;
         ]);
 
         $expectedOutput = <<<'OUTPUT'
-INSERT INTO `table1` (`string_col`, `int_col`) VALUES ('test_data1', 23), (null, 42);
+INSERT INTO "table1" (`string_col`, `int_col`) VALUES ('test_data1', 23), (null, 42);
 OUTPUT;
         $actualOutput = join("\n", $this->out->messages());
         $this->assertStringContainsString($expectedOutput, $actualOutput, 'Passing the --dry-run option doesn\'t dump the bulkinsert to the output');
@@ -2007,8 +2007,8 @@ OUTPUT;
         ])->save();
 
         $expectedOutput = <<<'OUTPUT'
-CREATE TABLE `table1` (`column1` VARCHAR NOT NULL, `column2` INTEGER NULL, PRIMARY KEY (`column1`));
-INSERT INTO `table1` (`column1`, `column2`) VALUES ('id1', 1);
+CREATE TABLE "table1" (`column1` VARCHAR NOT NULL, `column2` INTEGER NULL, PRIMARY KEY (`column1`));
+INSERT INTO "table1" (`column1`, `column2`) VALUES ('id1', 1);
 OUTPUT;
         $actualOutput = join("\n", $this->out->messages());
         $actualOutput = preg_replace("/\r\n|\r/", "\n", $actualOutput); // normalize line endings for Windows
@@ -2282,7 +2282,7 @@ OUTPUT;
             ->expects($this->atLeastOnce())
             ->method('query')
             ->willReturnCallback(function (string $sql, array $params = []) use ($adapter, $queryReflection) {
-                if ($sql === 'PRAGMA foreign_key_check(`comments`)') {
+                if ($sql === 'PRAGMA foreign_key_check("comments")') {
                     $adapter->execute('PRAGMA foreign_keys = OFF');
                     $adapter->execute('DELETE FROM articles');
                     $adapter->execute('PRAGMA foreign_keys = ON');
@@ -3246,7 +3246,7 @@ INPUT;
                 $sql = $row['sql'];
             }
         }
-        $this->assertStringContainsString("REFERENCES `{$refTable->getName()}` (`id`)", $sql);
+        $this->assertStringContainsString("REFERENCES \"{$refTable->getName()}\" (`id`)", $sql);
     }
 
     public function testForeignKeyReferenceCorrectAfterChangeColumn()
@@ -3273,7 +3273,7 @@ INPUT;
                 $sql = $row['sql'];
             }
         }
-        $this->assertStringContainsString("REFERENCES `{$refTable->getName()}` (`id`)", $sql);
+        $this->assertStringContainsString("REFERENCES \"{$refTable->getName()}\" (`id`)", $sql);
     }
 
     public function testForeignKeyReferenceCorrectAfterRemoveColumn()
@@ -3300,7 +3300,7 @@ INPUT;
                 $sql = $row['sql'];
             }
         }
-        $this->assertStringContainsString("REFERENCES `{$refTable->getName()}` (`id`)", $sql);
+        $this->assertStringContainsString("REFERENCES \"{$refTable->getName()}\" (`id`)", $sql);
     }
 
     public function testForeignKeyReferenceCorrectAfterChangePrimaryKey()
@@ -3324,13 +3324,13 @@ INPUT;
         $this->assertFalse($this->adapter->hasTable("tmp_{$refTable->getName()}"));
         $this->assertTrue($this->adapter->getColumns($refTable->getName())[1]->getIdentity());
 
-        $rows = $this->adapter->fetchAll('select * from sqlite_master where `type` = \'table\'');
+        $rows = $this->adapter->fetchAll('select * from sqlite_master where "type" = \'table\'');
         foreach ($rows as $row) {
             if ($row['tbl_name'] === $table->getName()) {
                 $sql = $row['sql'];
             }
         }
-        $this->assertStringContainsString("REFERENCES `{$refTable->getName()}` (`id`)", $sql);
+        $this->assertStringContainsString("REFERENCES \"{$refTable->getName()}\" (`id`)", $sql);
     }
 
     public function testForeignKeyReferenceCorrectAfterDropForeignKey()
@@ -3362,7 +3362,7 @@ INPUT;
                 $sql = $row['sql'];
             }
         }
-        $this->assertStringContainsString("REFERENCES `{$refTable->getName()}` (`id`)", $sql);
+        $this->assertStringContainsString("REFERENCES \"{$refTable->getName()}\" (`id`)", $sql);
     }
 
     public function testPdoExceptionUpdateNonExistingTable()
