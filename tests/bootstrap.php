@@ -74,15 +74,10 @@ Configure::write('Migrations', [
 
 Cache::setConfig([
     '_cake_core_' => [
-        'engine' => 'File',
-        'prefix' => 'cake_core_',
-        'serialize' => true,
+        'engine' => 'Array',
     ],
     '_cake_model_' => [
-        'engine' => 'File',
-        'prefix' => 'cake_model_',
-        'serialize' => true,
-        'path' => TMP,
+        'engine' => 'Array',
     ],
 ]);
 
