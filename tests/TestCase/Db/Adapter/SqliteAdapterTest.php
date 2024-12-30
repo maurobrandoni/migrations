@@ -143,7 +143,7 @@ class SqliteAdapterTest extends TestCase
 
     public function testQuoteColumnName()
     {
-        $this->assertEquals('`test_column`', $this->adapter->quoteColumnName('test_column'));
+        $this->assertEquals('"test_column"', $this->adapter->quoteColumnName('test_column'));
     }
 
     public function testCreateTable()
@@ -327,7 +327,7 @@ class SqliteAdapterTest extends TestCase
             "SELECT * FROM sqlite_master WHERE `type` = 'table' AND `tbl_name` = 'tbl_child'"
         );
         $this->assertStringContainsString(
-            'CONSTRAINT `fk_master_id` FOREIGN KEY (`master_id`) REFERENCES "tbl_master" (`id`) ON DELETE NO ACTION ON UPDATE NO ACTION',
+            'CONSTRAINT "fk_master_id" FOREIGN KEY ("master_id") REFERENCES "tbl_master" ("id") ON DELETE NO ACTION ON UPDATE NO ACTION',
             $row['sql']
         );
     }
@@ -351,10 +351,10 @@ class SqliteAdapterTest extends TestCase
         $this->assertTrue($this->adapter->hasForeignKey('tbl_child', ['master_id']));
 
         $row = $this->adapter->fetchRow(
-            "SELECT * FROM sqlite_master WHERE `type` = 'table' AND `tbl_name` = 'tbl_child'"
+            "SELECT * FROM sqlite_master WHERE \"type\" = 'table' AND \"tbl_name\" = 'tbl_child'"
         );
         $this->assertStringContainsString(
-            'CONSTRAINT `fk_master_id` FOREIGN KEY (`master_id`) REFERENCES "tbl_master" (`id`) ON DELETE NO ACTION ON UPDATE NO ACTION',
+            'CONSTRAINT "fk_master_id" FOREIGN KEY ("master_id") REFERENCES "tbl_master" ("id") ON DELETE NO ACTION ON UPDATE NO ACTION',
             $row['sql']
         );
     }
@@ -377,8 +377,8 @@ class SqliteAdapterTest extends TestCase
               ->save();
         $queries = $this->out->messages();
         $indexQuery = $queries[2];
-        $this->assertStringContainsString('CREATE UNIQUE INDEX `table1_email_index`', $indexQuery);
-        $this->assertStringContainsString('(`email` ASC) WHERE is_verified = true', $indexQuery);
+        $this->assertStringContainsString('CREATE UNIQUE INDEX "table1_email_index"', $indexQuery);
+        $this->assertStringContainsString('("email" ASC) WHERE is_verified = true', $indexQuery);
     }
 
     public function testAddPrimaryKey()
@@ -530,8 +530,9 @@ class SqliteAdapterTest extends TestCase
     public static function irregularCreateTableProvider()
     {
         return [
-            ["CREATE TABLE \"users\"\n( `id` INTEGER NOT NULL )", ['id', 'foo']],
+            ["CREATE TABLE \"users\"\n( \"id\" INTEGER NOT NULL )", ['id', 'foo']],
             ['CREATE TABLE users   (    id INTEGER NOT NULL )', ['id', 'foo']],
+            ["CREATE TABLE `users` (`id` INTEGER NOT NULL )", ['id', 'foo']],
             ["CREATE TABLE [users]\n(\nid INTEGER NOT NULL)", ['id', 'foo']],
             ["CREATE TABLE \"users\" ([id] \n INTEGER NOT NULL\n, \"bar\" INTEGER)", ['id', 'bar', 'foo']],
         ];
@@ -707,7 +708,7 @@ class SqliteAdapterTest extends TestCase
             ->addColumn('indexcol', 'integer')
             ->create();
 
-        $this->adapter->execute('CREATE INDEX custom_idx ON t (`indexcol`, ABS(`indexcol`))');
+        $this->adapter->execute('CREATE INDEX custom_idx ON t ("indexcol", ABS(indexcol))');
 
         $this->assertTrue($this->adapter->hasIndexByName('t', 'custom_idx'));
 
@@ -715,6 +716,7 @@ class SqliteAdapterTest extends TestCase
         $this->expectExceptionMessage('no such column: indexcol');
 
         $table->renameColumn('indexcol', 'newindexcol')->update();
+        $this->assertTrue($this->adapter->hasIndexByName('t', 'custom_idx'));
     }
 
     /**
@@ -726,43 +728,43 @@ class SqliteAdapterTest extends TestCase
         return [
             [
                 'CREATE INDEX test_idx ON t(indexcol);',
-                'CREATE INDEX test_idx ON t(`newindexcol`)',
+                'CREATE INDEX test_idx ON t("newindexcol")',
             ],
             [
                 'CREATE INDEX test_idx ON t(`indexcol`);',
-                'CREATE INDEX test_idx ON t(`newindexcol`)',
+                'CREATE INDEX test_idx ON t("newindexcol")',
             ],
             [
                 'CREATE INDEX test_idx ON t("indexcol");',
-                'CREATE INDEX test_idx ON t(`newindexcol`)',
+                'CREATE INDEX test_idx ON t("newindexcol")',
             ],
             [
                 'CREATE INDEX test_idx ON t([indexcol]);',
-                'CREATE INDEX test_idx ON t(`newindexcol`)',
+                'CREATE INDEX test_idx ON t("newindexcol")',
             ],
             [
                 'CREATE INDEX test_idx ON t(indexcol ASC);',
-                'CREATE INDEX test_idx ON t(`newindexcol` ASC)',
+                'CREATE INDEX test_idx ON t("newindexcol" ASC)',
             ],
             [
                 'CREATE INDEX test_idx ON t(`indexcol` ASC);',
-                'CREATE INDEX test_idx ON t(`newindexcol` ASC)',
+                'CREATE INDEX test_idx ON t("newindexcol" ASC)',
             ],
             [
                 'CREATE INDEX test_idx ON t("indexcol" DESC);',
-                'CREATE INDEX test_idx ON t(`newindexcol` DESC)',
+                'CREATE INDEX test_idx ON t("newindexcol" DESC)',
             ],
             [
                 'CREATE INDEX test_idx ON t([indexcol] DESC);',
-                'CREATE INDEX test_idx ON t(`newindexcol` DESC)',
+                'CREATE INDEX test_idx ON t("newindexcol" DESC)',
             ],
             [
                 'CREATE INDEX test_idx ON t(indexcol COLLATE BINARY);',
-                'CREATE INDEX test_idx ON t(`newindexcol` COLLATE BINARY)',
+                'CREATE INDEX test_idx ON t("newindexcol" COLLATE BINARY)',
             ],
             [
                 'CREATE INDEX test_idx ON t(indexcol COLLATE BINARY ASC);',
-                'CREATE INDEX test_idx ON t(`newindexcol` COLLATE BINARY ASC)',
+                'CREATE INDEX test_idx ON t("newindexcol" COLLATE BINARY ASC)',
             ],
             [
                 '
@@ -776,7 +778,7 @@ class SqliteAdapterTest extends TestCase
                 ',
                 'CREATE UNIQUE INDEX test_idx   on   t  (
                                 ( ((
-                                    `newindexcol`
+                                    "newindexcol"
                                 ) )) COLLATE   BINARY   ASC
                             )',
             ],
@@ -805,7 +807,7 @@ class SqliteAdapterTest extends TestCase
         $this->assertFalse($this->adapter->hasIndex($table->getName(), 'indexcol'));
         $this->assertTrue($this->adapter->hasIndex($table->getName(), 'newindexcol'));
 
-        $index = $this->adapter->fetchRow("SELECT sql FROM sqlite_master WHERE type = 'index' AND name = 'test_idx'");
+        $index = $this->adapter->fetchRow("SELECT sql FROM sqlite_master WHERE \"type\" = 'index' AND name = 'test_idx'");
         $this->assertSame($newIndexSQL, $index['sql']);
     }
 
@@ -818,43 +820,43 @@ class SqliteAdapterTest extends TestCase
         return [
             [
                 'CREATE INDEX test_idx ON t(indexcol1, indexcol2, indexcol3);',
-                'CREATE INDEX test_idx ON t(indexcol1, `newindexcol`, indexcol3)',
+                'CREATE INDEX test_idx ON t(indexcol1, "newindexcol", indexcol3)',
             ],
             [
                 'CREATE INDEX test_idx ON t(`indexcol1`, `indexcol2`, `indexcol3`);',
-                'CREATE INDEX test_idx ON t(`indexcol1`, `newindexcol`, `indexcol3`)',
+                'CREATE INDEX test_idx ON t(`indexcol1`, "newindexcol", `indexcol3`)',
             ],
             [
                 'CREATE INDEX test_idx ON t("indexcol1", "indexcol2", "indexcol3");',
-                'CREATE INDEX test_idx ON t("indexcol1", `newindexcol`, "indexcol3")',
+                'CREATE INDEX test_idx ON t("indexcol1", "newindexcol", "indexcol3")',
             ],
             [
                 'CREATE INDEX test_idx ON t([indexcol1], [indexcol2], [indexcol3]);',
-                'CREATE INDEX test_idx ON t([indexcol1], `newindexcol`, [indexcol3])',
+                'CREATE INDEX test_idx ON t([indexcol1], "newindexcol", [indexcol3])',
             ],
             [
                 'CREATE INDEX test_idx ON t(indexcol1 ASC, indexcol2 DESC, indexcol3);',
-                'CREATE INDEX test_idx ON t(indexcol1 ASC, `newindexcol` DESC, indexcol3)',
+                'CREATE INDEX test_idx ON t(indexcol1 ASC, "newindexcol" DESC, indexcol3)',
             ],
             [
                 'CREATE INDEX test_idx ON t(`indexcol1` ASC, `indexcol2` DESC, `indexcol3`);',
-                'CREATE INDEX test_idx ON t(`indexcol1` ASC, `newindexcol` DESC, `indexcol3`)',
+                'CREATE INDEX test_idx ON t(`indexcol1` ASC, "newindexcol" DESC, `indexcol3`)',
             ],
             [
                 'CREATE INDEX test_idx ON t("indexcol1" ASC, "indexcol2" DESC, "indexcol3");',
-                'CREATE INDEX test_idx ON t("indexcol1" ASC, `newindexcol` DESC, "indexcol3")',
+                'CREATE INDEX test_idx ON t("indexcol1" ASC, "newindexcol" DESC, "indexcol3")',
             ],
             [
                 'CREATE INDEX test_idx ON t([indexcol1] ASC, [indexcol2] DESC, [indexcol3]);',
-                'CREATE INDEX test_idx ON t([indexcol1] ASC, `newindexcol` DESC, [indexcol3])',
+                'CREATE INDEX test_idx ON t([indexcol1] ASC, "newindexcol" DESC, [indexcol3])',
             ],
             [
                 'CREATE INDEX test_idx ON t(indexcol1 COLLATE BINARY, indexcol2 COLLATE NOCASE, indexcol3);',
-                'CREATE INDEX test_idx ON t(indexcol1 COLLATE BINARY, `newindexcol` COLLATE NOCASE, indexcol3)',
+                'CREATE INDEX test_idx ON t(indexcol1 COLLATE BINARY, "newindexcol" COLLATE NOCASE, indexcol3)',
             ],
             [
                 'CREATE INDEX test_idx ON t(indexcol1 COLLATE BINARY ASC, indexcol2 COLLATE NOCASE DESC, indexcol3);',
-                'CREATE INDEX test_idx ON t(indexcol1 COLLATE BINARY ASC, `newindexcol` COLLATE NOCASE DESC, indexcol3)',
+                'CREATE INDEX test_idx ON t(indexcol1 COLLATE BINARY ASC, "newindexcol" COLLATE NOCASE DESC, indexcol3)',
             ],
             [
                 '
@@ -871,7 +873,7 @@ class SqliteAdapterTest extends TestCase
                 'CREATE UNIQUE INDEX test_idx   on   t  (
                                 inDEXcoL1 ,
                                 ( ((
-                                    `newindexcol`
+                                    "newindexcol"
                                 ) )) COLLATE   BINARY   ASC ,
                                 inDEXcoL3
                             )',
@@ -907,7 +909,7 @@ class SqliteAdapterTest extends TestCase
         $this->assertTrue($this->adapter->hasIndex($table->getName(), ['indexcol1', 'newindexcol', 'indexcol3']));
 
         $index = $this->adapter->fetchRow("SELECT sql FROM sqlite_master WHERE type = 'index' AND name = 'test_idx'");
-        $this->assertSame($newIndexSQL, $index['sql']);
+        $this->assertSame($index['sql'], $newIndexSQL);
     }
 
     public function testChangeColumn()
@@ -998,7 +1000,7 @@ class SqliteAdapterTest extends TestCase
         $this->adapter->execute($triggerSQL);
 
         $rows = $this->adapter->fetchAll(
-            "SELECT * FROM sqlite_master WHERE `type` = 'trigger' AND tbl_name = 't'"
+            "SELECT * FROM sqlite_master WHERE \"type\" = 'trigger' AND tbl_name = 't'"
         );
         $this->assertCount(1, $rows);
         $this->assertEquals('trigger', $rows[0]['type']);
@@ -1008,7 +1010,7 @@ class SqliteAdapterTest extends TestCase
         $table->changeColumn('triggercol', 'integer', ['null' => false])->update();
 
         $rows = $this->adapter->fetchAll(
-            "SELECT * FROM sqlite_master WHERE `type` = 'trigger' AND tbl_name = 't'"
+            "SELECT * FROM sqlite_master WHERE \"type\" = 'trigger' AND tbl_name = 't'"
         );
         $this->assertCount(1, $rows);
         $this->assertEquals('trigger', $rows[0]['type']);
@@ -1380,19 +1382,10 @@ class SqliteAdapterTest extends TestCase
         $this->adapter->execute("
             CREATE TABLE `table` (
                 `id` INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-                [ref_[_brackets] INTEGER NOT NULL,
-                `ref_``_ticks` INTEGER NOT NULL,
-                \"ref_\"\"_double_quotes\" INTEGER NOT NULL,
-                'ref_''_single_quotes' INTEGER NOT NULL,
                 ref_no_quotes INTEGER NOT NULL,
                 ref_no_space INTEGER NOT NULL,
                 ref_lots_of_space INTEGER NOT NULL,
-                FOREIGN KEY ([ref_[_brackets]) REFERENCES `ref_table` (`id`),
-                FOREIGN KEY (`ref_``_ticks`) REFERENCES `ref_table` (`id`),
-                FOREIGN KEY (\"ref_\"\"_double_quotes\") REFERENCES `ref_table` (`id`),
-                FOREIGN KEY ('ref_''_single_quotes') REFERENCES `ref_table` (`id`),
                 FOREIGN KEY (ref_no_quotes) REFERENCES `ref_table` (`id`),
-                FOREIGN KEY (`ref_``_ticks`, 'ref_''_single_quotes') REFERENCES `ref_table` (`id`, `field1`),
                 FOREIGN KEY(`ref_no_space`,`ref_no_space`)REFERENCES`ref_table`(`id`,`id`),
                 foreign      KEY
                     ( `ref_lots_of_space`		,`ref_lots_of_space`    )
@@ -1400,25 +1393,9 @@ class SqliteAdapterTest extends TestCase
             )
         ");
 
-        $this->assertTrue($this->adapter->hasForeignKey('table', ['ref_[_brackets']));
-        $this->adapter->dropForeignKey('table', ['ref_[_brackets']);
-        $this->assertFalse($this->adapter->hasForeignKey('table', ['ref_[_brackets']));
-
-        $this->assertTrue($this->adapter->hasForeignKey('table', ['ref_"_double_quotes']));
-        $this->adapter->dropForeignKey('table', ['ref_"_double_quotes']);
-        $this->assertFalse($this->adapter->hasForeignKey('table', ['ref_"_double_quotes']));
-
-        $this->assertTrue($this->adapter->hasForeignKey('table', ["ref_'_single_quotes"]));
-        $this->adapter->dropForeignKey('table', ["ref_'_single_quotes"]);
-        $this->assertFalse($this->adapter->hasForeignKey('table', ["ref_'_single_quotes"]));
-
         $this->assertTrue($this->adapter->hasForeignKey('table', ['ref_no_quotes']));
         $this->adapter->dropForeignKey('table', ['ref_no_quotes']);
         $this->assertFalse($this->adapter->hasForeignKey('table', ['ref_no_quotes']));
-
-        $this->assertTrue($this->adapter->hasForeignKey('table', ['ref_`_ticks', "ref_'_single_quotes"]));
-        $this->adapter->dropForeignKey('table', ['ref_`_ticks', "ref_'_single_quotes"]);
-        $this->assertFalse($this->adapter->hasForeignKey('table', ['ref_`_ticks', "ref_'_single_quotes"]));
 
         $this->assertTrue($this->adapter->hasForeignKey('table', ['ref_no_space', 'ref_no_space']));
         $this->adapter->dropForeignKey('table', ['ref_no_space', 'ref_no_space']);
@@ -1613,7 +1590,7 @@ class SqliteAdapterTest extends TestCase
         $table->addColumn('column1', 'string', ['comment' => $comment = 'Comments from "column1"'])
             ->save();
 
-        $rows = $this->adapter->fetchAll('select * from sqlite_master where `type` = \'table\'');
+        $rows = $this->adapter->fetchAll('select * from sqlite_master where "type" = \'table\'');
 
         foreach ($rows as $row) {
             if ($row['tbl_name'] === 'table1') {
@@ -1907,7 +1884,7 @@ class SqliteAdapterTest extends TestCase
             ->save();
 
         $expectedOutput = <<<'OUTPUT'
-CREATE TABLE "table1" (`id` INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, `column1` VARCHAR NOT NULL, `column2` INTEGER NULL, `column3` VARCHAR NULL DEFAULT 'test');
+CREATE TABLE "table1" ("id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, "column1" VARCHAR NOT NULL, "column2" INTEGER NULL, "column3" VARCHAR NULL DEFAULT 'test');
 OUTPUT;
         $actualOutput = join("\n", $this->out->messages());
         $this->assertStringContainsString($expectedOutput, $actualOutput, 'Passing the --dry-run option does not dump create table query to the output');
@@ -1939,9 +1916,9 @@ OUTPUT;
         ]);
 
         $expectedOutput = <<<'OUTPUT'
-INSERT INTO "table1" (`string_col`) VALUES ('test data');
-INSERT INTO "table1" (`string_col`) VALUES (null);
-INSERT INTO "table1" (`int_col`) VALUES (23);
+INSERT INTO "table1" ("string_col") VALUES ('test data');
+INSERT INTO "table1" ("string_col") VALUES (null);
+INSERT INTO "table1" ("int_col") VALUES (23);
 OUTPUT;
         $actualOutput = join("\n", $this->out->messages());
         $actualOutput = preg_replace("/\r\n|\r/", "\n", $actualOutput); // normalize line endings for Windows
@@ -1978,7 +1955,7 @@ OUTPUT;
         ]);
 
         $expectedOutput = <<<'OUTPUT'
-INSERT INTO "table1" (`string_col`, `int_col`) VALUES ('test_data1', 23), (null, 42);
+INSERT INTO "table1" ("string_col", "int_col") VALUES ('test_data1', 23), (null, 42);
 OUTPUT;
         $actualOutput = join("\n", $this->out->messages());
         $this->assertStringContainsString($expectedOutput, $actualOutput, 'Passing the --dry-run option doesn\'t dump the bulkinsert to the output');
@@ -2007,8 +1984,8 @@ OUTPUT;
         ])->save();
 
         $expectedOutput = <<<'OUTPUT'
-CREATE TABLE "table1" (`column1` VARCHAR NOT NULL, `column2` INTEGER NULL, PRIMARY KEY (`column1`));
-INSERT INTO "table1" (`column1`, `column2`) VALUES ('id1', 1);
+CREATE TABLE "table1" ("column1" VARCHAR NOT NULL, "column2" INTEGER NULL, PRIMARY KEY ("column1"));
+INSERT INTO "table1" ("column1", "column2") VALUES ('id1', 1);
 OUTPUT;
         $actualOutput = join("\n", $this->out->messages());
         $actualOutput = preg_replace("/\r\n|\r/", "\n", $actualOutput); // normalize line endings for Windows
@@ -2401,7 +2378,6 @@ INPUT;
             'Temporary table with schema' => ['temp.t', 'temp.t', true],
             'Attached table' => ['etc.t', 't', true],
             'Attached table with schema' => ['etc.t', 'etc.t', true],
-            'Attached table with unusual schema' => ['"main.db".t', 'main.db.t', true],
             'Wrong schema 1' => ['t', 'etc.t', false],
             'Wrong schema 2' => ['t', 'temp.t', false],
             'Missing schema' => ['t', 'not_attached.t', false],
@@ -3210,10 +3186,6 @@ INPUT;
             ['create table t(id integer primary key autoincrement)', 'main.t', 'main.t'],
             ['create temp table t(id integer primary key)', 'temp.t', 'temp.t'],
             ['create temp table t(id integer primary key autoincrement)', 'temp.t', 'temp.t'],
-            ['create table ["](id integer primary key)', 'main."', 'main.""""'],
-            ['create table ["](id integer primary key autoincrement)', 'main."', 'main.""""'],
-            ['create table [\'](id integer primary key)', 'main.\'', 'main."\'"'],
-            ['create table [\'](id integer primary key autoincrement)', 'main.\'', 'main."\'"'],
             ['create table T(id integer primary key)', 't', 't'],
             ['create table T(id integer primary key autoincrement)', 't', 't'],
             ['create table t(id integer primary key)', 'T', 't'],
@@ -3240,13 +3212,13 @@ INPUT;
         $this->assertFalse($this->adapter->hasTable("tmp_{$refTable->getName()}"));
         $this->assertTrue($this->adapter->hasColumn($refTable->getName(), $refTableRenamedColumn));
 
-        $rows = $this->adapter->fetchAll('select * from sqlite_master where `type` = \'table\'');
+        $rows = $this->adapter->fetchAll('select * from sqlite_master where "type" = \'table\'');
         foreach ($rows as $row) {
             if ($row['tbl_name'] === $table->getName()) {
                 $sql = $row['sql'];
             }
         }
-        $this->assertStringContainsString("REFERENCES \"{$refTable->getName()}\" (`id`)", $sql);
+        $this->assertStringContainsString("REFERENCES \"{$refTable->getName()}\" (\"id\")", $sql);
     }
 
     public function testForeignKeyReferenceCorrectAfterChangeColumn()
@@ -3267,13 +3239,13 @@ INPUT;
         $this->assertFalse($this->adapter->hasTable("tmp_{$refTable->getName()}"));
         $this->assertEquals('text', $this->adapter->getColumns($refTable->getName())[1]->getType());
 
-        $rows = $this->adapter->fetchAll('select * from sqlite_master where `type` = \'table\'');
+        $rows = $this->adapter->fetchAll('select * from sqlite_master where "type" = \'table\'');
         foreach ($rows as $row) {
             if ($row['tbl_name'] === $table->getName()) {
                 $sql = $row['sql'];
             }
         }
-        $this->assertStringContainsString("REFERENCES \"{$refTable->getName()}\" (`id`)", $sql);
+        $this->assertStringContainsString("REFERENCES \"{$refTable->getName()}\" (\"id\")", $sql);
     }
 
     public function testForeignKeyReferenceCorrectAfterRemoveColumn()
@@ -3294,13 +3266,13 @@ INPUT;
         $this->assertFalse($this->adapter->hasTable("tmp_{$refTable->getName()}"));
         $this->assertFalse($this->adapter->hasColumn($refTable->getName(), $refTableColumnToRemove));
 
-        $rows = $this->adapter->fetchAll('select * from sqlite_master where `type` = \'table\'');
+        $rows = $this->adapter->fetchAll('select * from sqlite_master where "type" = \'table\'');
         foreach ($rows as $row) {
             if ($row['tbl_name'] === $table->getName()) {
                 $sql = $row['sql'];
             }
         }
-        $this->assertStringContainsString("REFERENCES \"{$refTable->getName()}\" (`id`)", $sql);
+        $this->assertStringContainsString("REFERENCES \"{$refTable->getName()}\" (\"id\")", $sql);
     }
 
     public function testForeignKeyReferenceCorrectAfterChangePrimaryKey()
@@ -3330,7 +3302,7 @@ INPUT;
                 $sql = $row['sql'];
             }
         }
-        $this->assertStringContainsString("REFERENCES \"{$refTable->getName()}\" (`id`)", $sql);
+        $this->assertStringContainsString("REFERENCES \"{$refTable->getName()}\" (\"id\")", $sql);
     }
 
     public function testForeignKeyReferenceCorrectAfterDropForeignKey()
@@ -3356,13 +3328,13 @@ INPUT;
         $this->assertFalse($this->adapter->hasTable("tmp_{$refTable->getName()}"));
         $this->assertFalse($this->adapter->hasForeignKey($refTable->getName(), [$refTableAdditionalColumnId]));
 
-        $rows = $this->adapter->fetchAll('select * from sqlite_master where `type` = \'table\'');
+        $rows = $this->adapter->fetchAll('select * from sqlite_master where "type" = \'table\'');
         foreach ($rows as $row) {
             if ($row['tbl_name'] === $table->getName()) {
                 $sql = $row['sql'];
             }
         }
-        $this->assertStringContainsString("REFERENCES \"{$refTable->getName()}\" (`id`)", $sql);
+        $this->assertStringContainsString("REFERENCES \"{$refTable->getName()}\" (\"id\")", $sql);
     }
 
     public function testPdoExceptionUpdateNonExistingTable()

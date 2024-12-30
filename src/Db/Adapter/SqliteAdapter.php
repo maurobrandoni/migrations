@@ -220,10 +220,9 @@ class SqliteAdapter extends PdoAdapter
      */
     public function quoteColumnName($columnName): string
     {
-        // $driver = $this->getConnection()->getDriver();
+        $driver = $this->getConnection()->getDriver();
 
-        // return $driver->quoteIdentifier($columnName);
-        return '`' . str_replace('`', '``', $columnName) . '`';
+        return $driver->quoteIdentifier($columnName);
     }
 
     /**
@@ -742,7 +741,7 @@ PCRE_PATTERN;
      */
     protected function getDeclaringSql(string $tableName): string
     {
-        $rows = $this->fetchAll("SELECT * FROM sqlite_master WHERE `type` = 'table'");
+        $rows = $this->fetchAll("SELECT * FROM sqlite_master WHERE \"type\" = 'table'");
 
         $sql = '';
         foreach ($rows as $table) {
@@ -758,7 +757,13 @@ PCRE_PATTERN;
             $columnNamePattern = "\"$columnName\"|`$columnName`|\\[$columnName\\]|$columnName";
             $columnNamePattern = "#([\(,]+\\s*)($columnNamePattern)(\\s)#iU";
 
-            $sql = preg_replace($columnNamePattern, "$1`{$column['name']}`$3", $sql);
+            $sql = preg_replace_callback(
+                $columnNamePattern,
+                function ($matches) use ($column) {
+                    return $matches[1] . $this->quoteColumnName($column['name']) . $matches[3];
+                },
+                $sql
+            );
         }
 
         $tableNamePattern = "\"$tableName\"|`$tableName`|\\[$tableName\\]|$tableName";
@@ -778,7 +783,7 @@ PCRE_PATTERN;
      */
     protected function getDeclaringIndexSql(string $tableName, string $indexName): string
     {
-        $rows = $this->fetchAll("SELECT * FROM sqlite_master WHERE `type` = 'index'");
+        $rows = $this->fetchAll("SELECT * FROM sqlite_master WHERE \"type\" = 'index'");
 
         $sql = '';
         foreach ($rows as $table) {
@@ -815,7 +820,7 @@ PCRE_PATTERN;
                 "SELECT *
                 FROM sqlite_master
                 WHERE
-                    (`type` = 'index' OR `type` = 'trigger')
+                    (\"type\" = 'index' OR `type` = 'trigger')
                     AND tbl_name = ?
                     AND sql IS NOT NULL
                 ",
@@ -1309,6 +1314,7 @@ PCRE_PATTERN;
      */
     protected function getIndexes(string $tableName): array
     {
+        // TODO could we describe the table and look for constraint in the metadata?
         $indexes = [];
         $schema = $this->getSchemaName($tableName, true)['schema'];
         $indexList = $this->getTableInfo($tableName, 'index_list');
@@ -1334,6 +1340,7 @@ PCRE_PATTERN;
      */
     protected function resolveIndex(string $tableName, string|array $columns): array
     {
+        // TODO could we describe the table and look for constraint in the metadata?
         $columns = array_map('strtolower', (array)$columns);
         $indexes = $this->getIndexes($tableName);
         $matches = [];
@@ -1361,6 +1368,7 @@ PCRE_PATTERN;
      */
     public function hasIndexByName(string $tableName, string $indexName): bool
     {
+        // TODO could we describe the table and look for constraint in the metadata?
         $indexName = strtolower($indexName);
         $indexes = $this->getIndexes($tableName);
 
@@ -1380,7 +1388,7 @@ PCRE_PATTERN;
     {
         $indexColumnArray = [];
         foreach ((array)$index->getColumns() as $column) {
-            $indexColumnArray[] = sprintf('`%s` ASC', $column);
+            $indexColumnArray[] = sprintf('%s ASC', $this->quoteColumnName($column));
         }
         $indexColumns = implode(',', $indexColumnArray);
         $where = (string)$index->getWhere();
@@ -1477,6 +1485,7 @@ PCRE_PATTERN;
      */
     protected function getPrimaryKey(string $tableName): array
     {
+        // TODO could we describe the table and look for constraint in the metadata?
         $primaryKey = [];
 
         $rows = $this->getTableInfo($tableName);
@@ -1495,6 +1504,7 @@ PCRE_PATTERN;
      */
     public function hasForeignKey(string $tableName, $columns, ?string $constraint = null): bool
     {
+        // TODO could we describe the table and look for constraint in the metadata?
         if ($constraint !== null) {
             return preg_match(
                 "/,?\s*CONSTRAINT\s*" . $this->possiblyQuotedIdentifierRegex($constraint) . '\s*FOREIGN\s+KEY/is',
@@ -1504,6 +1514,7 @@ PCRE_PATTERN;
 
         $columns = array_map('mb_strtolower', (array)$columns);
 
+        // TODO could we describe the table and look for constraint in the metadata by columns
         foreach ($this->getForeignKeys($tableName) as $key) {
             if (array_map('mb_strtolower', $key) === $columns) {
                 return true;
@@ -1521,6 +1532,7 @@ PCRE_PATTERN;
      */
     protected function getForeignKeys(string $tableName): array
     {
+        // TODO could this be describe() on table and map over foreign keys?
         $foreignKeys = [];
 
         $rows = $this->getTableInfo($tableName, 'foreign_key_list');
@@ -1546,7 +1558,9 @@ PCRE_PATTERN;
 
         $tableName = $table->getName();
         $instructions->addPostStep(function ($state) use ($column) {
-            $matchPattern = "/(`$column`)\s+(\w+(\(\d+\))?)\s+((NOT )?NULL)/";
+            $quotedColumn = preg_quote($column);
+            $columnPattern = "`{$quotedColumn}`|\"{$quotedColumn}\"|\[{$quotedColumn}\]";
+            $matchPattern = "/($columnPattern)\s+(\w+(\(\d+\))?)\s+((NOT )?NULL)/";
 
             $sql = $state['createSQL'];
 
@@ -1883,16 +1897,15 @@ PCRE_PATTERN;
         } else {
             $def = 'INDEX';
         }
-        if (is_string($index->getName())) {
-            $indexName = $index->getName();
-        } else {
+        $indexName = $index->getName();
+        if (!is_string($indexName)) {
             $indexName = $table->getName() . '_';
             foreach ((array)$index->getColumns() as $column) {
                 $indexName .= $column . '_';
             }
             $indexName .= 'index';
         }
-        $def .= ' `' . $indexName . '`';
+        $def .= ' ' . $this->quoteColumnName($indexName);
 
         return $def;
     }
