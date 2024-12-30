@@ -527,12 +527,12 @@ class SqliteAdapterTest extends TestCase
         $this->assertEquals("''", $rows[1]['dflt_value']);
     }
 
-    public static function irregularCreateTableProvider()
+    public static function irregularCreateTableProvider(): array
     {
         return [
             ["CREATE TABLE \"users\"\n( \"id\" INTEGER NOT NULL )", ['id', 'foo']],
             ['CREATE TABLE users   (    id INTEGER NOT NULL )', ['id', 'foo']],
-            ["CREATE TABLE `users` (`id` INTEGER NOT NULL )", ['id', 'foo']],
+            ['CREATE TABLE `users` (`id` INTEGER NOT NULL )', ['id', 'foo']],
             ["CREATE TABLE [users]\n(\nid INTEGER NOT NULL)", ['id', 'foo']],
             ["CREATE TABLE \"users\" ([id] \n INTEGER NOT NULL\n, \"bar\" INTEGER)", ['id', 'bar', 'foo']],
         ];
