@@ -9,6 +9,7 @@ declare(strict_types=1);
 namespace Migrations\Db\Adapter;
 
 use BadMethodCallException;
+use Cake\Database\Schema\SchemaDialect;
 use InvalidArgumentException;
 use Migrations\Db\AlterInstructions;
 use Migrations\Db\Expression;
@@ -226,6 +227,18 @@ class SqliteAdapter extends PdoAdapter
     }
 
     /**
+     * Get the schema dialect for this adapter.
+     *
+     * @return \Cake\Database\Schema\SchemaDialect
+     */
+    protected function getSchemaDialect(): SchemaDialect
+    {
+        $driver = $this->getConnection()->getDriver();
+
+        return $driver->schemaDialect();
+    }
+
+    /**
      * Generates a regular expression to match identifiers that may or
      * may not be quoted with any of the supported quotes.
      *
@@ -279,20 +292,6 @@ class SqliteAdapter extends PdoAdapter
         }
 
         return $result;
-    }
-
-    /**
-     * Retrieves information about a given table from one of the SQLite pragmas
-     *
-     * @param string $tableName The table to query
-     * @param string $pragma The pragma to query
-     * @return array
-     */
-    protected function getTableInfo(string $tableName, string $pragma = 'table_info'): array
-    {
-        $info = $this->getSchemaName($tableName, true);
-
-        return $this->fetchAll(sprintf('PRAGMA %s%s(%s)', $info['schema'], $pragma, $info['table']));
     }
 
     /**
@@ -612,7 +611,7 @@ PCRE_PATTERN;
     {
         $result = null;
         // make sure the table has only one primary key column which is of type integer
-        foreach ($this->getTableInfo($tableName) as $col) {
+        foreach ($this->getColumnData($tableName) as $col) {
             $type = strtolower($col['type']);
             if ($col['pk'] > 1) {
                 // the table has a composite primary key
@@ -634,7 +633,7 @@ PCRE_PATTERN;
         }
         // make sure the table does not have a PK-origin autoindex
         // such an autoindex would indicate either that the primary key was specified as descending, or that this is a WITHOUT ROWID table
-        foreach ($this->getTableInfo($tableName, 'index_list') as $idx) {
+        foreach ($this->getIndexes($tableName) as $idx) {
             if ($idx['origin'] === 'pk') {
                 return null;
             }
@@ -644,16 +643,29 @@ PCRE_PATTERN;
     }
 
     /**
+     * Get column metadata
+     *
+     * @param string $tableName The table to get column data from.
+     * @return array
+     */
+    protected function getColumnData(string $tableName): array
+    {
+        $dialect = $this->getSchemaDialect();
+
+        [$query, $params] = $dialect->describeColumnSql($tableName, []);
+
+        return $this->query($query, $params)->fetchAll('assoc');
+    }
+
+    /**
      * @inheritDoc
      */
     public function getColumns(string $tableName): array
     {
         $columns = [];
-
-        $rows = $this->getTableInfo($tableName);
         $identity = $this->resolveIdentity($tableName);
 
-        foreach ($rows as $columnInfo) {
+        foreach ($this->getColumnData($tableName) as $columnInfo) {
             $column = new Column();
             $type = $this->getPhinxType($columnInfo['type']);
             $default = $this->parseDefaultValue($columnInfo['dflt_value'], $type['name']);
@@ -678,8 +690,7 @@ PCRE_PATTERN;
      */
     public function hasColumn(string $tableName, string $columnName): bool
     {
-        $rows = $this->getTableInfo($tableName);
-        foreach ($rows as $column) {
+        foreach ($this->getColumnData($tableName) as $column) {
             if (strcasecmp($column['name'], $columnName) === 0) {
                 return true;
             }
@@ -750,8 +761,7 @@ PCRE_PATTERN;
             }
         }
 
-        $columnsInfo = $this->getTableInfo($tableName);
-
+        $columnsInfo = $this->getColumnData($tableName);
         foreach ($columnsInfo as $column) {
             $columnName = preg_quote($column['name'], '#');
             $columnNamePattern = "\"$columnName\"|`$columnName`|\\[$columnName\\]|$columnName";
@@ -826,16 +836,12 @@ PCRE_PATTERN;
                 ",
                 $params
             )->fetchAll('assoc');
-
-            $schema = $this->getSchemaName($tableName, true)['schema'];
+            $indexes = $this->getIndexes($tableName);
 
             foreach ($rows as $row) {
                 switch ($row['type']) {
                     case 'index':
-                        $info = $this->fetchAll(
-                            sprintf('PRAGMA %sindex_info(%s)', $schema, $this->quoteValue($row['name']))
-                        );
-
+                        $info = $indexes[$row['name']];
                         $columns = array_map(
                             function ($column) {
                                 if ($column === null) {
@@ -844,7 +850,7 @@ PCRE_PATTERN;
 
                                 return strtolower($column);
                             },
-                            array_column($info, 'name')
+                            $info['columns']
                         );
                         $hasExpressions = in_array(null, $columns, true);
 
@@ -989,7 +995,7 @@ PCRE_PATTERN;
                 ->fetchAll('assoc');
 
             foreach ($otherTables as $otherTable) {
-                $foreignKeyList = $this->getTableInfo($otherTable['name'], 'foreign_key_list');
+                $foreignKeyList = $this->getForeignKeys($otherTable['name']);
                 foreach ($foreignKeyList as $foreignKey) {
                     if (strcasecmp($foreignKey['table'], $tableName) === 0) {
                         $tablesToCheck[] = $otherTable['name'];
@@ -1087,7 +1093,7 @@ PCRE_PATTERN;
      */
     protected function calculateNewTableColumns(string $tableName, string|false $columnName, string|false $newColumnName): array
     {
-        $columns = $this->fetchAll(sprintf('pragma table_info(%s)', $this->quoteTableName($tableName)));
+        $columns = $this->getColumnData($tableName);
         /** @var array<string> $selectColumns */
         $selectColumns = [];
         /** @var array<string> $writeColumns */
@@ -1314,18 +1320,24 @@ PCRE_PATTERN;
      */
     protected function getIndexes(string $tableName): array
     {
-        // TODO could we describe the table and look for constraint in the metadata?
-        $indexes = [];
-        $schema = $this->getSchemaName($tableName, true)['schema'];
-        $indexList = $this->getTableInfo($tableName, 'index_list');
+        $dialect = $this->getSchemaDialect();
 
-        foreach ($indexList as $index) {
-            $indexData = $this->fetchAll(sprintf('pragma %sindex_info(%s)', $schema, $this->quoteColumnName($index['name'])));
+        [$query, $params] = $dialect->describeIndexSql($tableName, []);
+        $result = $this->query($query, $params)->fetchAll('assoc');
+
+        $indexes = [];
+        foreach ($result as $index) {
+            // We can't use the dialect here as convertIndexDescription
+            // has complicated requirements
+            $indexData = $this->fetchAll(sprintf('pragma index_info(%s)', $this->quoteColumnName($index['name'])));
             $cols = [];
             foreach ($indexData as $indexItem) {
                 $cols[] = $indexItem['name'];
             }
-            $indexes[$index['name']] = $cols;
+            $indexes[$index['name']] = [
+                'origin' => $index['origin'],
+                'columns' => $cols,
+            ];
         }
 
         return $indexes;
@@ -1340,13 +1352,12 @@ PCRE_PATTERN;
      */
     protected function resolveIndex(string $tableName, string|array $columns): array
     {
-        // TODO could we describe the table and look for constraint in the metadata?
         $columns = array_map('strtolower', (array)$columns);
         $indexes = $this->getIndexes($tableName);
         $matches = [];
 
         foreach ($indexes as $name => $index) {
-            $indexCols = array_map('strtolower', $index);
+            $indexCols = array_map('strtolower', $index['columns']);
             if ($columns == $indexCols) {
                 $matches[] = $name;
             }
@@ -1368,7 +1379,6 @@ PCRE_PATTERN;
      */
     public function hasIndexByName(string $tableName, string $indexName): bool
     {
-        // TODO could we describe the table and look for constraint in the metadata?
         $indexName = strtolower($indexName);
         $indexes = $this->getIndexes($tableName);
 
@@ -1485,10 +1495,8 @@ PCRE_PATTERN;
      */
     protected function getPrimaryKey(string $tableName): array
     {
-        // TODO could we describe the table and look for constraint in the metadata?
         $primaryKey = [];
-
-        $rows = $this->getTableInfo($tableName);
+        $rows = $this->getColumnData($tableName);
 
         foreach ($rows as $row) {
             if ($row['pk'] > 0) {
@@ -1504,7 +1512,6 @@ PCRE_PATTERN;
      */
     public function hasForeignKey(string $tableName, $columns, ?string $constraint = null): bool
     {
-        // TODO could we describe the table and look for constraint in the metadata?
         if ($constraint !== null) {
             return preg_match(
                 "/,?\s*CONSTRAINT\s*" . $this->possiblyQuotedIdentifierRegex($constraint) . '\s*FOREIGN\s+KEY/is',
@@ -1514,9 +1521,8 @@ PCRE_PATTERN;
 
         $columns = array_map('mb_strtolower', (array)$columns);
 
-        // TODO could we describe the table and look for constraint in the metadata by columns
         foreach ($this->getForeignKeys($tableName) as $key) {
-            if (array_map('mb_strtolower', $key) === $columns) {
+            if (array_map('mb_strtolower', $key['columns']) === $columns) {
                 return true;
             }
         }
@@ -1532,16 +1538,22 @@ PCRE_PATTERN;
      */
     protected function getForeignKeys(string $tableName): array
     {
-        // TODO could this be describe() on table and map over foreign keys?
         $foreignKeys = [];
 
-        $rows = $this->getTableInfo($tableName, 'foreign_key_list');
+        // Can't use the dialect here because describeForeignKeySql()
+        // doesn't fetch all metadata. If we improve the metadata query
+        // we can simplify here too.
+        $query = sprintf('PRAGMA foreign_key_list(%s)', $this->quoteTableName($tableName));
+        $rows = $this->fetchAll($query);
 
         foreach ($rows as $row) {
             if (!isset($foreignKeys[$row['id']])) {
-                $foreignKeys[$row['id']] = [];
+                $foreignKeys[$row['id']] = [
+                    'columns' => [],
+                    'table' => $row['table'],
+                ];
             }
-            $foreignKeys[$row['id']][$row['seq']] = $row['from'];
+            $foreignKeys[$row['id']]['columns'][$row['seq']] = $row['from'];
         }
 
         return $foreignKeys;
