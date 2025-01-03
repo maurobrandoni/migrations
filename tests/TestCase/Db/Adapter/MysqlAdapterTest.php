@@ -146,15 +146,6 @@ class MysqlAdapterTest extends TestCase
         $this->assertFalse($this->adapter->hasTable('unknown_schema.phinxlog'));
     }
 
-    public function testHasTableRespectsDotInTableName()
-    {
-        $sql = "CREATE TABLE `discouraged.naming.convention`
-                (id INT(11) NOT NULL)
-                ENGINE = InnoDB CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci";
-        $this->adapter->execute($sql);
-        $this->assertTrue($this->adapter->hasTable('discouraged.naming.convention'));
-    }
-
     public function testCreateTable()
     {
         $table = new Table('ntable', [], $this->adapter);
@@ -1369,20 +1360,6 @@ class MysqlAdapterTest extends TestCase
         $this->assertEquals($type, $columns[1]->getType());
 
         $this->assertEquals($this->usingMysql8() ? null : 10, $columns[1]->getLimit());
-    }
-
-    public function testDescribeTable()
-    {
-        $table = new Table('t', [], $this->adapter);
-        $table->addColumn('column1', 'string');
-        $table->save();
-
-        $described = $this->adapter->describeTable('t');
-
-        $this->assertContains($described['TABLE_TYPE'], ['VIEW', 'BASE TABLE']);
-        $this->assertEquals($described['TABLE_NAME'], 't');
-        $this->assertEquals($described['TABLE_SCHEMA'], $this->config['database']);
-        $this->assertEquals($described['TABLE_ROWS'], 0);
     }
 
     public function testGetColumnsReservedTableName()

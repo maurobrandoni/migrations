@@ -10,6 +10,8 @@ namespace Migrations\Db\Adapter;
 
 use Cake\Core\Configure;
 use Cake\Database\Connection;
+use Cake\Database\Exception\QueryException;
+use Cake\Database\Schema\SchemaDialect;
 use InvalidArgumentException;
 use Migrations\Db\AlterInstructions;
 use Migrations\Db\Literal;
@@ -157,7 +159,9 @@ class MysqlAdapter extends PdoAdapter
      */
     public function quoteTableName(string $tableName): string
     {
-        return str_replace('.', '`.`', $this->quoteColumnName($tableName));
+        $driver = $this->getConnection()->getDriver();
+
+        return $driver->quoteIdentifier($tableName);
     }
 
     /**
@@ -165,7 +169,21 @@ class MysqlAdapter extends PdoAdapter
      */
     public function quoteColumnName(string $columnName): string
     {
-        return '`' . str_replace('`', '``', $columnName) . '`';
+        $driver = $this->getConnection()->getDriver();
+
+        return $driver->quoteIdentifier($columnName);
+    }
+
+    /**
+     * Get the schema dialect for this adapter.
+     *
+     * @return \Cake\Database\Schema\SchemaDialect
+     */
+    protected function getSchemaDialect(): SchemaDialect
+    {
+        $driver = $this->getConnection()->getDriver();
+
+        return $driver->schemaDialect();
     }
 
     /**
@@ -186,9 +204,9 @@ class MysqlAdapter extends PdoAdapter
             }
         }
 
-        $options = $this->getOptions();
+        $database = (string)$this->getOption('database');
 
-        return $this->hasTableWithSchema($options['database'], $tableName);
+        return $this->hasTableWithSchema($database, $tableName);
     }
 
     /**
@@ -198,15 +216,20 @@ class MysqlAdapter extends PdoAdapter
      */
     protected function hasTableWithSchema(string $schema, string $tableName): bool
     {
-        $connection = $this->getConnection();
-        $result = $connection->execute(
-            "SELECT TABLE_NAME
-            FROM INFORMATION_SCHEMA.TABLES
-            WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?",
-            [$schema, $tableName]
-        );
+        $dialect = $this->getSchemaDialect();
+        [$query, $params] = $dialect->listTablesSql(['database' => $schema]);
 
-        return $result->rowCount() === 1;
+        try {
+            $statement = $this->query($query, $params);
+        } catch (QueryException $e) {
+            return false;
+        }
+        $tables = [];
+        foreach ($statement->fetchAll() as $row) {
+            $tables[] = $row[0];
+        }
+
+        return in_array($tableName, $tables, true);
     }
 
     /**
@@ -293,7 +316,7 @@ class MysqlAdapter extends PdoAdapter
             if (is_string($primaryKey)) { // handle primary_key => 'id'
                 $sql .= $this->quoteColumnName($primaryKey);
             } elseif (is_array($primaryKey)) { // handle primary_key => array('tag_id', 'resource_id')
-                $sql .= implode(',', array_map([$this, 'quoteColumnName'], $primaryKey));
+                $sql .= implode(',', array_map($this->quoteColumnName(...), $primaryKey));
             }
             $sql .= ')';
         } else {
@@ -335,7 +358,7 @@ class MysqlAdapter extends PdoAdapter
             if (is_string($newColumns)) { // handle primary_key => 'id'
                 $sql .= $this->quoteColumnName($newColumns);
             } elseif (is_array($newColumns)) { // handle primary_key => array('tag_id', 'resource_id')
-                $sql .= implode(',', array_map([$this, 'quoteColumnName'], $newColumns));
+                $sql .= implode(',', array_map($this->quoteColumnName(...), $newColumns));
             } else {
                 throw new InvalidArgumentException(sprintf(
                     'Invalid value for primary key: %s',
@@ -408,8 +431,11 @@ class MysqlAdapter extends PdoAdapter
      */
     public function getColumns(string $tableName): array
     {
+        $dialect = $this->getSchemaDialect();
+        [$query, $params] = $dialect->describeColumnSql($tableName, []);
+        $rows = $this->query($query, $params)->fetchAll('assoc');
+
         $columns = [];
-        $rows = $this->fetchAll(sprintf('SHOW FULL COLUMNS FROM %s', $this->quoteTableName($tableName)));
         foreach ($rows as $columnInfo) {
             $phinxType = $this->getPhinxType($columnInfo['Type']);
 
@@ -589,8 +615,10 @@ class MysqlAdapter extends PdoAdapter
      */
     protected function getIndexes(string $tableName): array
     {
+        $dialect = $this->getSchemaDialect();
+        [$query, $params] = $dialect->describeIndexSql($tableName, []);
+        $rows = $this->query($query, $params)->fetchAll('assoc');
         $indexes = [];
-        $rows = $this->fetchAll(sprintf('SHOW INDEXES FROM %s', $this->quoteTableName($tableName)));
         foreach ($rows as $row) {
             if (!isset($indexes[$row['Key_name']])) {
                 $indexes[$row['Key_name']] = ['columns' => []];
@@ -751,30 +779,14 @@ class MysqlAdapter extends PdoAdapter
      */
     public function getPrimaryKey(string $tableName): array
     {
-        $options = $this->getOptions();
-        $params = [
-            $options['database'],
-            $tableName,
-        ];
-        $rows = $this->query(
-            "SELECT
-                k.CONSTRAINT_NAME,
-                k.COLUMN_NAME
-            FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS t
-            JOIN INFORMATION_SCHEMA.KEY_COLUMN_USAGE k
-                USING(CONSTRAINT_NAME,TABLE_SCHEMA,TABLE_NAME)
-            WHERE t.CONSTRAINT_TYPE = 'PRIMARY KEY'
-                AND t.TABLE_SCHEMA = ?
-                AND t.TABLE_NAME = ?",
-            $params
-        )->fetchAll('assoc');
-
+        $indexes = $this->getIndexes($tableName);
         $primaryKey = [
+            'constraint' => '',
             'columns' => [],
         ];
-        foreach ($rows as $row) {
-            $primaryKey['constraint'] = $row['CONSTRAINT_NAME'];
-            $primaryKey['columns'][] = $row['COLUMN_NAME'];
+        foreach ($indexes as $name => $row) {
+            $primaryKey['constraint'] = $name;
+            $primaryKey['columns'] = (array)$row['columns'];
         }
 
         return $primaryKey;
@@ -813,33 +825,17 @@ class MysqlAdapter extends PdoAdapter
      */
     protected function getForeignKeys(string $tableName): array
     {
-        $schema = null;
+        $dialect = $this->getSchemaDialect();
+        $schema = (string)$this->getOption('database');
         if (strpos($tableName, '.') !== false) {
             [$schema, $tableName] = explode('.', $tableName);
         }
+        $config = ['database' => $schema];
 
-        $params = [];
-        $query = "SELECT
-              CONSTRAINT_NAME,
-              CONCAT(TABLE_SCHEMA, '.', TABLE_NAME) AS TABLE_NAME,
-              COLUMN_NAME,
-              CONCAT(REFERENCED_TABLE_SCHEMA, '.', REFERENCED_TABLE_NAME) AS REFERENCED_TABLE_NAME,
-              REFERENCED_COLUMN_NAME
-            FROM information_schema.KEY_COLUMN_USAGE
-            WHERE REFERENCED_TABLE_NAME IS NOT NULL";
-
-        if ($schema) {
-            $query .= ' AND TABLE_SCHEMA = ?';
-            $params[] = $schema;
-        } else {
-            $query .= ' AND TABLE_SCHEMA = DATABASE()';
-        }
-
-        $query .= ' AND TABLE_NAME = ? ORDER BY POSITION_IN_UNIQUE_CONSTRAINT';
-        $params[] = $tableName;
+        [$query, $params] = $dialect->describeForeignKeySql($tableName, $config);
+        $rows = $this->query($query, $params)->fetchAll('assoc');
 
         $foreignKeys = [];
-        $rows = $this->query($query, $params)->fetchAll('assoc');
         foreach ($rows as $row) {
             $foreignKeys[$row['CONSTRAINT_NAME']]['table'] = $row['TABLE_NAME'];
             $foreignKeys[$row['CONSTRAINT_NAME']]['columns'][] = $row['COLUMN_NAME'];
@@ -1413,13 +1409,13 @@ class MysqlAdapter extends PdoAdapter
         $def .= ' KEY';
 
         if (is_string($index->getName())) {
-            $def .= ' `' . $index->getName() . '`';
+            $def .= ' ' . $this->quoteColumnName($index->getName());
         }
 
         $columnNames = (array)$index->getColumns();
         $order = $index->getOrder() ?? [];
         $columnNames = array_map(function ($columnName) use ($order) {
-            $ret = '`' . $columnName . '`';
+            $ret = $this->quoteColumnName($columnName);
             if (isset($order[$columnName])) {
                 $ret .= ' ' . $order[$columnName];
             }
@@ -1439,7 +1435,7 @@ class MysqlAdapter extends PdoAdapter
             foreach ($columns as $column) {
                 $limit = !isset($limits[$column]) || $limits[$column] <= 0 ? '' : '(' . $limits[$column] . ')';
                 $columnSort = $order[$column] ?? '';
-                $def .= '`' . $column . '`' . $limit . ' ' . $columnSort . ', ';
+                $def .= $this->quoteColumnName($column) . $limit . ' ' . $columnSort . ', ';
             }
             $def = rtrim($def, ', ');
             $def .= ' )';
@@ -1478,28 +1474,6 @@ class MysqlAdapter extends PdoAdapter
         }
 
         return $def;
-    }
-
-    /**
-     * Describes a database table. This is a MySQL adapter specific method.
-     *
-     * @param string $tableName Table name
-     * @return array
-     */
-    public function describeTable(string $tableName): array
-    {
-        $options = $this->getOptions();
-
-        // mysql specific
-        $sql = "SELECT *
-             FROM information_schema.tables
-             WHERE table_schema = ?
-             AND table_name = ?";
-        $params = [$options['database'], $tableName];
-
-        $table = $this->query($sql, $params)->fetch('assoc');
-
-        return $table !== false ? $table : [];
     }
 
     /**
