@@ -4,6 +4,8 @@ declare(strict_types=1);
 namespace Migrations\Middleware;
 
 use Cake\Console\ConsoleIo;
+use Cake\Console\TestSuite\StubConsoleInput;
+use Cake\Console\TestSuite\StubConsoleOutput;
 use Cake\Core\Configure;
 use Cake\Core\Exception\CakeException;
 use Cake\Core\InstanceConfigTrait;
@@ -107,8 +109,7 @@ class PendingMigrationsMiddleware implements MiddlewareInterface
         $database = $connection->config()['database'];
         $this->_config['environment']['database'] = $database;
 
-        $config = new Config($this->_config);
-        $manager = new Manager($config, new ConsoleIo());
+        $manager = $this->getManager($this->_config);
 
         $migrations = $manager->getMigrations();
         foreach ($migrations as $migration) {
@@ -144,9 +145,7 @@ class PendingMigrationsMiddleware implements MiddlewareInterface
         $table = Util::tableName($plugin);
 
         $config['environment']['migration_table'] = $table;
-
-        $managerConfig = new Config($config);
-        $manager = new Manager($managerConfig, new ConsoleIo());
+        $manager = $this->getManager($config);
 
         $migrations = $manager->getMigrations();
         foreach ($migrations as $migration) {
@@ -165,5 +164,23 @@ class PendingMigrationsMiddleware implements MiddlewareInterface
     protected function isSkipped(ServerRequestInterface $request): bool
     {
         return (bool)Hash::get($request->getQueryParams(), static::SKIP_QUERY_KEY);
+    }
+
+    /**
+     * Create a manager instance with stubbed console io
+     *
+     * @param array $config Configuration data
+     * @return \Migrations\Migration\Manager
+     */
+    protected function getManager(array $config): Manager
+    {
+        $managerConfig = new Config($config);
+        $io = new ConsoleIo(
+            new StubConsoleOutput(),
+            new StubConsoleOutput(),
+            new StubConsoleInput([]),
+        );
+
+        return new Manager($managerConfig, $io);
     }
 }

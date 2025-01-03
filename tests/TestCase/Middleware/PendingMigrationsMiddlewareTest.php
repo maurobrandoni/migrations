@@ -14,6 +14,8 @@ declare(strict_types=1);
 namespace Migrations\Test\TestCase\Middleware;
 
 use Cake\Console\ConsoleIo;
+use Cake\Console\TestSuite\StubConsoleInput;
+use Cake\Console\TestSuite\StubConsoleOutput;
 use Cake\Core\Exception\CakeException;
 use Cake\Datasource\ConnectionManager;
 use Cake\Http\Response;
@@ -26,6 +28,10 @@ use TestApp\Http\TestRequestHandler;
 
 class PendingMigrationsMiddlewareTest extends TestCase
 {
+    private string $db;
+
+    private ConsoleIo $io;
+
     /**
      * Setup method
      *
@@ -34,6 +40,15 @@ class PendingMigrationsMiddlewareTest extends TestCase
     public function setUp(): void
     {
         parent::setUp();
+        $connection = ConnectionManager::get('test');
+
+        $config = $connection->config();
+        $this->db = $config['database'];
+        $this->io = new ConsoleIo(
+            new StubConsoleOutput(),
+            new StubConsoleOutput(),
+            new StubConsoleInput([])
+        );
     }
 
     public function tearDown(): void
@@ -75,13 +90,13 @@ class PendingMigrationsMiddlewareTest extends TestCase
                'migrations' => ROOT . DS . 'config' . DS . 'Migrations' . DS,
             ],
             'environment' => [
-               'database' => 'cakephp_test',
+               'database' => $this->db,
                'connection' => 'default',
                'migration_table' => 'phinxlog',
             ],
         ];
         $config = new Config($config);
-        $manager = new Manager($config, new ConsoleIo());
+        $manager = new Manager($config, $this->io);
         $manager->migrate(null, true);
 
         $request = new ServerRequest();
@@ -132,12 +147,12 @@ class PendingMigrationsMiddlewareTest extends TestCase
             ],
             'environment' => [
                 'connection' => 'default',
-                'database' => 'cakephp_test',
+                'database' => $this->db,
                 'migration_table' => 'migrator_phinxlog',
             ],
         ];
         $config = new Config($config);
-        $manager = new Manager($config, new ConsoleIo());
+        $manager = new Manager($config, $this->io);
         $manager->migrate(null, true);
 
         $request = new ServerRequest();
