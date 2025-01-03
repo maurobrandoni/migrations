@@ -1408,8 +1408,9 @@ class MysqlAdapter extends PdoAdapter
 
         $def .= ' KEY';
 
-        if (is_string($index->getName())) {
-            $def .= ' ' . $this->quoteColumnName($index->getName());
+        $name = $index->getName();
+        if (is_string($name)) {
+            $def .= ' ' . $this->quoteColumnName($name);
         }
 
         $columnNames = (array)$index->getColumns();
