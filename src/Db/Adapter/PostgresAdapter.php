@@ -9,6 +9,7 @@ declare(strict_types=1);
 namespace Migrations\Db\Adapter;
 
 use Cake\Database\Connection;
+use Cake\Database\Schema\SchemaDialect;
 use InvalidArgumentException;
 use Migrations\Db\AlterInstructions;
 use Migrations\Db\Literal;
@@ -124,6 +125,18 @@ class PostgresAdapter extends PdoAdapter
     }
 
     /**
+     * Get the schema dialect for this adapter.
+     *
+     * @return \Cake\Database\Schema\SchemaDialect
+     */
+    protected function getSchemaDialect(): SchemaDialect
+    {
+        $driver = $this->getConnection()->getDriver();
+
+        return $driver->schemaDialect();
+    }
+
+    /**
      * Quotes a schema name for use in a query.
      *
      * @param string $schemaName Schema Name
@@ -149,7 +162,9 @@ class PostgresAdapter extends PdoAdapter
      */
     public function quoteColumnName(string $columnName): string
     {
-        return '"' . $columnName . '"';
+        $driver = $this->getConnection()->getDriver();
+
+        return $driver->quoteIdentifier($columnName);
     }
 
     /**
@@ -160,20 +175,16 @@ class PostgresAdapter extends PdoAdapter
         if ($this->hasCreatedTable($tableName)) {
             return true;
         }
-
         $parts = $this->getSchemaName($tableName);
-        $connection = $this->getConnection();
-        $stmt = $connection->execute(
-            'SELECT *
-            FROM information_schema.tables
-            WHERE table_schema = ?
-            AND table_name = ?',
-            [$parts['schema'], $parts['table']]
-        );
-        $count = $stmt->rowCount();
-        $stmt->closeCursor();
+        $tableName = $parts['table'];
 
-        return $count === 1;
+        $dialect = $this->getSchemaDialect();
+        [$query, $params] = $dialect->listTablesSql(['schema' => $parts['schema']]);
+
+        $rows = $this->query($query, $params)->fetchAll();
+        $tables = array_column($rows, 0);
+
+        return in_array($tableName, $tables, true);
     }
 
     /**
@@ -376,6 +387,10 @@ class PostgresAdapter extends PdoAdapter
     {
         $parts = $this->getSchemaName($tableName);
         $columns = [];
+
+        // TODO We can't use cakephp/database here as several attributes are missing
+        // from the query cakephp prepares. We'll need to expand the cakephp/database
+        // query in a future release.
         $sql = sprintf(
             'SELECT column_name, data_type, udt_name, is_identity, is_nullable,
              column_default, character_maximum_length, numeric_precision, numeric_scale,
@@ -673,40 +688,25 @@ class PostgresAdapter extends PdoAdapter
      */
     protected function getIndexes(string $tableName): array
     {
+        $dialect = $this->getSchemaDialect();
         $parts = $this->getSchemaName($tableName);
 
+        [$query, $params] = $dialect->describeIndexSql($parts['table'], [
+            'schema' => $parts['schema'],
+            'database' => $this->getOption('database'),
+        ]);
+        $rows = $this->query($query, $params)->fetchAll('assoc');
+
         $indexes = [];
-        $sql = sprintf(
-            "SELECT
-                i.relname AS index_name,
-                a.attname AS column_name
-            FROM
-                pg_class t,
-                pg_class i,
-                pg_index ix,
-                pg_attribute a,
-                pg_namespace nsp
-            WHERE
-                t.oid = ix.indrelid
-                AND i.oid = ix.indexrelid
-                AND a.attrelid = t.oid
-                AND a.attnum = ANY(ix.indkey)
-                AND t.relnamespace = nsp.oid
-                AND nsp.nspname = %s
-                AND t.relkind = 'r'
-                AND t.relname = %s
-            ORDER BY
-                t.relname,
-                i.relname",
-            $this->quoteString($parts['schema']),
-            $this->quoteString($parts['table'])
-        );
-        $rows = $this->fetchAll($sql);
         foreach ($rows as $row) {
-            if (!isset($indexes[$row['index_name']])) {
-                $indexes[$row['index_name']] = ['columns' => []];
+            if (!isset($indexes[$row['relname']])) {
+                $indexes[$row['relname']] = [
+                    'isPrimary' => false,
+                    'columns' => [],
+                ];
             }
-            $indexes[$row['index_name']]['columns'][] = $row['column_name'];
+            $indexes[$row['relname']]['columns'][] = $row['attname'];
+            $indexes[$row['relname']]['isPrimary'] = $row['indisprimary'];
         }
 
         return $indexes;
@@ -832,34 +832,17 @@ class PostgresAdapter extends PdoAdapter
      */
     public function getPrimaryKey(string $tableName): array
     {
-        $parts = $this->getSchemaName($tableName);
-        $params = [
-            $parts['schema'],
-            $parts['table'],
-        ];
-        $rows = $this->query(
-            "SELECT
-                    tc.constraint_name,
-                    kcu.column_name
-                FROM information_schema.table_constraints AS tc
-                JOIN information_schema.key_column_usage AS kcu
-                    ON tc.constraint_name = kcu.constraint_name
-                WHERE constraint_type = 'PRIMARY KEY'
-                    AND tc.table_schema = ?
-                    AND tc.table_name = ?
-                ORDER BY kcu.position_in_unique_constraint",
-            $params,
-        )->fetchAll('assoc');
+        $indexes = $this->getIndexes($tableName);
 
-        $primaryKey = [
-            'columns' => [],
-        ];
-        foreach ($rows as $row) {
-            $primaryKey['constraint'] = $row['constraint_name'];
-            $primaryKey['columns'][] = $row['column_name'];
+        foreach ($indexes as $name => $index) {
+            if ($index['isPrimary']) {
+                $index['constraint'] = $name;
+
+                return $index;
+            }
         }
 
-        return $primaryKey;
+        return ['columns' => []];
     }
 
     /**
@@ -897,6 +880,26 @@ class PostgresAdapter extends PdoAdapter
      */
     protected function getForeignKeys(string $tableName): array
     {
+        $parts = $this->getSchemaName($tableName);
+
+        // This should work but is blocked on a bug in cakephp/database
+        // The field ordering after reflection is lost
+        /*
+        $dialect = $this->getSchemaDialect();
+        [$query, $params] = $dialect->describeForeignKeySql($parts['table'], [
+            'schema' => $parts['schema'],
+            'database' => $this->getOption('database'),
+        ]);
+        $rows = $this->query($query, $params)->fetchAll('assoc');
+        foreach ($rows as $row) {
+            $name = $row['name'];
+            $foreignKeys[$name]['table'] = $parts['table'];
+            $foreignKeys[$name]['columns'][] = $row['column_name'];
+            $foreignKeys[$name]['referenced_table'] = $row['references_table'];
+            $foreignKeys[$name]['references_columns'][] = $row['references_field'];
+        }
+        */
+
         $parts = $this->getSchemaName($tableName);
         $foreignKeys = [];
         $params = [
@@ -1556,7 +1559,7 @@ class PostgresAdapter extends PdoAdapter
             $this->quoteTableName($table->getName())
         );
         $columns = array_keys($row);
-        $sql .= '(' . implode(', ', array_map([$this, 'quoteColumnName'], $columns)) . ')';
+        $sql .= '(' . implode(', ', array_map($this->quoteColumnName(...), $columns)) . ')';
 
         foreach ($row as $column => $value) {
             if (is_bool($value)) {
@@ -1570,7 +1573,7 @@ class PostgresAdapter extends PdoAdapter
         }
 
         if ($this->isDryRunEnabled()) {
-            $sql .= ' ' . $override . 'VALUES (' . implode(', ', array_map([$this, 'quoteValue'], $row)) . ');';
+            $sql .= ' ' . $override . 'VALUES (' . implode(', ', array_map($this->quoteValue(...), $row)) . ');';
             $this->io->out($sql);
         } else {
             $values = [];
@@ -1607,12 +1610,11 @@ class PostgresAdapter extends PdoAdapter
             $override = self::OVERRIDE_SYSTEM_VALUE . ' ';
         }
 
-        $callback = fn ($key) => $this->quoteColumnName($key);
-        $sql .= '(' . implode(', ', array_map($callback, $keys)) . ') ' . $override . 'VALUES ';
+        $sql .= '(' . implode(', ', array_map($this->quoteColumnName(...), $keys)) . ') ' . $override . 'VALUES ';
 
         if ($this->isDryRunEnabled()) {
             $values = array_map(function ($row) {
-                return '(' . implode(', ', array_map([$this, 'quoteValue'], $row)) . ')';
+                return '(' . implode(', ', array_map($this->quoteValue(...), $row)) . ')';
             }, $rows);
             $sql .= implode(', ', $values) . ';';
             $this->io->out($sql);

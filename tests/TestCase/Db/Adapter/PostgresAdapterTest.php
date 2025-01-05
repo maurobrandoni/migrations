@@ -136,7 +136,8 @@ class PostgresAdapterTest extends TestCase
     public function testQuoteSchemaName()
     {
         $this->assertEquals('"schema"', $this->adapter->quoteSchemaName('schema'));
-        $this->assertEquals('"schema.schema"', $this->adapter->quoteSchemaName('schema.schema'));
+        // No . is supported in schema name.
+        $this->assertEquals('"schema"."schema"', $this->adapter->quoteSchemaName('schema.schema'));
     }
 
     public function testGetGlobalSchemaName()
@@ -172,7 +173,8 @@ class PostgresAdapterTest extends TestCase
     public function testQuoteColumnName()
     {
         $this->assertEquals('"string"', $this->adapter->quoteColumnName('string'));
-        $this->assertEquals('"string.string"', $this->adapter->quoteColumnName('string.string'));
+        // No . is supported in column name.
+        $this->assertEquals('"string"."string"', $this->adapter->quoteColumnName('string.string'));
     }
 
     public function testCreateTable()
@@ -1686,6 +1688,7 @@ class PostgresAdapterTest extends TestCase
             ->save();
 
         $this->assertTrue($this->adapter->hasForeignKey($table->getName(), ['ref_table_id', 'ref_table_field1']));
+
         $this->adapter->dropForeignKey($table->getName(), ['ref_table_id', 'ref_table_field1']);
         $this->assertFalse($this->adapter->hasForeignKey($table->getName(), ['ref_table_id', 'ref_table_field1']));
         $this->assertTrue(
