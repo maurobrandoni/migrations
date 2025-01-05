@@ -1603,6 +1603,7 @@ class PostgresAdapter extends PdoAdapter
             $this->quoteTableName($table->getName())
         );
         $current = current($rows);
+        /** @var array<string> $keys */
         $keys = array_keys($current);
 
         $override = '';
