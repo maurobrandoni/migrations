@@ -882,26 +882,27 @@ class PostgresAdapter extends PdoAdapter
     {
         $parts = $this->getSchemaName($tableName);
 
+        /*
         // This should work but is blocked on a bug in cakephp/database
         // The field ordering after reflection is lost
-        /*
         $dialect = $this->getSchemaDialect();
         [$query, $params] = $dialect->describeForeignKeySql($parts['table'], [
             'schema' => $parts['schema'],
             'database' => $this->getOption('database'),
         ]);
         $rows = $this->query($query, $params)->fetchAll('assoc');
+        $foreignKeys = [];
         foreach ($rows as $row) {
             $name = $row['name'];
             $foreignKeys[$name]['table'] = $parts['table'];
             $foreignKeys[$name]['columns'][] = $row['column_name'];
             $foreignKeys[$name]['referenced_table'] = $row['references_table'];
-            $foreignKeys[$name]['references_columns'][] = $row['references_field'];
+            $foreignKeys[$name]['referenced_columns'][] = $row['references_field'];
         }
         */
 
-        $parts = $this->getSchemaName($tableName);
         $foreignKeys = [];
+        $parts = $this->getSchemaName($tableName);
         $params = [
             $parts['schema'],
             $parts['table'],
