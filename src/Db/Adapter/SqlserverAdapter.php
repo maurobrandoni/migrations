@@ -9,6 +9,7 @@ declare(strict_types=1);
 namespace Migrations\Db\Adapter;
 
 use BadMethodCallException;
+use Cake\Database\Schema\SchemaDialect;
 use InvalidArgumentException;
 use Migrations\Db\AlterInstructions;
 use Migrations\Db\Literal;
@@ -100,6 +101,18 @@ class SqlserverAdapter extends PdoAdapter
     }
 
     /**
+     * Get the schema dialect for this adapter.
+     *
+     * @return \Cake\Database\Schema\SchemaDialect
+     */
+    protected function getSchemaDialect(): SchemaDialect
+    {
+        $driver = $this->getConnection()->getDriver();
+
+        return $driver->schemaDialect();
+    }
+
+    /**
      * Quotes a schema name for use in a query.
      *
      * @param string $schemaName Schema Name
@@ -125,7 +138,9 @@ class SqlserverAdapter extends PdoAdapter
      */
     public function quoteColumnName(string $columnName): string
     {
-        return '[' . str_replace(']', '\]', $columnName) . ']';
+        $driver = $this->getConnection()->getDriver();
+
+        return $driver->quoteIdentifier($columnName);
     }
 
     /**
@@ -137,6 +152,7 @@ class SqlserverAdapter extends PdoAdapter
             return true;
         }
 
+        // TODO update this to use listTables()
         $parts = $this->getSchemaName($tableName);
         /** @var array<string, mixed> $result */
         $result = $this->query(
@@ -367,14 +383,22 @@ class SqlserverAdapter extends PdoAdapter
      */
     public function getColumns(string $tableName): array
     {
+        // TODO we can't use cakephp/database for reflection here
+        // as we'd be missing some attributes.
         $parts = $this->getSchemaName($tableName);
         $columns = [];
-        $sql = "SELECT DISTINCT TABLE_SCHEMA AS [schema], TABLE_NAME as [table_name], COLUMN_NAME AS [name], DATA_TYPE AS [type],
+        $sql = "SELECT
+            DISTINCT TABLE_SCHEMA AS [schema],
+            TABLE_NAME as [table_name],
+            COLUMN_NAME AS [name],
+            DATA_TYPE AS [type],
             IS_NULLABLE AS [null], COLUMN_DEFAULT AS [default],
             CHARACTER_MAXIMUM_LENGTH AS [char_length],
             NUMERIC_PRECISION AS [precision],
-            NUMERIC_SCALE AS [scale], ORDINAL_POSITION AS [ordinal_position],
-            COLUMNPROPERTY(object_id(TABLE_NAME), COLUMN_NAME, 'IsIdentity') as [identity]
+            NUMERIC_SCALE AS [scale],
+            ORDINAL_POSITION AS [ordinal_position],
+            COLUMNPROPERTY(object_id(TABLE_NAME),
+            COLUMN_NAME, 'IsIdentity') as [identity]
         FROM INFORMATION_SCHEMA.COLUMNS
         WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?
         ORDER BY ordinal_position";
@@ -653,6 +677,7 @@ ORDER BY IC.[key_ordinal]';
     public function getIndexes(string $tableName): array
     {
         $parts = $this->getSchemaName($tableName);
+        // TODO use cakephp/database here
 
         $indexes = [];
         $sql = "SELECT I.[name] AS [index_name], I.[index_id] as [index_id], T.[object_id] as [table_id]
@@ -808,6 +833,7 @@ ORDER BY T.[name], I.[index_id]";
      */
     public function getPrimaryKey(string $tableName): array
     {
+        // TODO use cakephp/database here
         $parts = $this->getSchemaName($tableName);
         $rows = $this->query(
             "SELECT
@@ -869,6 +895,7 @@ ORDER BY T.[name], I.[index_id]";
      */
     protected function getForeignKeys(string $tableName): array
     {
+        // TODO use cakephp/database here
         $parts = $this->getSchemaName($tableName);
         $foreignKeys = [];
         $rows = $this->query(
