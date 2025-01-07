@@ -134,19 +134,6 @@ class SqliteAdapter extends PdoAdapter
     }
 
     /**
-     * {@inheritDoc}
-     *
-     * @throws \RuntimeException
-     * @throws \InvalidArgumentException
-     * @return void
-     */
-    public function connect(): void
-    {
-        $this->getConnection()->getDriver()->connect();
-        $this->setConnection($this->getConnection());
-    }
-
-    /**
      * @inheritDoc
      */
     public function setOptions(array $options): AdapterInterface
@@ -168,61 +155,11 @@ class SqliteAdapter extends PdoAdapter
     /**
      * @inheritDoc
      */
-    public function disconnect(): void
-    {
-        $this->getConnection()->getDriver()->disconnect();
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function hasTransactions(): bool
-    {
-        return true;
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function beginTransaction(): void
-    {
-        $this->getConnection()->begin();
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function commitTransaction(): void
-    {
-        $this->getConnection()->commit();
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function rollbackTransaction(): void
-    {
-        $this->getConnection()->rollBack();
-    }
-
-    /**
-     * @inheritDoc
-     */
     public function quoteTableName($tableName): string
     {
         $driver = $this->getConnection()->getDriver();
 
         return $driver->quoteIdentifier($tableName);
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function quoteColumnName($columnName): string
-    {
-        $driver = $this->getConnection()->getDriver();
-
-        return $driver->quoteIdentifier($columnName);
     }
 
     /**

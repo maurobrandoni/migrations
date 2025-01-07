@@ -69,6 +69,69 @@ abstract class PdoAdapter extends AbstractAdapter implements DirectActionInterfa
     }
 
     /**
+     * {@inheritDoc}
+     *
+     * @throws \RuntimeException
+     * @throws \InvalidArgumentException
+     * @return void
+     */
+    public function connect(): void
+    {
+        $this->getConnection()->getDriver()->connect();
+        $this->setConnection($this->getConnection());
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function disconnect(): void
+    {
+        $this->getConnection()->getDriver()->disconnect();
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function beginTransaction(): void
+    {
+        $this->getConnection()->begin();
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function commitTransaction(): void
+    {
+        $this->getConnection()->commit();
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function rollbackTransaction(): void
+    {
+        $this->getConnection()->rollback();
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function hasTransactions(): bool
+    {
+        return true;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function quoteColumnName($columnName): string
+    {
+        $driver = $this->getConnection()->getDriver();
+
+        return $driver->quoteIdentifier($columnName);
+    }
+
+    /**
      * Writes a message to stdout if verbose output is on
      *
      * @param string $message The message to show
@@ -198,16 +261,6 @@ abstract class PdoAdapter extends AbstractAdapter implements DirectActionInterfa
     {
         return $this->getConnection();
     }
-
-    /**
-     * @inheritDoc
-     */
-    abstract public function connect(): void;
-
-    /**
-     * @inheritDoc
-     */
-    abstract public function disconnect(): void;
 
     /**
      * @inheritDoc

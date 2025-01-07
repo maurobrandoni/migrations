@@ -71,59 +71,6 @@ class PostgresAdapter extends PdoAdapter
     }
 
     /**
-     * {@inheritDoc}
-     *
-     * @throws \RuntimeException
-     * @throws \InvalidArgumentException
-     * @return void
-     */
-    public function connect(): void
-    {
-        $this->getConnection()->getDriver()->connect();
-        $this->setConnection($this->getConnection());
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function disconnect(): void
-    {
-        $this->getConnection()->getDriver()->disconnect();
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function hasTransactions(): bool
-    {
-        return true;
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function beginTransaction(): void
-    {
-        $this->getConnection()->begin();
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function commitTransaction(): void
-    {
-        $this->getConnection()->commit();
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function rollbackTransaction(): void
-    {
-        $this->getConnection()->rollback();
-    }
-
-    /**
      * Quotes a schema name for use in a query.
      *
      * @param string $schemaName Schema Name
@@ -142,16 +89,6 @@ class PostgresAdapter extends PdoAdapter
         $parts = $this->getSchemaName($tableName);
 
         return $this->quoteSchemaName($parts['schema']) . '.' . $this->quoteColumnName($parts['table']);
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function quoteColumnName(string $columnName): string
-    {
-        $driver = $this->getConnection()->getDriver();
-
-        return $driver->quoteIdentifier($columnName);
     }
 
     /**
