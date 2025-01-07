@@ -9,7 +9,6 @@ declare(strict_types=1);
 namespace Migrations\Db\Adapter;
 
 use BadMethodCallException;
-use Cake\Database\Schema\SchemaDialect;
 use InvalidArgumentException;
 use Migrations\Db\AlterInstructions;
 use Migrations\Db\Expression;
@@ -224,18 +223,6 @@ class SqliteAdapter extends PdoAdapter
         $driver = $this->getConnection()->getDriver();
 
         return $driver->quoteIdentifier($columnName);
-    }
-
-    /**
-     * Get the schema dialect for this adapter.
-     *
-     * @return \Cake\Database\Schema\SchemaDialect
-     */
-    protected function getSchemaDialect(): SchemaDialect
-    {
-        $driver = $this->getConnection()->getDriver();
-
-        return $driver->schemaDialect();
     }
 
     /**

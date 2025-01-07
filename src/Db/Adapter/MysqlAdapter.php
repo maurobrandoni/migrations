@@ -11,7 +11,6 @@ namespace Migrations\Db\Adapter;
 use Cake\Core\Configure;
 use Cake\Database\Connection;
 use Cake\Database\Exception\QueryException;
-use Cake\Database\Schema\SchemaDialect;
 use InvalidArgumentException;
 use Migrations\Db\AlterInstructions;
 use Migrations\Db\Literal;
@@ -172,18 +171,6 @@ class MysqlAdapter extends PdoAdapter
         $driver = $this->getConnection()->getDriver();
 
         return $driver->quoteIdentifier($columnName);
-    }
-
-    /**
-     * Get the schema dialect for this adapter.
-     *
-     * @return \Cake\Database\Schema\SchemaDialect
-     */
-    protected function getSchemaDialect(): SchemaDialect
-    {
-        $driver = $this->getConnection()->getDriver();
-
-        return $driver->schemaDialect();
     }
 
     /**

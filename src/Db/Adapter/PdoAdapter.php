@@ -16,6 +16,7 @@ use Cake\Database\Query\DeleteQuery;
 use Cake\Database\Query\InsertQuery;
 use Cake\Database\Query\SelectQuery;
 use Cake\Database\Query\UpdateQuery;
+use Cake\Database\Schema\SchemaDialect;
 use InvalidArgumentException;
 use Migrations\Config\Config;
 use Migrations\Db\Action\AddColumn;
@@ -54,6 +55,18 @@ abstract class PdoAdapter extends AbstractAdapter implements DirectActionInterfa
      * @var \Cake\Database\Connection|null
      */
     protected ?Connection $connection = null;
+
+    /**
+     * Get the schema dialect for this adapter.
+     *
+     * @return \Cake\Database\Schema\SchemaDialect
+     */
+    protected function getSchemaDialect(): SchemaDialect
+    {
+        $driver = $this->getConnection()->getDriver();
+
+        return $driver->schemaDialect();
+    }
 
     /**
      * Writes a message to stdout if verbose output is on
