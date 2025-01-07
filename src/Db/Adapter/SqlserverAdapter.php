@@ -9,6 +9,7 @@ declare(strict_types=1);
 namespace Migrations\Db\Adapter;
 
 use BadMethodCallException;
+use Cake\Database\Schema\SchemaDialect;
 use InvalidArgumentException;
 use Migrations\Db\AlterInstructions;
 use Migrations\Db\Literal;
@@ -100,6 +101,18 @@ class SqlserverAdapter extends PdoAdapter
     }
 
     /**
+     * Get the schema dialect for this adapter.
+     *
+     * @return \Cake\Database\Schema\SchemaDialect
+     */
+    protected function getSchemaDialect(): SchemaDialect
+    {
+        $driver = $this->getConnection()->getDriver();
+
+        return $driver->schemaDialect();
+    }
+
+    /**
      * Quotes a schema name for use in a query.
      *
      * @param string $schemaName Schema Name
@@ -125,7 +138,9 @@ class SqlserverAdapter extends PdoAdapter
      */
     public function quoteColumnName(string $columnName): string
     {
-        return '[' . str_replace(']', '\]', $columnName) . ']';
+        $driver = $this->getConnection()->getDriver();
+
+        return $driver->quoteIdentifier($columnName);
     }
 
     /**
@@ -136,15 +151,15 @@ class SqlserverAdapter extends PdoAdapter
         if ($this->hasCreatedTable($tableName)) {
             return true;
         }
+        $dialect = $this->getSchemaDialect();
 
         $parts = $this->getSchemaName($tableName);
-        /** @var array<string, mixed> $result */
-        $result = $this->query(
-            'SELECT count(*) as [count] FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?',
-            [$parts['schema'], $parts['table']]
-        )->fetch('assoc');
+        [$query, $params] = $dialect->listTablesSql(['schema' => $parts['schema']]);
 
-        return $result['count'] > 0;
+        $rows = $this->query($query, $params)->fetchAll();
+        $tables = array_column($rows, 0);
+
+        return in_array($parts['table'], $tables, true);
     }
 
     /**
@@ -367,14 +382,22 @@ class SqlserverAdapter extends PdoAdapter
      */
     public function getColumns(string $tableName): array
     {
+        // TODO we can't use cakephp/database for reflection here
+        // as we'd be missing some attributes.
         $parts = $this->getSchemaName($tableName);
         $columns = [];
-        $sql = "SELECT DISTINCT TABLE_SCHEMA AS [schema], TABLE_NAME as [table_name], COLUMN_NAME AS [name], DATA_TYPE AS [type],
+        $sql = "SELECT
+            DISTINCT TABLE_SCHEMA AS [schema],
+            TABLE_NAME as [table_name],
+            COLUMN_NAME AS [name],
+            DATA_TYPE AS [type],
             IS_NULLABLE AS [null], COLUMN_DEFAULT AS [default],
             CHARACTER_MAXIMUM_LENGTH AS [char_length],
             NUMERIC_PRECISION AS [precision],
-            NUMERIC_SCALE AS [scale], ORDINAL_POSITION AS [ordinal_position],
-            COLUMNPROPERTY(object_id(TABLE_NAME), COLUMN_NAME, 'IsIdentity') as [identity]
+            NUMERIC_SCALE AS [scale],
+            ORDINAL_POSITION AS [ordinal_position],
+            COLUMNPROPERTY(object_id(TABLE_NAME),
+            COLUMN_NAME, 'IsIdentity') as [identity]
         FROM INFORMATION_SCHEMA.COLUMNS
         WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?
         ORDER BY ordinal_position";
@@ -653,19 +676,21 @@ ORDER BY IC.[key_ordinal]';
     public function getIndexes(string $tableName): array
     {
         $parts = $this->getSchemaName($tableName);
+        $dialect = $this->getSchemaDialect();
 
+        [$query, $params] = $dialect->describeIndexSql($parts['table'], ['schema' => $parts['schema']]);
+        $rows = $this->query($query, $params)->fetchAll('assoc');
         $indexes = [];
-        $sql = "SELECT I.[name] AS [index_name], I.[index_id] as [index_id], T.[object_id] as [table_id]
-FROM sys.[tables] AS T
-  INNER JOIN sys.[indexes] I ON T.[object_id] = I.[object_id]
-  INNER JOIN sys.[schemas] S ON s.schema_id = T.schema_id
-WHERE T.[is_ms_shipped] = 0 AND I.[type_desc] <> 'HEAP' AND S.[name] = ? AND T.[name] = ?
-ORDER BY T.[name], I.[index_id]";
-
-        $rows = $this->query($sql, [$parts['schema'], $parts['table']])->fetchAll('assoc');
         foreach ($rows as $row) {
-            $columns = $this->getIndexColumns($row['table_id'], $row['index_id']);
-            $indexes[$row['index_name']] = ['columns' => $columns];
+            $name = $row['index_name'];
+            if (!isset($indexes[$name])) {
+                $indexes[$name] = [
+                    'columns' => [],
+                    'isPrimary' => false,
+                ];
+            }
+            $indexes[$name]['columns'][] = $row['column_name'];
+            $indexes[$name]['isPrimary'] = $row['is_primary_key'];
         }
 
         return $indexes;
@@ -808,27 +833,15 @@ ORDER BY T.[name], I.[index_id]";
      */
     public function getPrimaryKey(string $tableName): array
     {
-        $parts = $this->getSchemaName($tableName);
-        $rows = $this->query(
-            "SELECT
-                    tc.CONSTRAINT_NAME,
-                    kcu.COLUMN_NAME
-                FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS AS tc
-                JOIN INFORMATION_SCHEMA.KEY_COLUMN_USAGE AS kcu
-                    ON tc.CONSTRAINT_NAME = kcu.CONSTRAINT_NAME
-                WHERE CONSTRAINT_TYPE = 'PRIMARY KEY'
-                    AND tc.CONSTRAINT_SCHEMA = ?
-                    AND tc.TABLE_NAME = ?
-                ORDER BY kcu.ORDINAL_POSITION",
-            [$parts['schema'], $parts['table']]
-        )->fetchAll('assoc');
-
+        $indexes = $this->getIndexes($tableName);
         $primaryKey = [
             'columns' => [],
         ];
-        foreach ($rows as $row) {
-            $primaryKey['constraint'] = $row['CONSTRAINT_NAME'];
-            $primaryKey['columns'][] = $row['COLUMN_NAME'];
+        foreach ($indexes as $name => $row) {
+            if ($row['isPrimary']) {
+                $primaryKey['constraint'] = $name;
+                $primaryKey['columns'] = $row['columns'];
+            }
         }
 
         return $primaryKey;
@@ -870,26 +883,26 @@ ORDER BY T.[name], I.[index_id]";
     protected function getForeignKeys(string $tableName): array
     {
         $parts = $this->getSchemaName($tableName);
+        $dialect = $this->getSchemaDialect();
         $foreignKeys = [];
-        $rows = $this->query(
-            "SELECT
-                tc.CONSTRAINT_NAME,
-                tc.TABLE_NAME, kcu.COLUMN_NAME,
-                ccu.TABLE_NAME AS REFERENCED_TABLE_NAME,
-                ccu.COLUMN_NAME AS REFERENCED_COLUMN_NAME
-            FROM
-                INFORMATION_SCHEMA.TABLE_CONSTRAINTS AS tc
-                JOIN INFORMATION_SCHEMA.KEY_COLUMN_USAGE AS kcu ON tc.CONSTRAINT_NAME = kcu.CONSTRAINT_NAME
-                JOIN INFORMATION_SCHEMA.CONSTRAINT_COLUMN_USAGE AS ccu ON ccu.CONSTRAINT_NAME = tc.CONSTRAINT_NAME
-            WHERE CONSTRAINT_TYPE = 'FOREIGN KEY' AND tc.TABLE_SCHEMA = ? AND tc.TABLE_NAME = ?
-            ORDER BY kcu.ORDINAL_POSITION",
-            [$parts['schema'], $parts['table']]
-        )->fetchAll('assoc');
+
+        [$query, $params] = $dialect->describeForeignKeySql($parts['table'], ['schema' => $parts['schema']]);
+        $rows = $this->query($query, $params)->fetchAll('assoc');
+
         foreach ($rows as $row) {
-            $foreignKeys[$row['CONSTRAINT_NAME']]['table'] = $row['TABLE_NAME'];
-            $foreignKeys[$row['CONSTRAINT_NAME']]['columns'][] = $row['COLUMN_NAME'];
-            $foreignKeys[$row['CONSTRAINT_NAME']]['referenced_table'] = $row['REFERENCED_TABLE_NAME'];
-            $foreignKeys[$row['CONSTRAINT_NAME']]['referenced_columns'][] = $row['REFERENCED_COLUMN_NAME'];
+            $name = $row['foreign_key_name'];
+            if (!isset($foreignKeys[$name])) {
+                $foreignKeys[$name] = [
+                    'table' => '',
+                    'columns' => [],
+                    'referenced_table' => '',
+                    'referenced_columns' => [],
+                ];
+            }
+            $foreignKeys[$name]['table'] = $parts['table'];
+            $foreignKeys[$name]['columns'][] = $row['column'];
+            $foreignKeys[$name]['referenced_table'] = $row['reference_table'];
+            $foreignKeys[$name]['referenced_columns'][] = $row['reference_column'];
         }
         foreach ($foreignKeys as $name => $key) {
             $foreignKeys[$name]['columns'] = array_values(array_unique($key['columns']));

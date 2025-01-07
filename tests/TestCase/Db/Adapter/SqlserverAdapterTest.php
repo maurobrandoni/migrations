@@ -44,7 +44,6 @@ class SqlserverAdapterTest extends TestCase
             'connection' => ConnectionManager::get('test'),
             'database' => $config['database'],
         ];
-
         $this->adapter = new SqlserverAdapter($this->config, $this->getConsoleIo());
 
         // ensure the database is empty for each test
@@ -1136,7 +1135,8 @@ WHERE t.name='ntable'");
     public function testQuoteSchemaName()
     {
         $this->assertEquals('[schema]', $this->adapter->quoteSchemaName('schema'));
-        $this->assertEquals('[schema.schema]', $this->adapter->quoteSchemaName('schema.schema'));
+        // Dotted schema names are not supported
+        $this->assertEquals('[schema].[schema]', $this->adapter->quoteSchemaName('schema.schema'));
     }
 
     public function testInvalidSqlType()
