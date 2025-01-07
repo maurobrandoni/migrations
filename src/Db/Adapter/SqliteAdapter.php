@@ -754,7 +754,7 @@ PCRE_PATTERN;
                 "SELECT *
                 FROM sqlite_master
                 WHERE
-                    (\"type\" = 'index' OR `type` = 'trigger')
+                    (\"type\" = 'index' OR \"type\" = 'trigger')
                     AND tbl_name = ?
                     AND sql IS NOT NULL
                 ",

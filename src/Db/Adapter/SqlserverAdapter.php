@@ -136,7 +136,7 @@ class SqlserverAdapter extends PdoAdapter
             if (is_string($primaryKey)) { // handle primary_key => 'id'
                 $pkSql .= $this->quoteColumnName($primaryKey);
             } elseif (is_array($primaryKey)) { // handle primary_key => array('tag_id', 'resource_id')
-                $pkSql .= implode(',', array_map([$this, 'quoteColumnName'], $primaryKey));
+                $pkSql .= implode(',', array_map($this->quoteColumnName(...), $primaryKey));
             }
             $pkSql .= ')';
             $sqlBuffer[] = $pkSql;
@@ -190,7 +190,7 @@ class SqlserverAdapter extends PdoAdapter
             if (is_string($newColumns)) { // handle primary_key => 'id'
                 $sql .= $this->quoteColumnName($newColumns);
             } elseif (is_array($newColumns)) { // handle primary_key => array('tag_id', 'resource_id')
-                $sql .= implode(',', array_map([$this, 'quoteColumnName'], $newColumns));
+                $sql .= implode(',', array_map($this->quoteColumnName(...), $newColumns));
             }
             $sql .= ')';
             $instructions->addPostStep($sql);
