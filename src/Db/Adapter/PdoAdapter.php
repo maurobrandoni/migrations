@@ -124,7 +124,7 @@ abstract class PdoAdapter extends AbstractAdapter implements DirectActionInterfa
     /**
      * @inheritDoc
      */
-    public function quoteColumnName($columnName): string
+    public function quoteColumnName(string $columnName): string
     {
         $driver = $this->getConnection()->getDriver();
 
