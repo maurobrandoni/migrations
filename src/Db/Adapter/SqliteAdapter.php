@@ -9,7 +9,6 @@ declare(strict_types=1);
 namespace Migrations\Db\Adapter;
 
 use BadMethodCallException;
-use Cake\Database\Schema\SchemaDialect;
 use InvalidArgumentException;
 use Migrations\Db\AlterInstructions;
 use Migrations\Db\Expression;
@@ -135,19 +134,6 @@ class SqliteAdapter extends PdoAdapter
     }
 
     /**
-     * {@inheritDoc}
-     *
-     * @throws \RuntimeException
-     * @throws \InvalidArgumentException
-     * @return void
-     */
-    public function connect(): void
-    {
-        $this->getConnection()->getDriver()->connect();
-        $this->setConnection($this->getConnection());
-    }
-
-    /**
      * @inheritDoc
      */
     public function setOptions(array $options): AdapterInterface
@@ -169,73 +155,11 @@ class SqliteAdapter extends PdoAdapter
     /**
      * @inheritDoc
      */
-    public function disconnect(): void
-    {
-        $this->getConnection()->getDriver()->disconnect();
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function hasTransactions(): bool
-    {
-        return true;
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function beginTransaction(): void
-    {
-        $this->getConnection()->begin();
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function commitTransaction(): void
-    {
-        $this->getConnection()->commit();
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function rollbackTransaction(): void
-    {
-        $this->getConnection()->rollBack();
-    }
-
-    /**
-     * @inheritDoc
-     */
     public function quoteTableName($tableName): string
     {
         $driver = $this->getConnection()->getDriver();
 
         return $driver->quoteIdentifier($tableName);
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function quoteColumnName($columnName): string
-    {
-        $driver = $this->getConnection()->getDriver();
-
-        return $driver->quoteIdentifier($columnName);
-    }
-
-    /**
-     * Get the schema dialect for this adapter.
-     *
-     * @return \Cake\Database\Schema\SchemaDialect
-     */
-    protected function getSchemaDialect(): SchemaDialect
-    {
-        $driver = $this->getConnection()->getDriver();
-
-        return $driver->schemaDialect();
     }
 
     /**
@@ -830,7 +754,7 @@ PCRE_PATTERN;
                 "SELECT *
                 FROM sqlite_master
                 WHERE
-                    (\"type\" = 'index' OR `type` = 'trigger')
+                    (\"type\" = 'index' OR \"type\" = 'trigger')
                     AND tbl_name = ?
                     AND sql IS NOT NULL
                 ",

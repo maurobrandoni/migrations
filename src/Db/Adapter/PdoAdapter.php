@@ -16,6 +16,7 @@ use Cake\Database\Query\DeleteQuery;
 use Cake\Database\Query\InsertQuery;
 use Cake\Database\Query\SelectQuery;
 use Cake\Database\Query\UpdateQuery;
+use Cake\Database\Schema\SchemaDialect;
 use InvalidArgumentException;
 use Migrations\Config\Config;
 use Migrations\Db\Action\AddColumn;
@@ -54,6 +55,81 @@ abstract class PdoAdapter extends AbstractAdapter implements DirectActionInterfa
      * @var \Cake\Database\Connection|null
      */
     protected ?Connection $connection = null;
+
+    /**
+     * Get the schema dialect for this adapter.
+     *
+     * @return \Cake\Database\Schema\SchemaDialect
+     */
+    protected function getSchemaDialect(): SchemaDialect
+    {
+        $driver = $this->getConnection()->getDriver();
+
+        return $driver->schemaDialect();
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @throws \RuntimeException
+     * @throws \InvalidArgumentException
+     * @return void
+     */
+    public function connect(): void
+    {
+        $this->getConnection()->getDriver()->connect();
+        $this->setConnection($this->getConnection());
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function disconnect(): void
+    {
+        $this->getConnection()->getDriver()->disconnect();
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function beginTransaction(): void
+    {
+        $this->getConnection()->begin();
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function commitTransaction(): void
+    {
+        $this->getConnection()->commit();
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function rollbackTransaction(): void
+    {
+        $this->getConnection()->rollback();
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function hasTransactions(): bool
+    {
+        return true;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function quoteColumnName(string $columnName): string
+    {
+        $driver = $this->getConnection()->getDriver();
+
+        return $driver->quoteIdentifier($columnName);
+    }
 
     /**
      * Writes a message to stdout if verbose output is on
@@ -185,16 +261,6 @@ abstract class PdoAdapter extends AbstractAdapter implements DirectActionInterfa
     {
         return $this->getConnection();
     }
-
-    /**
-     * @inheritDoc
-     */
-    abstract public function connect(): void;
-
-    /**
-     * @inheritDoc
-     */
-    abstract public function disconnect(): void;
 
     /**
      * @inheritDoc
