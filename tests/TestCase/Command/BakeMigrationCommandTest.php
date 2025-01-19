@@ -386,4 +386,16 @@ class BakeMigrationCommandTest extends TestCase
         $this->assertExitCode(BaseCommand::CODE_ERROR);
         $this->assertErrorContains('When applying fields the migration name should start with one of the following prefixes: `Create`, `Drop`, `Add`, `Remove`, `Alter`.');
     }
+
+    public function testBakeMigrationWithoutBake()
+    {
+        // Make sure to unload the Bake plugin
+        $this->createApp()->getEventManager()->on('Console.buildCommands', function ($event, $commands) {
+            Plugin::getCollection()->remove('Bake');
+        });
+
+        $this->exec('bake migration CreateUsers name:string --connection test');
+        $this->assertExitCode(BaseCommand::CODE_ERROR);
+        $this->assertErrorContains('Bake plugin is not loaded. Please load it first to generate a migration.');
+    }
 }

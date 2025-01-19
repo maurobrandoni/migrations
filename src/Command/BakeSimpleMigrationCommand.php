@@ -20,6 +20,7 @@ use Bake\Utility\TemplateRenderer;
 use Cake\Console\Arguments;
 use Cake\Console\ConsoleIo;
 use Cake\Console\ConsoleOptionParser;
+use Cake\Core\Plugin;
 use Cake\Utility\Inflector;
 use Migrations\Util\Util;
 
@@ -105,6 +106,10 @@ abstract class BakeSimpleMigrationCommand extends SimpleBakeCommand
      */
     public function execute(Arguments $args, ConsoleIo $io): ?int
     {
+        if (!Plugin::isLoaded('Bake')) {
+            $io->err('Bake plugin is not loaded. Please load it first to generate a migration.');
+            $this->abort();
+        }
         $this->extractCommonProperties($args);
         $name = $args->getArgumentAt(0);
         if (empty($name)) {
