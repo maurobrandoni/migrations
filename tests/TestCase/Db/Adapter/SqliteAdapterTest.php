@@ -383,17 +383,14 @@ class SqliteAdapterTest extends TestCase
 
     public function testAddPrimaryKey()
     {
-        $table = new Table('table1', ['id' => false], $this->adapter);
+        $table = new Table('table1', [], $this->adapter);
         $table
             ->addColumn('column1', 'integer')
             ->addColumn('column2', 'integer')
+            ->addPrimaryKey('id')
             ->save();
 
-        $table
-            ->changePrimaryKey('column1')
-            ->save();
-
-        $this->assertTrue($this->adapter->hasPrimaryKey('table1', ['column1']));
+        $this->assertTrue($this->adapter->hasPrimaryKey('table1', ['id']));
     }
 
     public function testChangePrimaryKey()

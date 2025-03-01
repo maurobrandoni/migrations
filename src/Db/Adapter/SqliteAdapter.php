@@ -311,6 +311,10 @@ class SqliteAdapter extends AbstractAdapter
 
         $sql = 'CREATE TABLE ';
         $sql .= $this->quoteTableName($table->getName()) . ' (';
+        if (isset($options['primary_key'])) {
+            $options['primary_key'] = (array)$options['primary_key'];
+        }
+
         foreach ($columns as $column) {
             $sql .= $this->quoteColumnName((string)$column->getName()) . ' ' . $this->getColumnSqlDefinition($column) . ', ';
 
