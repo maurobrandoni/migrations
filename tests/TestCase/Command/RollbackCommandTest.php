@@ -82,6 +82,26 @@ class RollbackCommandTest extends TestCase
         $this->assertFileDoesNotExist($dumpFile);
     }
 
+    public function testExecuteActuallyWorks(): void
+    {
+        $this->exec('migrations migrate -c test -s MigrationsRollback --no-lock');
+        $this->assertExitSuccess();
+        $this->resetOutput();
+
+        $this->exec('migrations rollback -c test -s MigrationsRollback --no-lock');
+        $this->assertExitSuccess();
+
+        $this->assertOutputContains('<info>20250307183600 ChangeTestTable:</info> <comment>reverting </comment>');
+        $this->assertOutputContains('<info>20250307183600 ChangeTestTable:</info> <comment>reverted');
+        $this->resetOutput();
+
+        $this->exec('migrations status -c test -s MigrationsRollback --format json');
+        $this->assertExitSuccess();
+        $output = $this->_out->messages();
+        $parsed = json_decode($output[0], true);
+        $this->assertEquals('down', $parsed[0]['status'], 'Migration status should be down');
+    }
+
     /**
      * Test that running with dry-run works
      */
