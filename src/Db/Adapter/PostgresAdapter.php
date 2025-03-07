@@ -1223,7 +1223,7 @@ class PostgresAdapter extends AbstractAdapter
     {
         $parts = $this->getSchemaName($tableName);
 
-        $constraintName = $foreignKey->getConstraint() ?: (
+        $constraintName = $foreignKey->getName() ?: (
             $parts['table'] . '_' . implode('_', $foreignKey->getColumns()) . '_fkey'
         );
         $def = ' CONSTRAINT ' . $this->quoteColumnName($constraintName) .

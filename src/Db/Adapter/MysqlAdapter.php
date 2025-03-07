@@ -1378,8 +1378,8 @@ class MysqlAdapter extends AbstractAdapter
     protected function getForeignKeySqlDefinition(ForeignKey $foreignKey): string
     {
         $def = '';
-        if ($foreignKey->getConstraint()) {
-            $def .= ' CONSTRAINT ' . $this->quoteColumnName((string)$foreignKey->getConstraint());
+        if ($foreignKey->getName()) {
+            $def .= ' CONSTRAINT ' . $this->quoteColumnName((string)$foreignKey->getName());
         }
         $columnNames = [];
         foreach ($foreignKey->getColumns() as $column) {
@@ -1391,11 +1391,13 @@ class MysqlAdapter extends AbstractAdapter
             $refColumnNames[] = $this->quoteColumnName($column);
         }
         $def .= ' REFERENCES ' . $this->quoteTableName($foreignKey->getReferencedTable()->getName()) . ' (' . implode(',', $refColumnNames) . ')';
-        if ($foreignKey->getOnDelete()) {
-            $def .= ' ON DELETE ' . $foreignKey->getOnDelete();
+        $onDelete = $foreignKey->getOnDelete();
+        if ($onDelete) {
+            $def .= ' ON DELETE ' . $onDelete;
         }
-        if ($foreignKey->getOnUpdate()) {
-            $def .= ' ON UPDATE ' . $foreignKey->getOnUpdate();
+        $onUpdate = $foreignKey->getOnUpdate();
+        if ($onUpdate) {
+            $def .= ' ON UPDATE ' . $onUpdate;
         }
 
         return $def;

@@ -1866,8 +1866,8 @@ PCRE_PATTERN;
     protected function getForeignKeySqlDefinition(ForeignKey $foreignKey): string
     {
         $def = '';
-        if ($foreignKey->getConstraint()) {
-            $def .= ' CONSTRAINT ' . $this->quoteColumnName((string)$foreignKey->getConstraint());
+        if ($foreignKey->getName()) {
+            $def .= ' CONSTRAINT ' . $this->quoteColumnName((string)$foreignKey->getName());
         }
         $columnNames = [];
         foreach ($foreignKey->getColumns() as $column) {
