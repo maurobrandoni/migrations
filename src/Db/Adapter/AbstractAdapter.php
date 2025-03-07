@@ -1284,7 +1284,7 @@ abstract class AbstractAdapter implements AdapterInterface, DirectActionInterfac
                     ));
                     break;
 
-                case $action instanceof DropForeignKey && !$action->getForeignKey()->getConstraint():
+                case $action instanceof DropForeignKey && !$action->getForeignKey()->getName():
                     /** @var \Migrations\Db\Action\DropForeignKey $action */
                     $instructions->merge($this->getDropForeignKeyByColumnsInstructions(
                         $table->getName(),
@@ -1292,11 +1292,11 @@ abstract class AbstractAdapter implements AdapterInterface, DirectActionInterfac
                     ));
                     break;
 
-                case $action instanceof DropForeignKey && $action->getForeignKey()->getConstraint():
+                case $action instanceof DropForeignKey && $action->getForeignKey()->getName():
                     /** @var \Migrations\Db\Action\DropForeignKey $action */
                     $instructions->merge($this->getDropForeignKeyInstructions(
                         $table->getName(),
-                        (string)$action->getForeignKey()->getConstraint()
+                        (string)$action->getForeignKey()->getName()
                     ));
                     break;
 
