@@ -34,6 +34,9 @@
     <php>
         <env name="FIXTURE_SCHEMA_METADATA" value="./tests/schema.php"/>
         <ini name="memory_limit" value="-1"/>
+        <!-- E_ALL & ~E_USER_DEPRECATED (16383)-->
+        <!-- E_ALL (32767) -->
+        <ini name="error_reporting" value="32767"/>
 
         <!-- SQLite
         <env name="DB" value="sqlite"/>
