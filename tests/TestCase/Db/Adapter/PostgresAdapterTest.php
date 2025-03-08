@@ -16,6 +16,7 @@ use Migrations\Db\Adapter\UnsupportedColumnTypeException;
 use Migrations\Db\Literal;
 use Migrations\Db\Table;
 use Migrations\Db\Table\Column;
+use Migrations\Db\Table\ForeignKey;
 use Migrations\Db\Table\Index;
 use PDO;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -51,6 +52,7 @@ class PostgresAdapterTest extends TestCase
 
     protected function setUp(): void
     {
+        parent::setUp();
         $config = ConnectionManager::getConfig('test');
         if ($config['scheme'] !== 'postgres') {
             $this->markTestSkipped('Postgres tests disabled.');
@@ -83,6 +85,7 @@ class PostgresAdapterTest extends TestCase
 
     protected function tearDown(): void
     {
+        parent::tearDown();
         unset($this->adapter, $this->out, $this->io);
     }
 
@@ -1714,21 +1717,22 @@ class PostgresAdapterTest extends TestCase
             ->save();
 
         $table = new Table('table', [], $this->adapter);
+        $keyOne = (new ForeignKey())
+            ->setName('ref_table_fk_1')
+            ->setColumns(['ref_table_id', 'ref_table_field1'])
+            ->setReferencedTable('ref_table')
+            ->setReferencedColumns(['id', 'field1']);
+        $keyTwo = (new ForeignKey())
+            ->setName('ref_table_fk_2')
+            ->setColumns(['ref_table_id', 'ref_table_field1'])
+            ->setReferencedTable('ref_table')
+            ->setReferencedColumns(['id', 'field1']);
+
         $table
             ->addColumn('ref_table_id', 'integer', ['signed' => false])
             ->addColumn('ref_table_field1', 'string')
-            ->addForeignKeyWithName(
-                'ref_table_fk_1',
-                ['ref_table_id', 'ref_table_field1'],
-                'ref_table',
-                ['id', 'field1'],
-            )
-            ->addForeignKeyWithName(
-                'ref_table_fk_2',
-                ['ref_table_id', 'ref_table_field1'],
-                'ref_table',
-                ['id', 'field1']
-            )
+            ->addForeignKey($keyOne)
+            ->addForeignKey($keyTwo)
             ->save();
 
         $this->assertTrue($this->adapter->hasForeignKey($table->getName(), ['ref_table_id', 'ref_table_field1']));
@@ -1812,9 +1816,14 @@ class PostgresAdapterTest extends TestCase
         $refTable->save();
 
         $table = new Table('table', [], $this->adapter);
+        $key = (new ForeignKey())
+            ->setName('my_constraint')
+            ->setColumns(['ref_table_id'])
+            ->setReferencedTable('ref_table')
+            ->setReferencedColumns(['id']);
         $table
             ->addColumn('ref_table_id', 'integer', ['signed' => false])
-            ->addForeignKeyWithName('my_constraint', ['ref_table_id'], 'ref_table', ['id'])
+            ->addForeignKey($key)
             ->save();
 
         $this->adapter->dropForeignKey($table->getName(), [], 'my_constraint');
@@ -1862,9 +1871,14 @@ class PostgresAdapterTest extends TestCase
         $refTable->save();
 
         $table = new Table('table', [], $this->adapter);
+        $key = (new ForeignKey())
+            ->setName('my_constraint')
+            ->setColumns(['ref_table_id'])
+            ->setReferencedTable('ref_table')
+            ->setReferencedColumns(['id']);
         $table
             ->addColumn('ref_table_id', 'integer')
-            ->addForeignKeyWithName('my_constraint', ['ref_table_id'], 'ref_table', ['id'])
+            ->addForeignKey($key)
             ->save();
 
         $this->assertTrue($this->adapter->hasForeignKey($table->getName(), ['ref_table_id'], 'my_constraint'));
