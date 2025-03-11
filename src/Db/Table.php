@@ -743,7 +743,7 @@ class Table
             return isset($primaryKey[$columnDef->getName()]);
         })->toArray();
 
-        if (empty($primaryKeyColumns)) {
+        if (!$primaryKeyColumns) {
             return;
         }
 
@@ -755,7 +755,7 @@ class Table
 
         $primaryKey = array_flip($primaryKey);
 
-        if (!empty($primaryKey)) {
+        if ($primaryKey) {
             $options['primary_key'] = $primaryKey;
         } else {
             unset($options['primary_key']);
@@ -784,7 +784,7 @@ class Table
     public function saveData(): void
     {
         $rows = $this->getData();
-        if (empty($rows)) {
+        if (!$rows) {
             return;
         }
 
