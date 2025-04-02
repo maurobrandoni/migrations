@@ -111,7 +111,7 @@ class SeedCommand extends Command
         ]);
         $manager = $factory->createManager($io);
         $config = $manager->getConfig();
-        $seeds = (array)$args->getMultipleOption('seed');
+        $seeds = (array)$args->getArrayOption('seed');
 
         $versionOrder = $config->getVersionOrder();
         $io->out('<info>using connection</info> ' . (string)$args->getOption('connection'));
