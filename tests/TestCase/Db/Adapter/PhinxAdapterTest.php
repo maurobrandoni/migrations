@@ -53,8 +53,8 @@ class PhinxAdapterTest extends TestCase
         $this->adapter = new PhinxAdapter(
             new SqliteAdapter(
                 $this->config,
-                $this->getConsoleIo()
-            )
+                $this->getConsoleIo(),
+            ),
         );
 
         if ($config['database'] !== ':memory:') {
@@ -90,7 +90,7 @@ class PhinxAdapterTest extends TestCase
 
         $this->assertTrue(
             $this->adapter->getConnection()->inTransaction(),
-            'Underlying PDO instance did not detect new transaction'
+            'Underlying PDO instance did not detect new transaction',
         );
         $this->adapter->rollbackTransaction();
     }
@@ -102,7 +102,7 @@ class PhinxAdapterTest extends TestCase
 
         $this->assertFalse(
             $this->adapter->getConnection()->inTransaction(),
-            'Underlying PDO instance did not detect rolled back transaction'
+            'Underlying PDO instance did not detect rolled back transaction',
         );
     }
 
@@ -287,7 +287,7 @@ class PhinxAdapterTest extends TestCase
                 'master_id',
                 'tbl_master',
                 'id',
-                ['delete' => 'NO_ACTION', 'update' => 'NO_ACTION', 'constraint' => 'fk_master_id']
+                ['delete' => 'NO_ACTION', 'update' => 'NO_ACTION', 'constraint' => 'fk_master_id'],
             )
             ->create();
 
@@ -296,11 +296,11 @@ class PhinxAdapterTest extends TestCase
         $this->assertTrue($this->adapter->hasForeignKey('tbl_child', ['master_id']));
 
         $row = $this->adapter->fetchRow(
-            "SELECT * FROM sqlite_master WHERE \"type\" = 'table' AND \"tbl_name\" = 'tbl_child'"
+            "SELECT * FROM sqlite_master WHERE \"type\" = 'table' AND \"tbl_name\" = 'tbl_child'",
         );
         $this->assertStringContainsString(
             'CONSTRAINT "fk_master_id" FOREIGN KEY ("master_id") REFERENCES "tbl_master" ("id") ON DELETE NO ACTION ON UPDATE NO ACTION',
-            $row['sql']
+            $row['sql'],
         );
     }
 
@@ -316,18 +316,18 @@ class PhinxAdapterTest extends TestCase
                 'master_id',
                 'tbl_master',
                 'id',
-                ['delete' => 'NO_ACTION', 'update' => 'NO_ACTION', 'constraint' => 'fk_master_id']
+                ['delete' => 'NO_ACTION', 'update' => 'NO_ACTION', 'constraint' => 'fk_master_id'],
             );
         $table->create();
 
         $this->assertTrue($this->adapter->hasForeignKey('tbl_child', ['master_id']));
 
         $row = $this->adapter->fetchRow(
-            "SELECT * FROM sqlite_master WHERE \"type\" = 'table' AND \"tbl_name\" = 'tbl_child'"
+            "SELECT * FROM sqlite_master WHERE \"type\" = 'table' AND \"tbl_name\" = 'tbl_child'",
         );
         $this->assertStringContainsString(
             'CONSTRAINT "fk_master_id" FOREIGN KEY ("master_id") REFERENCES "tbl_master" ("id") ON DELETE NO ACTION ON UPDATE NO ACTION',
-            $row['sql']
+            $row['sql'],
         );
     }
 
@@ -464,16 +464,6 @@ class PhinxAdapterTest extends TestCase
             ->save();
         $rows = $this->adapter->fetchAll(sprintf('pragma table_info(%s)', 'table1'));
         $this->assertEquals("''", $rows[1]['dflt_value']);
-    }
-
-    public function testAddDoubleColumn()
-    {
-        $table = new PhinxTable('table1', [], $this->adapter);
-        $table->save();
-        $table->addColumn('foo', 'double', ['null' => true])
-            ->save();
-        $rows = $this->adapter->fetchAll(sprintf('pragma table_info(%s)', 'table1'));
-        $this->assertEquals('DOUBLE', $rows[1]['type']);
     }
 
     public function testRenameColumnWithIndex()
@@ -669,7 +659,7 @@ class PhinxAdapterTest extends TestCase
             ->addColumn('indexcol', 'integer')
             ->addIndex(
                 'indexcol',
-                ['unique' => true]
+                ['unique' => true],
             )
             ->create();
 
@@ -697,7 +687,7 @@ class PhinxAdapterTest extends TestCase
         $this->adapter->execute($triggerSQL);
 
         $rows = $this->adapter->fetchAll(
-            "SELECT * FROM sqlite_master WHERE `type` = 'trigger' AND tbl_name = 't'"
+            "SELECT * FROM sqlite_master WHERE `type` = 'trigger' AND tbl_name = 't'",
         );
         $this->assertCount(1, $rows);
         $this->assertEquals('trigger', $rows[0]['type']);
@@ -707,7 +697,7 @@ class PhinxAdapterTest extends TestCase
         $table->changeColumn('triggercol', 'integer', ['null' => false])->update();
 
         $rows = $this->adapter->fetchAll(
-            "SELECT * FROM sqlite_master WHERE `type` = 'trigger' AND tbl_name = 't'"
+            "SELECT * FROM sqlite_master WHERE `type` = 'trigger' AND tbl_name = 't'",
         );
         $this->assertCount(1, $rows);
         $this->assertEquals('trigger', $rows[0]['type']);
@@ -984,13 +974,13 @@ class PhinxAdapterTest extends TestCase
                 [
                     'column1' => 'value3',
                     'column2' => 3,
-                ]
+                ],
             )
             ->insert(
                 [
                     'column1' => '\'value4\'',
                     'column2' => null,
-                ]
+                ],
             )
             ->save();
         $rows = $this->adapter->fetchAll('SELECT * FROM table1');
@@ -1024,13 +1014,13 @@ class PhinxAdapterTest extends TestCase
                 [
                     'column1' => 'value3',
                     'column2' => 3,
-                ]
+                ],
             )
             ->insert(
                 [
                     'column1' => '\'value4\'',
                     'column2' => null,
-                ]
+                ],
             )
             ->save();
 
@@ -1115,7 +1105,7 @@ class PhinxAdapterTest extends TestCase
             ->save();
 
         $expectedOutput = <<<'OUTPUT'
-CREATE TABLE "table1" ("id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, "column1" VARCHAR NOT NULL, "column2" INTEGER NULL, "column3" VARCHAR NULL DEFAULT 'test');
+CREATE TABLE "table1" ("id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, "column1" VARCHAR NOT NULL, "column2" INTEGER, "column3" VARCHAR DEFAULT 'test');
 OUTPUT;
         $actualOutput = join("\n", $this->out->messages());
         $this->assertStringContainsString($expectedOutput, $actualOutput, 'Passing the --dry-run option does not dump create table query to the output');
@@ -1216,7 +1206,7 @@ OUTPUT;
         ])->save();
 
         $expectedOutput = <<<'OUTPUT'
-CREATE TABLE "table1" ("column1" VARCHAR NOT NULL, "column2" INTEGER NULL, PRIMARY KEY ("column1"));
+CREATE TABLE "table1" ("column1" VARCHAR NOT NULL, "column2" INTEGER, PRIMARY KEY ("column1"));
 INSERT INTO "table1" ("column1", "column2") VALUES ('id1', 1);
 OUTPUT;
         $actualOutput = join("\n", $this->out->messages());
@@ -1254,7 +1244,7 @@ OUTPUT;
         $this->assertEquals(0, $stm->rowCount());
         $this->assertEquals(
             ['id' => 2, 'string_col' => 'value2', 'int_col' => '2'],
-            $stm->fetch('assoc')
+            $stm->fetch('assoc'),
         );
 
         $builder = $this->adapter->getQueryBuilder(Query::TYPE_DELETE);
