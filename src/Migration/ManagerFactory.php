@@ -88,7 +88,16 @@ class ManagerFactory
         $templatePath = dirname(__DIR__) . DS . 'templates' . DS;
         $connectionName = (string)$this->getOption('connection');
 
-        $connectionConfig = ConnectionManager::getConfig($connectionName);
+        if (str_contains($connectionName, '://')) {
+            /** @var array<string, mixed> $connectionConfig */
+            $connectionConfig = ConnectionManager::parseDsn($connectionName);
+            $connectionName = 'tmp';
+            if (!ConnectionManager::getConfig($connectionName)) {
+                ConnectionManager::setConfig($connectionName, $connectionConfig);
+            }
+        } else {
+            $connectionConfig = ConnectionManager::getConfig($connectionName);
+        }
         if (!$connectionConfig) {
             throw new RuntimeException("Could not find connection `{$connectionName}`");
         }
