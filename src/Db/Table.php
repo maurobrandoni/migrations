@@ -743,7 +743,7 @@ class Table
             return isset($primaryKey[$columnDef->getName()]);
         })->toArray();
 
-        if (empty($primaryKeyColumns)) {
+        if (!$primaryKeyColumns) {
             return;
         }
 
@@ -755,7 +755,7 @@ class Table
 
         $primaryKey = array_flip($primaryKey);
 
-        if (!empty($primaryKey)) {
+        if ($primaryKey) {
             $options['primary_key'] = $primaryKey;
         } else {
             unset($options['primary_key']);
@@ -784,7 +784,7 @@ class Table
     public function saveData(): void
     {
         $rows = $this->getData();
-        if (empty($rows)) {
+        if (!$rows) {
             return;
         }
 
@@ -839,7 +839,7 @@ class Table
     /**
      * Executes all the pending actions for this table
      *
-     * @param bool $exists Whether or not the table existed prior to executing this method
+     * @param bool $exists Whether the table existed prior to executing this method
      * @return void
      */
     protected function executeActions(bool $exists): void
