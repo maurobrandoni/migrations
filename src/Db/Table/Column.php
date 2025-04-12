@@ -812,17 +812,32 @@ class Column
      */
     public function toArray(): array
     {
+        $default = $this->getDefault();
+        if ($default instanceof Literal) {
+            $default = (string)$default;
+        }
+
+        $type = $this->getType();
+        $precision = $this->getPrecision();
+        if ($precision !== null) {
+            if ($type === 'timestamp') {
+                $type = 'timestampfractional';
+            } elseif ($type === 'datetime') {
+                $type = 'datetimefractional';
+            }
+        }
+        $scale = $this->getScale();
+
         return [
             'name' => $this->getName(),
-            'type' => $this->getType(),
+            'type' => $type,
             'length' => $this->getLimit(),
             'null' => $this->getNull(),
-            'default' => $this->getDefault(),
-            'unsigned' => $this->getSigned(),
+            'default' => $default,
+            'unsigned' => !$this->getSigned(),
             'onUpdate' => $this->getUpdate(),
             'collate' => $this->getCollation(),
-            'precision' => $this->getPrecision(),
-            'scale' => $this->getScale(),
+            'precision' => $scale ?? $precision,
             'srid' => $this->getSrid(),
             'timezone' => $this->getTimezone(),
             'comment' => $this->getComment(),
