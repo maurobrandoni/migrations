@@ -17,6 +17,7 @@ use Cake\Command\Command;
 use Cake\Console\Arguments;
 use Cake\Console\ConsoleIo;
 use Cake\Console\ConsoleOptionParser;
+use Cake\Core\Configure;
 use Cake\Event\EventDispatcherTrait;
 use Migrations\Config\ConfigInterface;
 use Migrations\Migration\ManagerFactory;
@@ -111,7 +112,11 @@ class SeedCommand extends Command
         ]);
         $manager = $factory->createManager($io);
         $config = $manager->getConfig();
-        $seeds = (array)$args->getMultipleOption('seed');
+        if (version_compare(Configure::version(), '5.2.0', '>=')) {
+            $seeds = (array)$args->getArrayOption('seed');
+        } else {
+            $seeds = (array)$args->getMultipleOption('seed');
+        }
 
         $versionOrder = $config->getVersionOrder();
         $io->out('<info>using connection</info> ' . (string)$args->getOption('connection'));
