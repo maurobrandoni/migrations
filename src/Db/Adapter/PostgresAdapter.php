@@ -144,13 +144,10 @@ class PostgresAdapter extends AbstractAdapter
         $sql = 'CREATE TABLE ';
         $sql .= $this->quoteTableName($table->getName()) . ' (';
 
+        $dialect = $this->getSchemaDialect();
         $this->columnsWithComments = [];
         foreach ($columns as $column) {
-            $sql .= $this->quoteColumnName((string)$column->getName()) . ' ' . $this->getColumnSqlDefinition($column);
-            if ($this->useIdentity && $column->getIdentity() && $column->getGenerated() !== null) {
-                $sql .= sprintf(' GENERATED %s AS IDENTITY', (string)$column->getGenerated());
-            }
-            $sql .= ', ';
+            $sql .= $dialect->columnDefinitionSql($this->mapColumnData($column->toArray())) . ', ';
 
             // set column comments, if needed
             if ($column->getComment()) {
@@ -203,6 +200,25 @@ class PostgresAdapter extends AbstractAdapter
         }
 
         $this->addCreatedTable($table->getName());
+    }
+
+    /**
+     * Apply postgres specific translations between the values using migrations constants/types
+     * and the cakephp/database constants. Over time, these can be aligned.
+     *
+     * @param array $data The raw column data.
+     * @return array Modified column data.
+     */
+    protected function mapColumnData(array $data): array
+    {
+        if (
+            $data['type'] === self::PHINX_TYPE_TIMESTAMP &&
+            isset($data['timezone']) && $data['timezone'] === true
+        ) {
+            $data['type'] = 'timestamptimezone';
+        }
+
+        return $data;
     }
 
     /**
@@ -415,6 +431,7 @@ class PostgresAdapter extends AbstractAdapter
         $instructions->addAlter(sprintf(
             'ADD %s %s %s',
             $this->quoteColumnName((string)$column->getName()),
+            // TODO use dialect
             $this->getColumnSqlDefinition($column),
             $column->isIdentity() && $column->getGenerated() !== null && $this->useIdentity ?
                 sprintf('GENERATED %s AS IDENTITY', (string)$column->getGenerated()) : '',
@@ -481,6 +498,7 @@ class PostgresAdapter extends AbstractAdapter
         $sql = sprintf(
             'ALTER COLUMN %s TYPE %s',
             $quotedColumnName,
+            // TODO use dialect. This could be tricky because the name and type need to be separated.
             $this->getColumnSqlDefinition($newColumn),
         );
         if (in_array($newColumn->getType(), ['smallinteger', 'integer', 'biginteger'], true)) {

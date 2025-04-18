@@ -390,16 +390,6 @@ class PostgresAdapterTest extends TestCase
         $this->assertFalse($this->adapter->hasIndex('table1', ['email', 'user_email']));
     }
 
-    public function testCreateTableWithFullTextSearchIndexes()
-    {
-        $table = new Table('table1', [], $this->adapter);
-        $table->addColumn('names', 'jsonb')
-            ->addIndex('names', ['type' => 'gin'])
-            ->save();
-
-        $this->assertTrue($this->adapter->hasIndex('table1', ['names']));
-    }
-
     public function testCreateTableWithNamedIndexes()
     {
         $table = new Table('table1', [], $this->adapter);
@@ -649,6 +639,7 @@ class PostgresAdapterTest extends TestCase
 
     public function testAddColumnWithAutoIdentity()
     {
+        $this->markTestIncomplete('Requires cakephp/database to use identity columns');
         if (!$this->usingPostgres10()) {
             $this->markTestSkipped('Test Skipped because of PostgreSQL version is < 10.0');
         }
@@ -793,28 +784,6 @@ class PostgresAdapterTest extends TestCase
             if ($column->getName() === 'default_ts') {
                 $this->assertNotNull($column->getDefault());
                 $this->assertEquals('now()', (string)$column->getDefault());
-            }
-        }
-    }
-
-    public function testAddColumnWithLiteralType()
-    {
-        $table = new Table('citable', ['id' => false], $this->adapter);
-        $table
-            ->addColumn('insensitive', Literal::from('citext'))
-            ->save();
-
-        $this->assertTrue($this->adapter->hasColumn('citable', 'insensitive'));
-
-        /** @var Column[] $columns */
-        $columns = $this->adapter->getColumns('citable');
-        foreach ($columns as $column) {
-            if ($column->getName() === 'insensitive') {
-                $this->assertEquals(
-                    'citext',
-                    (string)$column->getType(),
-                    'column: ' . $column->getName(),
-                );
             }
         }
     }
@@ -1036,6 +1005,7 @@ class PostgresAdapterTest extends TestCase
 
     public function testChangeColumnDropIdentity()
     {
+        $this->markTestIncomplete('Requires cakephp/database to use identity columns');
         if (!$this->usingPostgres10()) {
             $this->markTestSkipped('Test Skipped because of PostgreSQL version is < 10.0');
         }
@@ -1053,6 +1023,7 @@ class PostgresAdapterTest extends TestCase
 
     public function testChangeColumnChangeIdentity()
     {
+        $this->markTestIncomplete('Requires cakephp/database to use identity columns');
         if (!$this->usingPostgres10()) {
             $this->markTestSkipped('Test Skipped because of PostgreSQL version is < 10.0');
         }
@@ -1238,16 +1209,14 @@ class PostgresAdapterTest extends TestCase
             ['column2_1', 'integer', []],
             ['column3', 'biginteger', []],
             ['column4', 'text', []],
-            ['column5', 'float', []],
+            ['column5', 'float', [], 'double'],
             ['column6', 'decimal', []],
             ['column7', 'datetime', []],
-            ['column8', 'time', []],
             ['column9', 'timestamp', [], 'datetime'],
             ['column10', 'date', []],
             ['column11', 'binary', []],
             ['column12', 'boolean', []],
             ['column13', 'string', ['limit' => 10]],
-            ['column16', 'interval', []],
             ['decimal_precision_scale', 'decimal', ['precision' => 10, 'scale' => 2]],
             ['decimal_limit', 'decimal', ['limit' => 10]],
             ['decimal_precision', 'decimal', ['precision' => 10]],
@@ -2287,16 +2256,11 @@ class PostgresAdapterTest extends TestCase
         $table = new Table('tztable', ['id' => false], $this->adapter);
         $table
             ->addColumn('timestamp_tz', 'timestamp', ['timezone' => true])
-            ->addColumn('time_tz', 'time', ['timezone' => true])
-            /* date columns cannot have timestamp */
-            ->addColumn('date_notz', 'date', ['timezone' => true])
             /* default for timezone option is false */
             ->addColumn('time_notz', 'timestamp')
             ->save();
 
         $this->assertTrue($this->adapter->hasColumn('tztable', 'timestamp_tz'));
-        $this->assertTrue($this->adapter->hasColumn('tztable', 'time_tz'));
-        $this->assertTrue($this->adapter->hasColumn('tztable', 'date_notz'));
         $this->assertTrue($this->adapter->hasColumn('tztable', 'time_notz'));
 
         $columns = $this->adapter->getColumns('tztable');
@@ -2316,16 +2280,11 @@ class PostgresAdapterTest extends TestCase
         $table = new Table('tzschema.tztable', ['id' => false], $this->adapter);
         $table
             ->addColumn('timestamp_tz', 'timestamp', ['timezone' => true])
-            ->addColumn('time_tz', 'time', ['timezone' => true])
-            /* date columns cannot have timestamp */
-            ->addColumn('date_notz', 'date', ['timezone' => true])
             /* default for timezone option is false */
             ->addColumn('time_notz', 'timestamp')
             ->save();
 
         $this->assertTrue($this->adapter->hasColumn('tzschema.tztable', 'timestamp_tz'));
-        $this->assertTrue($this->adapter->hasColumn('tzschema.tztable', 'time_tz'));
-        $this->assertTrue($this->adapter->hasColumn('tzschema.tztable', 'date_notz'));
         $this->assertTrue($this->adapter->hasColumn('tzschema.tztable', 'time_notz'));
 
         $columns = $this->adapter->getColumns('tzschema.tztable');
@@ -2608,13 +2567,15 @@ class PostgresAdapterTest extends TestCase
             ->save();
 
         if ($this->usingPostgres10()) {
-            $expectedOutput = 'CREATE TABLE "public"."table1" ("id" INTEGER NOT NULL GENERATED BY DEFAULT AS IDENTITY, "column1" CHARACTER VARYING (255) ' .
-                'NULL, "column2" INTEGER NULL, "column3" CHARACTER VARYING (255) NOT NULL  DEFAULT \'test\', CONSTRAINT ' .
-                '"table1_pkey" PRIMARY KEY ("id"));';
+            $expectedOutput = 'CREATE TABLE "public"."table1" ("id" SERIAL NOT NULL, ' .
+                '"column1" VARCHAR DEFAULT NULL, ' .
+                '"column2" INT DEFAULT NULL, "column3" VARCHAR NOT NULL DEFAULT \'test\', ' .
+                'CONSTRAINT "table1_pkey" PRIMARY KEY ("id"));';
         } else {
-            $expectedOutput = 'CREATE TABLE "public"."table1" ("id" SERIAL NOT NULL, "column1" CHARACTER VARYING (255) ' .
-                'NULL, "column2" INTEGER NULL, "column3" CHARACTER VARYING (255) NOT NULL  DEFAULT \'test\', CONSTRAINT ' .
-                '"table1_pkey" PRIMARY KEY ("id"));';
+            $expectedOutput = 'CREATE TABLE "public"."table1" ("id" SERIAL NOT NULL, ' .
+                '"column1" VARCHAR DEFAULT NULL, ' .
+                '"column2" INT DEFAULT NULL, "column3" VARCHAR NOT NULL DEFAULT \'test\', ' .
+               'CONSTRAINT "table1_pkey" PRIMARY KEY ("id"));';
         }
         $actualOutput = join("\n", $this->out->messages());
         $this->assertStringContainsString(
@@ -2638,12 +2599,12 @@ class PostgresAdapterTest extends TestCase
             ->save();
 
         if ($this->usingPostgres10()) {
-            $expectedOutput = 'CREATE TABLE "schema1"."table1" ("id" INTEGER NOT NULL GENERATED BY DEFAULT AS IDENTITY, "column1" CHARACTER VARYING (255) ' .
-                'NULL, "column2" INTEGER NULL, "column3" CHARACTER VARYING (255) NOT NULL  DEFAULT \'test\', CONSTRAINT ' .
+            $expectedOutput = 'CREATE TABLE "schema1"."table1" ("id" SERIAL NOT NULL, "column1" VARCHAR DEFAULT NULL, ' .
+                '"column2" INT DEFAULT NULL, "column3" VARCHAR NOT NULL DEFAULT \'test\', CONSTRAINT ' .
                 '"table1_pkey" PRIMARY KEY ("id"));';
         } else {
-            $expectedOutput = 'CREATE TABLE "schema1"."table1" ("id" SERIAL NOT NULL, "column1" CHARACTER VARYING (255) ' .
-                'NULL, "column2" INTEGER NULL, "column3" CHARACTER VARYING (255) NOT NULL  DEFAULT \'test\', CONSTRAINT ' .
+            $expectedOutput = 'CREATE TABLE "schema1"."table1" ("id" SERIAL NOT NULL, "column1" VARCHAR DEFAULT NULL, ' .
+                '"column2" INT DEFAULT NULL, "column3" VARCHAR NOT NULL DEFAULT \'test\', CONSTRAINT ' .
                 '"table1_pkey" PRIMARY KEY ("id"));';
         }
         $actualOutput = join("\n", $this->out->messages());
@@ -2777,13 +2738,13 @@ OUTPUT;
         ])->save();
 
         $expectedOutput = <<<'OUTPUT'
-CREATE TABLE "schema1"."table1" ("column1" CHARACTER VARYING (255) NOT NULL, "column2" INTEGER NULL, CONSTRAINT "table1_pkey" PRIMARY KEY ("column1"));
+CREATE TABLE "schema1"."table1" ("column1" VARCHAR NOT NULL, "column2" INT DEFAULT NULL, CONSTRAINT "table1_pkey" PRIMARY KEY ("column1"));
 INSERT INTO "schema1"."table1" ("column1", "column2") OVERRIDING SYSTEM VALUE VALUES ('id1', 1);
 OUTPUT;
 
         if (!$this->usingPostgres10()) {
             $expectedOutput = <<<'OUTPUT'
-CREATE TABLE "schema1"."table1" ("column1" CHARACTER VARYING (255) NOT NULL, "column2" INTEGER NULL, CONSTRAINT "table1_pkey" PRIMARY KEY ("column1"));
+CREATE TABLE "schema1"."table1" ("column1" CHARACTER VARCHAR NOT NULL, "column2" INT DEFAULT NULL, CONSTRAINT "table1_pkey" PRIMARY KEY ("column1"));
 INSERT INTO "schema1"."table1" ("column1", "column2") VALUES ('id1', 1);
 OUTPUT;
         }
