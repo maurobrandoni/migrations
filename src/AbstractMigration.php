@@ -15,6 +15,9 @@ namespace Migrations;
 
 use Phinx\Migration\AbstractMigration as BaseAbstractMigration;
 
+/**
+ * @deprecated 4.5.0 You should use Migrations\BaseMigration for new migrations.
+ */
 class AbstractMigration extends BaseAbstractMigration
 {
     /**

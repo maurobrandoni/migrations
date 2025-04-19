@@ -11,6 +11,8 @@ use Cake\Event\EventInterface;
 use Cake\Event\EventManager;
 use Cake\TestSuite\TestCase;
 use InvalidArgumentException;
+use Phinx\Config\FeatureFlags;
+use ReflectionClass;
 use ReflectionProperty;
 
 class SeedCommandTest extends TestCase
@@ -38,6 +40,13 @@ class SeedCommandTest extends TestCase
         $connection->execute('DROP TABLE IF EXISTS numbers');
         $connection->execute('DROP TABLE IF EXISTS letters');
         $connection->execute('DROP TABLE IF EXISTS stores');
+
+        if (class_exists(FeatureFlags::class)) {
+            $reflection = new ReflectionClass(FeatureFlags::class);
+            if ($reflection->hasProperty('addTimestampsUseDateTime')) {
+                FeatureFlags::$addTimestampsUseDateTime = false;
+            }
+        }
     }
 
     protected function resetOutput(): void
@@ -141,7 +150,7 @@ class SeedCommandTest extends TestCase
         $this->assertEquals(2, $query->fetchColumn(0));
     }
 
-    public function testSeederImplictAll(): void
+    public function testSeederImplicitAll(): void
     {
         $this->createTables();
         $this->exec('migrations seed -c test');
@@ -191,5 +200,69 @@ class SeedCommandTest extends TestCase
         $this->expectExceptionMessage('The seed class "LettersSeed" does not exist');
 
         $this->exec('migrations seed -c test --source NotThere --seed LettersSeed');
+    }
+
+    public function testSeederWithTimestampFields(): void
+    {
+        if (class_exists(FeatureFlags::class)) {
+            $reflection = new ReflectionClass(FeatureFlags::class);
+            if ($reflection->hasProperty('addTimestampsUseDateTime')) {
+                FeatureFlags::$addTimestampsUseDateTime = false;
+            }
+        }
+
+        $this->createTables();
+        $this->exec('migrations seed -c test --seed StoresSeed');
+
+        $this->assertExitSuccess();
+        $this->assertOutputContains('StoresSeed:</info> <comment>seeding');
+        $this->assertOutputContains('All Done');
+
+        /** @var \Cake\Database\Connection $connection */
+        $connection = ConnectionManager::get('test');
+        $result = $connection->selectQuery()
+            ->select(['*'])
+            ->from('stores')
+            ->orderBy('id DESC')
+            ->limit(1)
+            ->execute()->fetchAll('assoc');
+
+        $this->assertNotEmpty($result[0]);
+        $store = $result[0];
+        $this->assertEquals('foo_with_date', $store['name']);
+        $this->assertNotEmpty($store['created']);
+        $this->assertNotEmpty($store['modified']);
+    }
+
+    public function testSeederWithDateTimeFields(): void
+    {
+        $this->skipIf(!class_exists(FeatureFlags::class));
+
+        $reflection = new ReflectionClass(FeatureFlags::class);
+        $this->skipIf(!$reflection->hasProperty('addTimestampsUseDateTime'));
+
+        FeatureFlags::$addTimestampsUseDateTime = true;
+
+        $this->createTables();
+        $this->exec('migrations seed -c test --seed StoresSeed');
+
+        $this->assertExitSuccess();
+        $this->assertOutputContains('StoresSeed:</info> <comment>seeding');
+        $this->assertOutputContains('All Done');
+
+        /** @var \Cake\Database\Connection $connection */
+        $connection = ConnectionManager::get('test');
+        $result = $connection->selectQuery()
+            ->select(['*'])
+            ->from('stores')
+            ->orderBy('id DESC')
+            ->limit(1)
+            ->execute()->fetchAll('assoc');
+
+        $this->assertNotEmpty($result[0]);
+        $store = $result[0];
+        $this->assertEquals('foo_with_date', $store['name']);
+        $this->assertNotEmpty($store['created']);
+        $this->assertNotEmpty($store['modified']);
     }
 }
