@@ -28,16 +28,6 @@ You can load the plugin using the shell command:
 bin/cake plugin load Migrations
 ```
 
-Or you can manually add the loading statement in the **src/Application.php** file of your application:
-
-```php
-public function bootstrap(): void
-{
-    parent::bootstrap();
-    $this->addPlugin('Migrations');
-}
-```
-
 ### Enabling the builtin backend
 
 In a future release, migrations will be switching to a new backend based on the CakePHP ORM. We're aiming
