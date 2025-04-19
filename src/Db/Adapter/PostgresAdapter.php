@@ -427,14 +427,12 @@ class PostgresAdapter extends AbstractAdapter
      */
     protected function getAddColumnInstructions(Table $table, Column $column): AlterInstructions
     {
+        $dialect = $this->getSchemaDialect();
+
         $instructions = new AlterInstructions();
         $instructions->addAlter(sprintf(
-            'ADD %s %s %s',
-            $this->quoteColumnName((string)$column->getName()),
-            // TODO use dialect
-            $this->getColumnSqlDefinition($column),
-            $column->isIdentity() && $column->getGenerated() !== null && $this->useIdentity ?
-                sprintf('GENERATED %s AS IDENTITY', (string)$column->getGenerated()) : '',
+            'ADD %s',
+            $dialect->columnDefinitionSql($this->mapColumnData($column->toArray())),
         ));
 
         if ($column->getComment()) {
@@ -495,11 +493,16 @@ class PostgresAdapter extends AbstractAdapter
             $sql = sprintf('ALTER COLUMN %s DROP DEFAULT', $quotedColumnName);
             $instructions->addAlter($sql);
         }
+        $dialect = $this->getSchemaDialect();
+
+        $columnSql = $dialect->columnDefinitionSql($this->mapColumnData($newColumn->toArray()));
+        // Remove the column name from $columnSql
+        $columnType = preg_replace('/^"?(?:[^"]+)"?\s+/', '', $columnSql);
+
         $sql = sprintf(
             'ALTER COLUMN %s TYPE %s',
             $quotedColumnName,
-            // TODO use dialect. This could be tricky because the name and type need to be separated.
-            $this->getColumnSqlDefinition($newColumn),
+            $columnType,
         );
         if (in_array($newColumn->getType(), ['smallinteger', 'integer', 'biginteger'], true)) {
             $sql .= sprintf(
@@ -515,7 +518,7 @@ class PostgresAdapter extends AbstractAdapter
         }
         //NULL and DEFAULT cannot be set while changing column type
         $sql = preg_replace('/ NOT NULL/', '', $sql);
-        $sql = preg_replace('/ NULL/', '', $sql);
+        $sql = preg_replace('/ DEFAULT NULL/', '', $sql);
         //If it is set, DEFAULT is the last definition
         $sql = preg_replace('/DEFAULT .*/', '', $sql);
         if ($newColumn->getType() === 'boolean') {
@@ -1078,78 +1081,6 @@ class PostgresAdapter extends AbstractAdapter
         $this->execute(sprintf('DROP DATABASE IF EXISTS %s', $name));
         $this->createdTables = [];
         $this->connect();
-    }
-
-    /**
-     * Gets the PostgreSQL Column Definition for a Column object.
-     *
-     * @param \Migrations\Db\Table\Column $column Column
-     * @return string
-     */
-    protected function getColumnSqlDefinition(Column $column): string
-    {
-        $buffer = [];
-
-        if ($column->isIdentity() && (!$this->useIdentity || $column->getGenerated() === null)) {
-            if ($column->getType() === 'smallinteger') {
-                $buffer[] = 'SMALLSERIAL';
-            } elseif ($column->getType() === 'biginteger') {
-                $buffer[] = 'BIGSERIAL';
-            } else {
-                $buffer[] = 'SERIAL';
-            }
-        } elseif ($column->getType() instanceof Literal) {
-            $buffer[] = (string)$column->getType();
-        } else {
-            $sqlType = $this->getSqlType($column->getType(), $column->getLimit());
-            $buffer[] = strtoupper($sqlType['name']);
-
-            // integers cant have limits in postgres
-            if ($sqlType['name'] === static::PHINX_TYPE_DECIMAL && ($column->getPrecision() || $column->getScale())) {
-                $buffer[] = sprintf(
-                    '(%s, %s)',
-                    $column->getPrecision() ?: $sqlType['precision'],
-                    $column->getScale() ?: $sqlType['scale'],
-                );
-            } elseif ($sqlType['name'] === self::PHINX_TYPE_GEOMETRY) {
-                // geography type must be written with geometry type and srid, like this: geography(POLYGON,4326)
-                $buffer[] = sprintf(
-                    '(%s,%s)',
-                    strtoupper($sqlType['type']),
-                    $column->getSrid() ?: $sqlType['srid'],
-                );
-            } elseif (in_array($sqlType['name'], [self::PHINX_TYPE_TIME, self::PHINX_TYPE_TIMESTAMP], true)) {
-                if (is_numeric($column->getPrecision())) {
-                    $buffer[] = sprintf('(%s)', (string)$column->getPrecision());
-                }
-
-                if ($column->isTimezone()) {
-                    $buffer[] = strtoupper('with time zone');
-                }
-            } elseif (
-                !in_array($column->getType(), [
-                    self::PHINX_TYPE_TINY_INTEGER,
-                    self::PHINX_TYPE_SMALL_INTEGER,
-                    self::PHINX_TYPE_INTEGER,
-                    self::PHINX_TYPE_BIG_INTEGER,
-                    self::PHINX_TYPE_BOOLEAN,
-                    self::PHINX_TYPE_TEXT,
-                    self::PHINX_TYPE_BINARY,
-                ], true)
-            ) {
-                if ($column->getLimit() || isset($sqlType['limit'])) {
-                    $buffer[] = sprintf('(%s)', $column->getLimit() ?: $sqlType['limit']);
-                }
-            }
-        }
-
-        $buffer[] = $column->isNull() ? 'NULL' : 'NOT NULL';
-
-        if ($column->getDefault() !== null) {
-            $buffer[] = $this->getDefaultValueDefinition($column->getDefault(), (string)$column->getType());
-        }
-
-        return implode(' ', $buffer);
     }
 
     /**
