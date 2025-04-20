@@ -25,6 +25,11 @@ composer require cakephp/migrations
 You can load the plugin using the shell command:
 
 ```
+bin/cake plugin load Migrations --only-cli
+```
+
+If you are using the PendingMigrations middleware, use:
+```
 bin/cake plugin load Migrations
 ```
 
