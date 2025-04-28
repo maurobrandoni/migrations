@@ -422,6 +422,7 @@ class MysqlAdapter extends AbstractAdapter
     public function getColumns(string $tableName): array
     {
         $dialect = $this->getSchemaDialect();
+        // TODO use dialect
         [$query, $params] = $dialect->describeColumnSql($tableName, []);
         $rows = $this->query($query, $params)->fetchAll('assoc');
 
@@ -613,15 +614,7 @@ class MysqlAdapter extends AbstractAdapter
     protected function getIndexes(string $tableName): array
     {
         $dialect = $this->getSchemaDialect();
-        [$query, $params] = $dialect->describeIndexSql($tableName, []);
-        $rows = $this->query($query, $params)->fetchAll('assoc');
-        $indexes = [];
-        foreach ($rows as $row) {
-            if (!isset($indexes[$row['Key_name']])) {
-                $indexes[$row['Key_name']] = ['columns' => []];
-            }
-            $indexes[$row['Key_name']]['columns'][] = strtolower($row['Column_name']);
-        }
+        $indexes = $dialect->describeIndexes($tableName);
 
         return $indexes;
     }
@@ -654,8 +647,8 @@ class MysqlAdapter extends AbstractAdapter
     {
         $indexes = $this->getIndexes($tableName);
 
-        foreach ($indexes as $name => $index) {
-            if ($name === $indexName) {
+        foreach ($indexes as $index) {
+            if ($index['name'] === $indexName) {
                 return true;
             }
         }
@@ -706,11 +699,11 @@ class MysqlAdapter extends AbstractAdapter
         $indexes = $this->getIndexes($tableName);
         $columns = array_map('strtolower', $columns);
 
-        foreach ($indexes as $indexName => $index) {
+        foreach ($indexes as $index) {
             if ($columns == $index['columns']) {
                 return new AlterInstructions([sprintf(
                     'DROP INDEX %s',
-                    $this->quoteColumnName($indexName),
+                    $this->quoteColumnName($index['name']),
                 )]);
             }
         }
@@ -730,8 +723,8 @@ class MysqlAdapter extends AbstractAdapter
     {
         $indexes = $this->getIndexes($tableName);
 
-        foreach ($indexes as $name => $index) {
-            if ($name === $indexName) {
+        foreach ($indexes as $index) {
+            if ($index['name'] === $indexName) {
                 return new AlterInstructions([sprintf(
                     'DROP INDEX %s',
                     $this->quoteColumnName($indexName),
@@ -748,21 +741,18 @@ class MysqlAdapter extends AbstractAdapter
     /**
      * @inheritDoc
      */
-    public function hasPrimaryKey(string $tableName, $columns, ?string $constraint = null): bool
+    public function hasPrimaryKey(string $tableName, string|array $columns, ?string $constraint = null): bool
     {
         $primaryKey = $this->getPrimaryKey($tableName);
 
-        if (empty($primaryKey['constraint'])) {
+        if (empty($primaryKey['name'])) {
             return false;
         }
 
         if ($constraint) {
-            return $primaryKey['constraint'] === $constraint;
+            return $primaryKey['name'] === $constraint;
         } else {
-            if (is_string($columns)) {
-                $columns = [$columns]; // str to array
-            }
-            $missingColumns = array_diff($columns, $primaryKey['columns']);
+            $missingColumns = array_diff((array)$columns, (array)$primaryKey['columns']);
 
             return empty($missingColumns);
         }
@@ -778,12 +768,14 @@ class MysqlAdapter extends AbstractAdapter
     {
         $indexes = $this->getIndexes($tableName);
         $primaryKey = [
-            'constraint' => '',
+            'name' => '',
             'columns' => [],
         ];
-        foreach ($indexes as $name => $row) {
-            $primaryKey['constraint'] = $name;
-            $primaryKey['columns'] = (array)$row['columns'];
+        foreach ($indexes as $index) {
+            if ($index['type'] === TableSchema::CONSTRAINT_PRIMARY) {
+                $primaryKey = $index;
+                break;
+            }
         }
 
         return $primaryKey;
@@ -795,12 +787,9 @@ class MysqlAdapter extends AbstractAdapter
     public function hasForeignKey(string $tableName, $columns, ?string $constraint = null): bool
     {
         $foreignKeys = $this->getForeignKeys($tableName);
+        $names = array_map(fn($key) => $key['name'], $foreignKeys);
         if ($constraint) {
-            if (isset($foreignKeys[$constraint])) {
-                return !empty($foreignKeys[$constraint]);
-            }
-
-            return false;
+            return in_array($constraint, $names, true);
         }
 
         $columns = array_map('mb_strtolower', (array)$columns);
@@ -823,22 +812,7 @@ class MysqlAdapter extends AbstractAdapter
     protected function getForeignKeys(string $tableName): array
     {
         $dialect = $this->getSchemaDialect();
-        $schema = (string)$this->getOption('database');
-        if (strpos($tableName, '.') !== false) {
-            [$schema, $tableName] = explode('.', $tableName);
-        }
-        $config = ['database' => $schema];
-
-        [$query, $params] = $dialect->describeForeignKeySql($tableName, $config);
-        $rows = $this->query($query, $params)->fetchAll('assoc');
-
-        $foreignKeys = [];
-        foreach ($rows as $row) {
-            $foreignKeys[$row['CONSTRAINT_NAME']]['table'] = $row['TABLE_NAME'];
-            $foreignKeys[$row['CONSTRAINT_NAME']]['columns'][] = $row['COLUMN_NAME'];
-            $foreignKeys[$row['CONSTRAINT_NAME']]['referenced_table'] = $row['REFERENCED_TABLE_NAME'];
-            $foreignKeys[$row['CONSTRAINT_NAME']]['referenced_columns'][] = $row['REFERENCED_COLUMN_NAME'];
-        }
+        $foreignKeys = $dialect->describeForeignKeys($tableName);
 
         return $foreignKeys;
     }
@@ -882,9 +856,9 @@ class MysqlAdapter extends AbstractAdapter
 
         $matches = [];
         $foreignKeys = $this->getForeignKeys($tableName);
-        foreach ($foreignKeys as $name => $key) {
+        foreach ($foreignKeys as $key) {
             if (array_map('mb_strtolower', $key['columns']) === $columns) {
-                $matches[] = $name;
+                $matches[] = $key['name'];
             }
         }
 
