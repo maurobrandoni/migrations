@@ -231,7 +231,6 @@ class PostgresAdapter extends AbstractAdapter
     protected function getChangePrimaryKeyInstructions(Table $table, array|string|null $newColumns): AlterInstructions
     {
         $parts = $this->getSchemaName($table->getName());
-
         $instructions = new AlterInstructions();
 
         // Drop the existing primary key
@@ -638,25 +637,7 @@ class PostgresAdapter extends AbstractAdapter
     protected function getIndexes(string $tableName): array
     {
         $dialect = $this->getSchemaDialect();
-        $parts = $this->getSchemaName($tableName);
-
-        [$query, $params] = $dialect->describeIndexSql($parts['table'], [
-            'schema' => $parts['schema'],
-            'database' => $this->getOption('database'),
-        ]);
-        $rows = $this->query($query, $params)->fetchAll('assoc');
-
-        $indexes = [];
-        foreach ($rows as $row) {
-            if (!isset($indexes[$row['relname']])) {
-                $indexes[$row['relname']] = [
-                    'isPrimary' => false,
-                    'columns' => [],
-                ];
-            }
-            $indexes[$row['relname']]['columns'][] = $row['attname'];
-            $indexes[$row['relname']]['isPrimary'] = $row['indisprimary'];
-        }
+        $indexes = $dialect->describeIndexes($tableName);
 
         return $indexes;
     }
@@ -685,8 +666,8 @@ class PostgresAdapter extends AbstractAdapter
     public function hasIndexByName(string $tableName, string $indexName): bool
     {
         $indexes = $this->getIndexes($tableName);
-        foreach ($indexes as $name => $index) {
-            if ($name === $indexName) {
+        foreach ($indexes as $index) {
+            if ($index['name'] === $indexName || (isset($index['constraint']) && $index['constraint'] === $indexName)) {
                 return true;
             }
         }
@@ -719,12 +700,12 @@ class PostgresAdapter extends AbstractAdapter
         }
 
         $indexes = $this->getIndexes($tableName);
-        foreach ($indexes as $indexName => $index) {
+        foreach ($indexes as $index) {
             $a = array_diff($columns, $index['columns']);
             if (!$a) {
                 return new AlterInstructions([], [sprintf(
                     'DROP INDEX IF EXISTS %s',
-                    '"' . ($parts['schema'] . '".' . $this->quoteColumnName($indexName)),
+                    '"' . ($parts['schema'] . '".' . $this->quoteColumnName($index['name'])),
                 )]);
             }
         }
@@ -782,15 +763,13 @@ class PostgresAdapter extends AbstractAdapter
     {
         $indexes = $this->getIndexes($tableName);
 
-        foreach ($indexes as $name => $index) {
-            if ($index['isPrimary']) {
-                $index['constraint'] = $name;
-
+        foreach ($indexes as $index) {
+            if ($index['type'] === 'primary') {
                 return $index;
             }
         }
 
-        return ['columns' => []];
+        return ['constraint' => '', 'columns' => []];
     }
 
     /**
@@ -799,12 +778,9 @@ class PostgresAdapter extends AbstractAdapter
     public function hasForeignKey(string $tableName, $columns, ?string $constraint = null): bool
     {
         $foreignKeys = $this->getForeignKeys($tableName);
+        $names = array_column($foreignKeys, 'name');
         if ($constraint) {
-            if (isset($foreignKeys[$constraint])) {
-                return !empty($foreignKeys[$constraint]);
-            }
-
-            return false;
+            return in_array($constraint, $names);
         }
 
         if (is_string($columns)) {
@@ -828,26 +804,8 @@ class PostgresAdapter extends AbstractAdapter
      */
     protected function getForeignKeys(string $tableName): array
     {
-        $parts = $this->getSchemaName($tableName);
         $dialect = $this->getSchemaDialect();
-
-        [$query, $params] = $dialect->describeForeignKeySql($parts['table'], [
-            'schema' => $parts['schema'],
-            'database' => $this->getOption('database'),
-        ]);
-        $rows = $this->query($query, $params)->fetchAll('assoc');
-        $foreignKeys = [];
-        foreach ($rows as $row) {
-            $name = $row['name'];
-            $foreignKeys[$name]['table'] = $parts['table'];
-            $foreignKeys[$name]['columns'][] = $row['column_name'];
-            $foreignKeys[$name]['referenced_table'] = $row['references_table'];
-            $foreignKeys[$name]['referenced_columns'][] = $row['references_field'];
-        }
-        foreach ($foreignKeys as $name => $key) {
-            $foreignKeys[$name]['columns'] = array_values(array_unique($key['columns']));
-            $foreignKeys[$name]['referenced_columns'] = array_values(array_unique($key['referenced_columns']));
-        }
+        $foreignKeys = $dialect->describeForeignKeys($tableName);
 
         return $foreignKeys;
     }
@@ -887,9 +845,9 @@ class PostgresAdapter extends AbstractAdapter
 
         $matches = [];
         $foreignKeys = $this->getForeignKeys($tableName);
-        foreach ($foreignKeys as $name => $key) {
+        foreach ($foreignKeys as $key) {
             if ($key['columns'] === $columns) {
-                $matches[] = $name;
+                $matches[] = $key['name'];
             }
         }
 
