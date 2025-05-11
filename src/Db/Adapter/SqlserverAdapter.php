@@ -9,6 +9,7 @@ declare(strict_types=1);
 namespace Migrations\Db\Adapter;
 
 use BadMethodCallException;
+use Cake\Database\Schema\TableSchema;
 use Cake\I18n\Date;
 use Cake\I18n\DateTime;
 use InvalidArgumentException;
@@ -312,44 +313,20 @@ class SqlserverAdapter extends AbstractAdapter
      */
     public function getColumns(string $tableName): array
     {
-        // TODO we can't use cakephp/database for reflection here
-        // as we'd be missing some attributes.
-        $parts = $this->getSchemaName($tableName);
+        $dialect = $this->getSchemaDialect();
+
         $columns = [];
-        $sql = "SELECT
-            DISTINCT TABLE_SCHEMA AS [schema],
-            TABLE_NAME as [table_name],
-            COLUMN_NAME AS [name],
-            DATA_TYPE AS [type],
-            IS_NULLABLE AS [null], COLUMN_DEFAULT AS [default],
-            CHARACTER_MAXIMUM_LENGTH AS [char_length],
-            NUMERIC_PRECISION AS [precision],
-            NUMERIC_SCALE AS [scale],
-            ORDINAL_POSITION AS [ordinal_position],
-            COLUMNPROPERTY(object_id(TABLE_NAME),
-            COLUMN_NAME, 'IsIdentity') as [identity]
-        FROM INFORMATION_SCHEMA.COLUMNS
-        WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?
-        ORDER BY ordinal_position";
-        $rows = $this->query($sql, [$parts['schema'], $parts['table']])
-            ->fetchAll('assoc');
-        foreach ($rows as $columnInfo) {
-            try {
-                $type = $this->getPhinxType($columnInfo['type']);
-            } catch (UnsupportedColumnTypeException $e) {
-                $type = Literal::from($columnInfo['type']);
-            }
-
-            $column = new Column();
-            $column->setName($columnInfo['name'])
-                ->setType($type)
-                ->setNull($columnInfo['null'] !== 'NO')
+        foreach ($dialect->describeColumns($tableName) as $columnInfo) {
+            $column = (new Column())
+                ->setName($columnInfo['name'])
+                ->setType($columnInfo['type'])
+                ->setNull($columnInfo['null'])
+                ->setLimit($columnInfo['length'])
                 ->setDefault($this->parseDefault($columnInfo['default']))
-                ->setIdentity($columnInfo['identity'] === '1')
-                ->setComment($this->getColumnComment($columnInfo['table_name'], $columnInfo['name']));
+                ->setComment($columnInfo['comment']);
 
-            if (!empty($columnInfo['char_length'])) {
-                $column->setLimit((int)$columnInfo['char_length']);
+            if ($columnInfo['autoIncrement'] ?? false) {
+                $column->setIdentity($columnInfo['autoIncrement']);
             }
 
             $columns[$columnInfo['name']] = $column;
@@ -489,6 +466,10 @@ SQL;
     protected function getChangeColumnInstructions(string $tableName, string $columnName, Column $newColumn): AlterInstructions
     {
         $columns = $this->getColumns($tableName);
+        if (!isset($columns[$columnName])) {
+            throw new InvalidArgumentException("Unknown column {$columnName} cannot be changed.");
+        }
+
         $changeDefault =
             $newColumn->getDefault() !== $columns[$columnName]->getDefault() ||
             $newColumn->getType() !== $columns[$columnName]->getType();
@@ -612,25 +593,9 @@ ORDER BY IC.[key_ordinal]';
      */
     public function getIndexes(string $tableName): array
     {
-        $parts = $this->getSchemaName($tableName);
         $dialect = $this->getSchemaDialect();
 
-        [$query, $params] = $dialect->describeIndexSql($parts['table'], ['schema' => $parts['schema']]);
-        $rows = $this->query($query, $params)->fetchAll('assoc');
-        $indexes = [];
-        foreach ($rows as $row) {
-            $name = $row['index_name'];
-            if (!isset($indexes[$name])) {
-                $indexes[$name] = [
-                    'columns' => [],
-                    'isPrimary' => false,
-                ];
-            }
-            $indexes[$name]['columns'][] = $row['column_name'];
-            $indexes[$name]['isPrimary'] = $row['is_primary_key'];
-        }
-
-        return $indexes;
+        return $dialect->describeIndexes($tableName);
     }
 
     /**
@@ -662,8 +627,8 @@ ORDER BY IC.[key_ordinal]';
     {
         $indexes = $this->getIndexes($tableName);
 
-        foreach ($indexes as $name => $index) {
-            if ($name === $indexName) {
+        foreach ($indexes as $index) {
+            if ($index['name'] === $indexName) {
                 return true;
             }
         }
@@ -696,12 +661,12 @@ ORDER BY IC.[key_ordinal]';
         $columns = array_map('strtolower', $columns);
         $instructions = new AlterInstructions();
 
-        foreach ($indexes as $indexName => $index) {
+        foreach ($indexes as $index) {
             $a = array_diff($columns, $index['columns']);
             if (!$a) {
                 $instructions->addPostStep(sprintf(
                     'DROP INDEX %s ON %s',
-                    $this->quoteColumnName($indexName),
+                    $this->quoteColumnName($index['name']),
                     $this->quoteTableName($tableName),
                 ));
 
@@ -725,8 +690,8 @@ ORDER BY IC.[key_ordinal]';
         $indexes = $this->getIndexes($tableName);
         $instructions = new AlterInstructions();
 
-        foreach ($indexes as $name => $index) {
-            if ($name === $indexName) {
+        foreach ($indexes as $index) {
+            if ($index['name'] === $indexName) {
                 $instructions->addPostStep(sprintf(
                     'DROP INDEX %s ON %s',
                     $this->quoteColumnName($indexName),
@@ -772,10 +737,9 @@ ORDER BY IC.[key_ordinal]';
         $primaryKey = [
             'columns' => [],
         ];
-        foreach ($indexes as $name => $row) {
-            if ($row['isPrimary']) {
-                $primaryKey['constraint'] = $name;
-                $primaryKey['columns'] = $row['columns'];
+        foreach ($indexes as $row) {
+            if ($row['type'] == TableSchema::CONSTRAINT_PRIMARY) {
+                return $row;
             }
         }
 
@@ -789,8 +753,10 @@ ORDER BY IC.[key_ordinal]';
     {
         $foreignKeys = $this->getForeignKeys($tableName);
         if ($constraint) {
-            if (isset($foreignKeys[$constraint])) {
-                return !empty($foreignKeys[$constraint]);
+            foreach ($foreignKeys as $key) {
+                if ($key['name'] === $constraint) {
+                    return true;
+                }
             }
 
             return false;
@@ -817,34 +783,9 @@ ORDER BY IC.[key_ordinal]';
      */
     protected function getForeignKeys(string $tableName): array
     {
-        $parts = $this->getSchemaName($tableName);
         $dialect = $this->getSchemaDialect();
-        $foreignKeys = [];
 
-        [$query, $params] = $dialect->describeForeignKeySql($parts['table'], ['schema' => $parts['schema']]);
-        $rows = $this->query($query, $params)->fetchAll('assoc');
-
-        foreach ($rows as $row) {
-            $name = $row['foreign_key_name'];
-            if (!isset($foreignKeys[$name])) {
-                $foreignKeys[$name] = [
-                    'table' => '',
-                    'columns' => [],
-                    'referenced_table' => '',
-                    'referenced_columns' => [],
-                ];
-            }
-            $foreignKeys[$name]['table'] = $parts['table'];
-            $foreignKeys[$name]['columns'][] = $row['column'];
-            $foreignKeys[$name]['referenced_table'] = $row['reference_table'];
-            $foreignKeys[$name]['referenced_columns'][] = $row['reference_column'];
-        }
-        foreach ($foreignKeys as $name => $key) {
-            $foreignKeys[$name]['columns'] = array_values(array_unique($key['columns']));
-            $foreignKeys[$name]['referenced_columns'] = array_values(array_unique($key['referenced_columns']));
-        }
-
-        return $foreignKeys;
+        return $dialect->describeForeignKeys($tableName);
     }
 
     /**
@@ -886,9 +827,9 @@ ORDER BY IC.[key_ordinal]';
 
         $matches = [];
         $foreignKeys = $this->getForeignKeys($tableName);
-        foreach ($foreignKeys as $name => $key) {
+        foreach ($foreignKeys as $key) {
             if ($key['columns'] === $columns) {
-                $matches[] = $name;
+                $matches[] = $key['name'];
             }
         }
 
