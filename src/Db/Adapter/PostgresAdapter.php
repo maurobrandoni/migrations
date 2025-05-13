@@ -9,6 +9,7 @@ declare(strict_types=1);
 namespace Migrations\Db\Adapter;
 
 use Cake\Database\Connection;
+use Cake\Database\Schema\TableSchema;
 use Cake\I18n\Date;
 use Cake\I18n\DateTime;
 use InvalidArgumentException;
@@ -326,78 +327,30 @@ class PostgresAdapter extends AbstractAdapter
      */
     public function getColumns(string $tableName): array
     {
-        $parts = $this->getSchemaName($tableName);
+        $dialect = $this->getSchemaDialect();
         $columns = [];
-
-        // TODO We can't use cakephp/database here as several attributes are missing
-        // from the query cakephp prepares. We'll need to expand the cakephp/database
-        // query in a future release.
-        $sql = sprintf(
-            'SELECT column_name, data_type, udt_name, is_identity, is_nullable,
-             column_default, character_maximum_length, numeric_precision, numeric_scale,
-             datetime_precision
-             %s
-             FROM information_schema.columns
-             WHERE table_schema = ? AND table_name = ?
-             ORDER BY ordinal_position',
-            $this->useIdentity ? ', identity_generation' : '',
-        );
-        $params = [
-            $parts['schema'],
-            $parts['table'],
-        ];
-        $columnsInfo = $this->query($sql, $params)->fetchAll('assoc');
-        foreach ($columnsInfo as $columnInfo) {
-            $isUserDefined = strtoupper(trim($columnInfo['data_type'])) === 'USER-DEFINED';
-
-            if ($isUserDefined) {
-                $columnType = Literal::from($columnInfo['udt_name']);
-            } else {
-                $columnType = $this->getPhinxType($columnInfo['data_type']);
-            }
-
-            // If the default value begins with a ' or looks like a function mark it as literal
-            if (isset($columnInfo['column_default'][0]) && $columnInfo['column_default'][0] === "'") {
-                if (preg_match('/^\'(.*)\'::[^:]+$/', $columnInfo['column_default'], $match)) {
-                    // '' and \' are replaced with a single '
-                    $columnDefault = preg_replace('/[\'\\\\]\'/', "'", $match[1]);
-                } else {
-                    $columnDefault = Literal::from($columnInfo['column_default']);
-                }
-            } elseif (
-                $columnInfo['column_default'] !== null &&
-                preg_match('/^\D[a-z_\d]*\(.*\)$/', $columnInfo['column_default'])
-            ) {
-                $columnDefault = Literal::from($columnInfo['column_default']);
-            } else {
-                $columnDefault = $columnInfo['column_default'];
-            }
-
+        foreach ($dialect->describeColumns($tableName) as $columnInfo) {
             $column = new Column();
+            $column->setName($columnInfo['name'])
+                   ->setType($columnInfo['type'])
+                   ->setNull($columnInfo['null'])
+                   ->setDefault($columnInfo['default'])
+                   ->setLimit($columnInfo['length'])
+                   ->setScale($columnInfo['precision'] ?? null);
 
-            $column->setName($columnInfo['column_name'])
-                   ->setType($columnType)
-                   ->setNull($columnInfo['is_nullable'] === 'YES')
-                   ->setDefault($columnDefault)
-                   ->setIdentity($columnInfo['is_identity'] === 'YES')
-                   ->setScale($columnInfo['numeric_scale']);
+            if ($columnInfo['autoIncrement'] ?? false) {
+                $column->setIdentity(true);
+            }
 
             if ($this->useIdentity) {
-                $column->setGenerated($columnInfo['identity_generation']);
+                $column->setGenerated($columnInfo['generated'] ?? null);
             }
 
-            if (preg_match('/\bwith time zone$/', $columnInfo['data_type'])) {
+            if ($columnInfo['type'] === TableSchema::TYPE_TIMESTAMP_FRACTIONAL) {
+                $column->setPrecision($columnInfo['precision'] ?? null);
+            }
+            if ($columnInfo['type'] === TableSchema::TYPE_TIMESTAMP_TIMEZONE) {
                 $column->setTimezone(true);
-            }
-
-            if (isset($columnInfo['character_maximum_length'])) {
-                $column->setLimit($columnInfo['character_maximum_length']);
-            }
-
-            if (in_array($columnType, [static::PHINX_TYPE_TIME, static::PHINX_TYPE_DATETIME], true)) {
-                $column->setPrecision($columnInfo['datetime_precision']);
-            } elseif ($columnType === self::PHINX_TYPE_DECIMAL) {
-                $column->setPrecision($columnInfo['numeric_precision']);
             }
             $columns[] = $column;
         }
