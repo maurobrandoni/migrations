@@ -221,15 +221,20 @@ abstract class BakeSimpleMigrationCommand extends SimpleBakeCommand
         )->addOption('no-test', [
             'boolean' => true,
             'help' => 'Do not generate a test skeleton.',
-        ])->addOption('force', [
-            'short' => 'f',
-            'boolean' => true,
-            'help' => 'Force overwriting existing file if a migration already exists with the same name.',
         ])->addOption('source', [
             'short' => 's',
             'default' => self::DEFAULT_MIGRATION_FOLDER,
             'help' => 'Name of the folder in which the migration should be saved.',
         ]);
+
+        $options = $parser->options();
+        if (!isset($options['force'])) {
+            $parser->addOption('force', [
+                'short' => 'f',
+                'boolean' => true,
+                'help' => 'Force overwriting existing file if a migration already exists with the same name.',
+            ]);
+        }
 
         return $parser;
     }
