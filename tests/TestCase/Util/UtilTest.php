@@ -7,6 +7,7 @@ use Cake\TestSuite\TestCase;
 use DateTime;
 use DateTimeZone;
 use Migrations\Util\Util;
+use PHPUnit\Framework\Attributes\DataProvider;
 use RuntimeException;
 
 class UtilTest extends TestCase
@@ -77,9 +78,7 @@ class UtilTest extends TestCase
         ];
     }
 
-    /**
-     * @dataProvider providerMapClassNameToFileName
-     */
+    #[DataProvider('providerMapClassNameToFileName')]
     public function testMapClassNameToFileName(string $name, string $pattern): void
     {
         $this->assertMatchesRegularExpression($pattern, Util::mapClassNameToFileName($name));
@@ -97,9 +96,7 @@ class UtilTest extends TestCase
         ];
     }
 
-    /**
-     * @dataProvider providerMapFileName
-     */
+    #[DataProvider('providerMapFileName')]
     public function testMapFileNameToClassName(string $fileName, string $className)
     {
         $this->assertEquals($className, Util::mapFileNameToClassName($fileName));

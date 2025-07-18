@@ -46,6 +46,7 @@ class Migrate extends MigrateCommand
             ->setHelp('runs all available migrations, optionally up to a specific version')
             ->addOption('--target', '-t', InputOption::VALUE_REQUIRED, 'The version number to migrate to')
             ->addOption('--date', '-d', InputOption::VALUE_REQUIRED, 'The date to migrate to')
+            ->addOption('--count', '-k', InputOption::VALUE_REQUIRED, 'The number of migrations to run')
             ->addOption(
                 '--dry-run',
                 '-x',
