@@ -706,7 +706,7 @@ class MysqlAdapter extends AbstractAdapter
         }
 
         throw new InvalidArgumentException(sprintf(
-            "The specified index on columns '%s' does not exist",
+            'The specified index on columns `%s` does not exist',
             implode(',', $columns),
         ));
     }
@@ -730,7 +730,7 @@ class MysqlAdapter extends AbstractAdapter
         }
 
         throw new InvalidArgumentException(sprintf(
-            "The specified index name '%s' does not exist",
+            'The specified index name `%s` does not exist',
             $indexName,
         ));
     }

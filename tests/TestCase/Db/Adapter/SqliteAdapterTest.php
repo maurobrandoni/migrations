@@ -1193,9 +1193,10 @@ class SqliteAdapterTest extends TestCase
 
     /**
      * @param string $indexSQL Index creation SQL
+     * @param string $newIndexSQL Expected new index creation SQL
      */
     #[DataProvider('customIndexSQLDataProvider')]
-    public function testDropColumnWithCustomIndex(string $indexSQL)
+    public function testDropColumnWithCustomIndex(string $indexSQL, string $newIndexSQL)
     {
         $table = new Table('t', [], $this->adapter);
         $table
@@ -1213,9 +1214,10 @@ class SqliteAdapterTest extends TestCase
 
     /**
      * @param string $indexSQL Index creation SQL
+     * @param string $newIndexSQL Expected new index creation SQL
      */
     #[DataProvider('customCompositeIndexSQLDataProvider')]
-    public function testDropColumnWithCustomCompositeIndex(string $indexSQL)
+    public function testDropColumnWithCustomCompositeIndex(string $indexSQL, string $newIndexSQL)
     {
         $table = new Table('t', [], $this->adapter);
         $table

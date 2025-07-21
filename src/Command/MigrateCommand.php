@@ -76,6 +76,9 @@ class MigrateCommand extends Command
         ])->addOption('date', [
             'short' => 'd',
             'help' => 'The date to migrate to',
+        ])->addOption('count', [
+            'short' => 'k',
+            'help' => 'The number of migrations to run',
         ])->addOption('fake', [
             'help' => "Mark any migrations selected as run, but don't actually execute them",
             'boolean' => true,

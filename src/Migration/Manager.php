@@ -263,7 +263,6 @@ class Manager
         $class = ucwords($class);
         $class = str_replace(' ', '', $class);
         if (strpos($class, '.') !== false) {
-            /** @psalm-suppress PossiblyFalseArgument */
             $class = substr($class, 0, strpos($class, '.'));
         }
 
@@ -670,10 +669,13 @@ class Manager
             }
         } else {
             // run only one seeder
-            if (array_key_exists($seed, $seeds)) {
+            if (array_key_exists($seed . 'Seed', $seeds)) {
+                $seed = $seed . 'Seed';
+                $this->executeSeed($seeds[$seed]);
+            } elseif (array_key_exists($seed, $seeds)) {
                 $this->executeSeed($seeds[$seed]);
             } else {
-                throw new InvalidArgumentException(sprintf('The seed class "%s" does not exist', $seed));
+                throw new InvalidArgumentException(sprintf('The seed `%s` does not exist', $seed));
             }
         }
     }
@@ -826,7 +828,7 @@ class Manager
                     ini_set('display_errors', $orig_display_errors_setting);
                     if (!class_exists($class)) {
                         throw new InvalidArgumentException(sprintf(
-                            'Could not find class "%s" in file "%s"',
+                            'Could not find class `%s` in file `%s`',
                             $class,
                             $filePath,
                         ));
@@ -954,7 +956,7 @@ class Manager
                     require_once $filePath;
                     if (!class_exists($class)) {
                         throw new InvalidArgumentException(sprintf(
-                            'Could not find class "%s" in file "%s"',
+                            'Could not find class `%s` in file `%s`',
                             $class,
                             $filePath,
                         ));
