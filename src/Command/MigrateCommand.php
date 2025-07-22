@@ -125,7 +125,6 @@ class MigrateCommand extends Command
         $version = $args->getOption('target') !== null ? (int)$args->getOption('target') : null;
         $date = $args->getOption('date');
         $fake = (bool)$args->getOption('fake');
-        $dryRun = (bool)$args->getOption('dry-run');
 
         $count = $args->getOption('count');
         if ($count) {
@@ -136,13 +135,15 @@ class MigrateCommand extends Command
             'plugin' => $args->getOption('plugin'),
             'source' => $args->getOption('source'),
             'connection' => $args->getOption('connection'),
-            'dry-run' => $dryRun,
+            'dry-run' => (bool)$args->getOption('dry-run'),
         ]);
+
         $manager = $factory->createManager($io);
         $config = $manager->getConfig();
 
         $versionOrder = $config->getVersionOrder();
-        if ($dryRun) {
+
+        if ($config->isDryRun()) {
             $io->warning('dry-run mode enabled');
         }
         $io->verbose('<info>using connection</info> ' . (string)$args->getOption('connection'));
