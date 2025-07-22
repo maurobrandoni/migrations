@@ -127,6 +127,11 @@ class MigrateCommand extends Command
         $fake = (bool)$args->getOption('fake');
         $dryRun = (bool)$args->getOption('dry-run');
 
+        $count = $args->getOption('count');
+        if ($count) {
+            $io->abort('The `--count` option is not supported yet in this command. Use `--target` instead.');
+        }
+
         $factory = new ManagerFactory([
             'plugin' => $args->getOption('plugin'),
             'source' => $args->getOption('source'),
