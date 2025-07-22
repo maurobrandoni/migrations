@@ -144,7 +144,7 @@ class MigrateCommand extends Command
         $versionOrder = $config->getVersionOrder();
 
         if ($config->isDryRun()) {
-            $io->warning('dry-run mode enabled');
+            $io->info('DRY-RUN mode enabled');
         }
         $io->verbose('<info>using connection</info> ' . (string)$args->getOption('connection'));
         $io->verbose('<info>using paths</info> ' . $config->getMigrationPath());
