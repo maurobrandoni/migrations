@@ -238,11 +238,17 @@ class BaseSeed implements SeedInterface
         [$pluginName, $seeder] = pluginSplit($seeder);
         $adapter = $this->getAdapter();
         $connection = $adapter->getConnection()->configName();
+        $config = $this->getConfig();
 
+        $options += [
+            'connection' => $connection,
+            'plugin' => $pluginName ?? $config['plugin'],
+            'source' => $config['source'],
+        ];
         $factory = new ManagerFactory([
-            'plugin' => $options['plugin'] ?? $pluginName ?? null,
-            'source' => $options['source'] ?? null,
-            'connection' => $options['connection'] ?? $connection,
+            'connection' => $options['connection'],
+            'plugin' => $options['plugin'],
+            'source' => $options['source'],
         ]);
         $io = $this->getIo();
         assert($io !== null, 'Missing ConsoleIo instance');

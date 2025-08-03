@@ -92,6 +92,9 @@ class EntryCommand extends Command implements CommandCollectionAwareInterface
                 "Using <info>{$backend}</info> backend.",
                 '',
             ]);
+            if ($backend !== 'builtin') {
+                $io->warning("You are using the <info>{$backend}</info> backend which is no longer supported.");
+            }
             $help = $this->getHelp();
             $this->executeCommand($help, [], $io);
 

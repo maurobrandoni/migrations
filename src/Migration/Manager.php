@@ -985,6 +985,7 @@ class Manager
             ksort($seeds);
             $this->setSeeds($seeds);
         }
+        // debug($this->seeds);
         $this->seeds = $this->orderSeedsByDependencies((array)$this->seeds);
         if (!$this->seeds) {
             return [];

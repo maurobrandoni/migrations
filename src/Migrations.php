@@ -96,6 +96,8 @@ class Migrations
     /**
      * Sets the command
      *
+     * TODO(mark) Remove as part of phinx removal
+     *
      * @param string $command Command name to store.
      * @return $this
      */
@@ -109,6 +111,8 @@ class Migrations
     /**
      * Sets the input object that should be used for the command class. This object
      * is used to inspect the extra options that are needed for CakePHP apps.
+     *
+     * TODO(mark) Remove as part of phinx removal
      *
      * @param \Symfony\Component\Console\Input\InputInterface $input the input object
      * @return void
@@ -135,12 +139,10 @@ class Migrations
      */
     protected function getBackend(): BackendInterface
     {
+        // TODO(mark) Always return `BuiltinBackend` in the future, or remove this method.
         $backend = (string)(Configure::read('Migrations.backend') ?? 'builtin');
         if ($backend === 'builtin') {
             return new BuiltinBackend($this->default);
-        }
-        if ($backend === 'phinx') {
-            return new PhinxBackend($this->default);
         }
 
         throw new RuntimeException("Unknown `Migrations.backend` of `{$backend}`");
@@ -248,6 +250,8 @@ class Migrations
     /**
      * Returns an instance of CakeManager
      *
+     * TODO(mark) Remove as part of phinx removal
+     *
      * @param \Phinx\Config\ConfigInterface|null $config ConfigInterface the Manager needs to run
      * @return \Migrations\CakeManager Instance of CakeManager
      */
@@ -289,6 +293,8 @@ class Migrations
      * Sets the adapter the manager is going to need to operate on the DB
      * This will make sure the adapter instance is a \Migrations\CakeAdapter instance
      *
+     * TODO(mark) Remove as part of phinx removal
+     *
      * @return void
      */
     public function setAdapter(): void
@@ -312,6 +318,8 @@ class Migrations
     /**
      * Get the input needed for each commands to be run
      *
+     * TODO(mark) Remove as part of phinx removal
+     *
      * @param string $command Command name for which we need the InputInterface
      * @param array<string, mixed> $arguments Simple key/values array representing the command arguments
      * to pass to the InputInterface
@@ -333,6 +341,8 @@ class Migrations
 
     /**
      * Prepares the option to pass on to the InputInterface
+     *
+     * TODO(mark) Remove as part of phinx removal
      *
      * @param array<string, mixed> $options Simple key-values array to pass to the InputInterface
      * @return array<string, mixed> Prepared $options
