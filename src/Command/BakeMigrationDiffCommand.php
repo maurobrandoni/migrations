@@ -25,9 +25,8 @@ use Cake\Database\Schema\TableSchema;
 use Cake\Datasource\ConnectionManager;
 use Cake\Event\Event;
 use Cake\Event\EventManager;
-use Migrations\Command\Phinx\Dump;
+use Migrations\Migration\ManagerFactory;
 use Migrations\Util\UtilTrait;
-use Symfony\Component\Console\Input\ArrayInput;
 
 /**
  * Task class for generating migration diff files.
@@ -505,28 +504,20 @@ class BakeMigrationDiffCommand extends BakeSimpleMigrationCommand
      */
     protected function getDumpSchema(Arguments $args): array
     {
-        $inputArgs = [];
+        $options = [];
 
         $connectionName = 'default';
         if ($args->getOption('connection')) {
             $connectionName = $inputArgs['--connection'] = $args->getOption('connection');
         }
+        $options['connection'] = $connectionName;
+        $options['source'] = $args->getOption('source');
+        $options['plugin'] = $args->getOption('plugin');
 
-        if ($args->getOption('source')) {
-            $inputArgs['--source'] = $args->getOption('source');
-        }
+        $factory = new ManagerFactory($options);
+        $config = $factory->createConfig();
 
-        if ($args->getOption('plugin')) {
-            $inputArgs['--plugin'] = $args->getOption('plugin');
-        }
-
-        // TODO(mark) This has to change for the built-in backend
-        $className = Dump::class;
-        $definition = (new $className())->getDefinition();
-
-        $input = new ArrayInput($inputArgs, $definition);
-        $path = $this->getOperationsPath($input) . DS . 'schema-dump-' . $connectionName . '.lock';
-
+        $path = $config->getMigrationPath() . DS . 'schema-dump-' . $connectionName . '.lock';
         if (!file_exists($path)) {
             $msg = 'Unable to retrieve the schema dump file. You can create a dump file using ' .
                 'the `cake migrations dump` command';
