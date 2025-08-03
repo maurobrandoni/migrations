@@ -32,7 +32,6 @@ use Symfony\Component\Console\Output\OutputInterface;
  */
 class Migrations
 {
-
     /**
      * The OutputInterface.
      * Should be a \Symfony\Component\Console\Output\NullOutput instance

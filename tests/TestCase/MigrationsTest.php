@@ -22,7 +22,6 @@ use Cake\TestSuite\TestCase;
 use Exception;
 use InvalidArgumentException;
 use Migrations\Migrations;
-use Phinx\Db\Adapter\WrapperInterface;
 use PHPUnit\Framework\Attributes\DataProvider;
 use function Cake\Core\env;
 
