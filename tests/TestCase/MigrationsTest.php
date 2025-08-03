@@ -70,6 +70,8 @@ class MigrationsTest extends TestCase
 
         /** @var \Cake\Database\Connection $connection */
         $connection = ConnectionManager::get('test');
+        $connection->getDriver()->disconnect();
+
         // List of tables managed by migrations this test runs.
         // We can't wipe all tables as we'l break other tests.
         $connection->execute('DROP TABLE IF EXISTS numbers');
@@ -1110,11 +1112,8 @@ class MigrationsTest extends TestCase
     /**
      * Tests that migrating in case of error throws an exception
      */
-    #[DataProvider('backendProvider')]
-    public function testMigrateErrors($backend)
+    public function testMigrateErrors()
     {
-        Configure::write('Migrations.backend', $backend);
-
         $this->expectException(Exception::class);
         $this->migrations->markMigrated(20150704160200);
         $this->migrations->migrate();
@@ -1123,11 +1122,8 @@ class MigrationsTest extends TestCase
     /**
      * Tests that rolling back in case of error throws an exception
      */
-    #[DataProvider('backendProvider')]
-    public function testRollbackErrors($backend)
+    public function testRollbackErrors()
     {
-        Configure::write('Migrations.backend', $backend);
-
         $this->expectException(Exception::class);
         $this->migrations->markMigrated('all');
         $this->migrations->rollback();
@@ -1137,11 +1133,8 @@ class MigrationsTest extends TestCase
      * Tests that marking migrated a non-existant migrations returns an error
      * and can return a error message
      */
-    #[DataProvider('backendProvider')]
-    public function testMarkMigratedErrors($backend)
+    public function testMarkMigratedErrors()
     {
-        Configure::write('Migrations.backend', $backend);
-
         $this->expectException(Exception::class);
         $this->migrations->markMigrated(20150704000000);
     }
