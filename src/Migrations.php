@@ -19,7 +19,6 @@ use Cake\Datasource\ConnectionManager;
 use InvalidArgumentException;
 use Migrations\Migration\BackendInterface;
 use Migrations\Migration\BuiltinBackend;
-use Migrations\Migration\PhinxBackend;
 use Phinx\Config\ConfigInterface;
 use RuntimeException;
 use Symfony\Component\Console\Input\ArrayInput;
@@ -33,7 +32,6 @@ use Symfony\Component\Console\Output\OutputInterface;
  */
 class Migrations
 {
-    use ConfigurationTrait;
 
     /**
      * The OutputInterface.
