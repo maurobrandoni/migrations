@@ -116,7 +116,7 @@ class Migrations
      */
     public function setInput(InputInterface $input): void
     {
-        $this->input = $input;
+        // $this->input = $input;
     }
 
     /**
@@ -261,8 +261,8 @@ class Migrations
                 );
             }
 
-            $input = $this->input ?: $this->stubInput;
-            $this->manager = new CakeManager($config, $input, $this->output);
+            // $input = $this->input ?: $this->stubInput;
+            // $this->manager = new CakeManager($config, $input, $this->output);
         } elseif ($config !== null) {
             $defaultEnvironment = $config->getEnvironment('default');
             try {
@@ -281,35 +281,9 @@ class Migrations
             $this->manager->setConfig($config);
         }
 
-        $this->setAdapter();
+        // $this->setAdapter();
 
         return $this->manager;
-    }
-
-    /**
-     * Sets the adapter the manager is going to need to operate on the DB
-     * This will make sure the adapter instance is a \Migrations\CakeAdapter instance
-     *
-     * TODO(mark) Remove as part of phinx removal
-     *
-     * @return void
-     */
-    public function setAdapter(): void
-    {
-        if ($this->input === null) {
-            return;
-        }
-
-        $connectionName = $this->input()->getOption('connection') ?: 'default';
-        assert(is_string($connectionName), 'Connection name must be a string');
-        $connection = ConnectionManager::get($connectionName);
-        assert($connection instanceof Connection, 'Connection must be an instance of \Cake\Database\Connection');
-
-        $env = $this->manager->getEnvironment('default');
-        $adapter = $env->getAdapter();
-        if (!$adapter instanceof CakeAdapter) {
-            $env->setAdapter(new CakeAdapter($adapter, $connection));
-        }
     }
 
     /**

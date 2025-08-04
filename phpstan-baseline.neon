@@ -157,7 +157,7 @@ parameters:
 			path: src/Migration/Manager.php
 
 		-
-			message: '#^Method Migrations\\Shim\\OutputAdapter\:\:getVerbosity\(\) should return 16\|32\|64\|128\|256 but returns int\.$#'
+			message: '#^Method Migrations\\Shim\\OutputAdapter\:\:getVerbosity\(\) should return 8\|16\|32\|64\|128\|256 but returns int\.$#'
 			identifier: return.type
 			count: 1
 			path: src/Shim/OutputAdapter.php
