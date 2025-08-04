@@ -14,8 +14,6 @@ declare(strict_types=1);
 namespace Migrations;
 
 use Cake\Core\Configure;
-use Cake\Database\Connection;
-use Cake\Datasource\ConnectionManager;
 use InvalidArgumentException;
 use Migrations\Migration\BackendInterface;
 use Migrations\Migration\BuiltinBackend;
