@@ -1,11 +1,11 @@
 <?php
 
-use Migrations\AbstractSeed;
+use Migrations\BaseSeed;
 
 /**
  * NumbersSeed seed.
  */
-class DatabaseSeed extends AbstractSeed
+class DatabaseSeed extends BaseSeed
 {
     /**
      * Run Method.

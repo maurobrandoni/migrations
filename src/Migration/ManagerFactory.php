@@ -126,7 +126,7 @@ class ManagerFactory
             'migration_base_class' => 'Migrations\AbstractMigration',
             'environment' => $adapterConfig,
             'plugin' => $plugin,
-            'source' => (string)$this->getOption('source'),
+            'source' => $folder,
             'feature_flags' => [
                 'unsigned_primary_keys' => Configure::read('Migrations.unsigned_primary_keys'),
                 'column_null_default' => Configure::read('Migrations.column_null_default'),

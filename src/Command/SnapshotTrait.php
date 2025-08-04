@@ -15,7 +15,6 @@ namespace Migrations\Command;
 
 use Cake\Console\Arguments;
 use Cake\Console\ConsoleIo;
-use Cake\Core\Configure;
 
 /**
  * Trait needed for all "snapshot" type of bake operations.
@@ -42,15 +41,6 @@ trait SnapshotTrait
     }
 
     /**
-     * @internal
-     * @return bool Whether the builtin backend is active.
-     */
-    protected function useBuiltinBackend(): bool
-    {
-        return Configure::read('Migrations.backend', 'builtin') === 'builtin';
-    }
-
-    /**
      * Will mark a snapshot created, the snapshot being identified by its
      * full file path.
      *
@@ -72,11 +62,7 @@ trait SnapshotTrait
         $newArgs = array_merge($newArgs, $this->parseOptions($args));
 
         $io->out('Marking the migration ' . $fileName . ' as migrated...');
-        if ($this->useBuiltinBackend()) {
-            $this->executeCommand(MarkMigratedCommand::class, $newArgs, $io);
-        } else {
-            $this->executeCommand(MigrationsMarkMigratedCommand::class, $newArgs, $io);
-        }
+        $this->executeCommand(MarkMigratedCommand::class, $newArgs, $io);
     }
 
     /**
@@ -92,11 +78,7 @@ trait SnapshotTrait
         $newArgs = $this->parseOptions($args);
 
         $io->out('Creating a dump of the new database state...');
-        if ($this->useBuiltinBackend()) {
-            $this->executeCommand(DumpCommand::class, $newArgs, $io);
-        } else {
-            $this->executeCommand(MigrationsDumpCommand::class, $newArgs, $io);
-        }
+        $this->executeCommand(DumpCommand::class, $newArgs, $io);
     }
 
     /**

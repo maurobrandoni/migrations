@@ -13,9 +13,7 @@ declare(strict_types=1);
  */
 namespace Migrations;
 
-use Migrations\Command\Phinx\Seed;
 use Phinx\Seed\AbstractSeed as BaseAbstractSeed;
-use Symfony\Component\Console\Input\ArgvInput;
 use Symfony\Component\Console\Input\InputInterface;
 use function Cake\Core\pluginSplit;
 
@@ -100,6 +98,7 @@ abstract class AbstractSeed extends BaseAbstractSeed
             $argv[] = $source;
         }
 
+        /*
         $seedCommand = new Seed();
         $input = new ArgvInput($argv, $seedCommand->getDefinition());
         $seedCommand->setInput($input);
@@ -107,12 +106,13 @@ abstract class AbstractSeed extends BaseAbstractSeed
 
         $seedPaths = $config->getSeedPaths();
         require_once array_pop($seedPaths) . DS . $seeder . '.php';
-        /** @var \Phinx\Seed\SeedInterface $seeder */
+        /** @var \Phinx\Seed\SeedInterface $seeder * /
         $seeder = new $seeder();
         $seeder->setOutput($this->getOutput());
         $seeder->setAdapter($this->getAdapter());
         $seeder->setInput($this->input);
         $seeder->run();
+        */
     }
 
     /**

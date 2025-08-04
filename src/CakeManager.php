@@ -24,6 +24,8 @@ use Symfony\Component\Console\Output\OutputInterface;
 /**
  * Overrides Phinx Manager class in order to provide an interface
  * for running migrations within an app
+ *
+ * TODO(mark) Remove as part of phinx removal
  */
 class CakeManager extends Manager
 {
