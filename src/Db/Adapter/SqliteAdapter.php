@@ -9,6 +9,7 @@ declare(strict_types=1);
 namespace Migrations\Db\Adapter;
 
 use BadMethodCallException;
+use Cake\Database\Schema\TableSchema;
 use InvalidArgumentException;
 use Migrations\Db\AlterInstructions;
 use Migrations\Db\Expression;
@@ -314,10 +315,11 @@ class SqliteAdapter extends AbstractAdapter
         if (isset($options['primary_key'])) {
             $options['primary_key'] = (array)$options['primary_key'];
         }
+        $dialect = $this->getSchemaDialect();
 
         foreach ($columns as $column) {
-            $sql .= $this->quoteColumnName((string)$column->getName()) . ' ' . $this->getColumnSqlDefinition($column) . ', ';
-
+            $columnData = $column->toArray();
+            $sql .= $dialect->columnDefinitionSql($columnData) . ', ';
             if (isset($options['primary_key']) && $column->getIdentity()) {
                 //remove column from the primary key array as it is already defined as an autoincrement
                 //primary id
@@ -492,28 +494,26 @@ PCRE_PATTERN;
         $defaultBare = rtrim(ltrim($defaultClean, $trimChars . '('), $trimChars . ')');
 
         // match the string against one of several patterns
-        if (preg_match('/^CURRENT_(?:DATE|TIME|TIMESTAMP)$/i', $defaultBare)) {
-            // magic date or time
-            return strtoupper($defaultBare);
-        } elseif (preg_match('/^\'(?:[^\']|\'\')*\'$/i', $defaultBare)) {
+        if ($columnType === 'text' || $columnType === 'string') {
             // string literal
-            $str = str_replace("''", "'", substr($defaultBare, 1, strlen($defaultBare) - 2));
-
-            return Literal::from($str);
-        } elseif (preg_match('/^[+-]?\d+$/i', $defaultBare)) {
-            $int = (int)$defaultBare;
+            return Literal::from($default);
+        } elseif (preg_match('/^CURRENT_(?:DATE|TIME|TIMESTAMP)$/i', $default)) {
+            // magic date or time
+            return strtoupper($default);
+        } elseif (preg_match('/^[+-]?\d+$/i', $default)) {
+            $int = (int)$default;
             // integer literal
             if ($columnType === self::PHINX_TYPE_BOOLEAN && ($int === 0 || $int === 1)) {
                 return (bool)$int;
             } else {
                 return $int;
             }
-        } elseif (preg_match('/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i', $defaultBare)) {
+        } elseif (preg_match('/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i', $default)) {
             // float literal
-            return (float)$defaultBare;
-        } elseif (preg_match('/^0x[0-9a-f]+$/i', $defaultBare)) {
+            return (float)$default;
+        } elseif (preg_match('/^0x[0-9a-f]+$/i', $default)) {
             // hexadecimal literal
-            return hexdec(substr($defaultBare, 2));
+            return hexdec(substr($default, 2));
         } elseif (preg_match('/^null$/i', $defaultBare)) {
             // null literal
             return null;
@@ -522,7 +522,7 @@ PCRE_PATTERN;
             return filter_var($defaultClean, FILTER_VALIDATE_BOOLEAN);
         } else {
             // any other expression: return the expression with parentheses, but without comments
-            return Expression::from($defaultClean);
+            return Expression::from($default);
         }
     }
 
@@ -558,13 +558,6 @@ PCRE_PATTERN;
         if ($result === null) {
             return null;
         }
-        // make sure the table does not have a PK-origin autoindex
-        // such an autoindex would indicate either that the primary key was specified as descending, or that this is a WITHOUT ROWID table
-        foreach ($this->getIndexes($tableName) as $idx) {
-            if ($idx['origin'] === 'pk') {
-                return null;
-            }
-        }
 
         return $result;
     }
@@ -579,9 +572,7 @@ PCRE_PATTERN;
     {
         $dialect = $this->getSchemaDialect();
 
-        [$query, $params] = $dialect->describeColumnSql($tableName, []);
-
-        return $this->query($query, $params)->fetchAll('assoc');
+        return $dialect->describeColumns($tableName);
     }
 
     /**
@@ -590,21 +581,19 @@ PCRE_PATTERN;
     public function getColumns(string $tableName): array
     {
         $columns = [];
-        $identity = $this->resolveIdentity($tableName);
-
         foreach ($this->getColumnData($tableName) as $columnInfo) {
+            $default = $this->parseDefaultValue($columnInfo['default'], $columnInfo['type']);
             $column = new Column();
-            $type = $this->getPhinxType($columnInfo['type']);
-            $default = $this->parseDefaultValue($columnInfo['dflt_value'], $type['name']);
-
-            $column->setName($columnInfo['name'])
-                // SQLite on PHP 8.1 returns int for notnull, older versions return a string
-                   ->setNull((int)$columnInfo['notnull'] !== 1)
-                   ->setDefault($default)
-                   ->setType($type['name'])
-                   ->setLimit($type['limit'])
-                   ->setScale($type['scale'])
-                   ->setIdentity($columnInfo['name'] === $identity);
+            $column
+                ->setName($columnInfo['name'])
+                ->setType($columnInfo['type'])
+                ->setNull($columnInfo['null'])
+                ->setDefault($default)
+                ->setLimit($columnInfo['length'])
+                // cakephp uses precision not scale
+                ->setScale($columnInfo['precision'] ?? null)
+                ->setComment($columnInfo['comment'])
+                ->setIdentity($columnInfo['autoIncrement'] ?? false);
 
             $columns[] = $column;
         }
@@ -640,6 +629,7 @@ PCRE_PATTERN;
             // as the alternative is unwinding all possible table constraints which
             // gets messy quickly with CHECK constraints.
             $columns = $this->getColumns($tableName);
+            $dialect = $this->getSchemaDialect();
             if (!$columns) {
                 return $state;
             }
@@ -650,9 +640,8 @@ PCRE_PATTERN;
                     $this->quoteColumnName((string)$finalColumnName),
                 ),
                 sprintf(
-                    '$1, %s %s$2',
-                    $this->quoteColumnName((string)$column->getName()),
-                    $this->getColumnSqlDefinition($column),
+                    '$1, %s$2',
+                    $dialect->columnDefinitionSql($column->toArray()),
                 ),
                 (string)$state['createSQL'],
                 1,
@@ -763,12 +752,17 @@ PCRE_PATTERN;
                 ",
                 $params,
             )->fetchAll('assoc');
+
             $indexes = $this->getIndexes($tableName);
+            $indexMap = [];
+            foreach ($indexes as $index) {
+                $indexMap[$index['name']] = $index;
+            }
 
             foreach ($rows as $row) {
                 switch ($row['type']) {
                     case 'index':
-                        $info = $indexes[$row['name']];
+                        $info = $indexMap[$row['name']];
                         $columns = array_map(
                             function ($column) {
                                 if ($column === null) {
@@ -924,7 +918,7 @@ PCRE_PATTERN;
             foreach ($otherTables as $otherTable) {
                 $foreignKeyList = $this->getForeignKeys($otherTable['name']);
                 foreach ($foreignKeyList as $foreignKey) {
-                    if (strcasecmp($foreignKey['table'], $tableName) === 0) {
+                    if (strcasecmp($foreignKey['references'][0], $tableName) === 0) {
                         $tablesToCheck[] = $otherTable['name'];
                         break;
                     }
@@ -1046,7 +1040,6 @@ PCRE_PATTERN;
                 $writeColumns[] = $writeName;
             }
         }
-
         $selectColumns = array_filter($selectColumns, fn($value) => $value !== '');
         $writeColumns = array_filter($writeColumns, fn($value) => $value !== '');
         $selectColumns = array_map([$this, 'quoteColumnName'], $selectColumns);
@@ -1186,10 +1179,11 @@ PCRE_PATTERN;
         $instructions = $this->beginAlterByCopyTable($tableName);
 
         $newColumnName = (string)$newColumn->getName();
-        $instructions->addPostStep(function ($state) use ($columnName, $newColumn, $newColumnName) {
+        $instructions->addPostStep(function ($state) use ($columnName, $newColumn) {
+            $dialect = $this->getSchemaDialect();
             $sql = preg_replace(
                 sprintf("/%s(?:\/\*.*?\*\/|\([^)]+\)|'[^']*?'|[^,])+([,)])/", $this->quoteColumnName($columnName)),
-                sprintf('%s %s$1', $this->quoteColumnName($newColumnName), $this->getColumnSqlDefinition($newColumn)),
+                sprintf('%s$1', $dialect->columnDefinitionSql($newColumn->toArray())),
                 (string)$state['createSQL'],
                 1,
             );
@@ -1222,7 +1216,7 @@ PCRE_PATTERN;
 
         $instructions->addPostStep(function ($state) use ($columnName) {
             $sql = preg_replace(
-                sprintf("/%s\s%s.*(,\s(?!')|\)$)/U", preg_quote($this->quoteColumnName($columnName)), preg_quote($state['columnType'])),
+                sprintf("/%s\s\w+.*(,\s(?!')|\)$)/U", preg_quote($this->quoteColumnName($columnName))),
                 '',
                 (string)$state['createSQL'],
             );
@@ -1248,24 +1242,7 @@ PCRE_PATTERN;
     protected function getIndexes(string $tableName): array
     {
         $dialect = $this->getSchemaDialect();
-
-        [$query, $params] = $dialect->describeIndexSql($tableName, []);
-        $result = $this->query($query, $params)->fetchAll('assoc');
-
-        $indexes = [];
-        foreach ($result as $index) {
-            // We can't use the dialect here as convertIndexDescription
-            // has complicated requirements
-            $indexData = $this->fetchAll(sprintf('pragma index_info(%s)', $this->quoteColumnName($index['name'])));
-            $cols = [];
-            foreach ($indexData as $indexItem) {
-                $cols[] = $indexItem['name'];
-            }
-            $indexes[$index['name']] = [
-                'origin' => $index['origin'],
-                'columns' => $cols,
-            ];
-        }
+        $indexes = $dialect->describeIndexes($tableName);
 
         return $indexes;
     }
@@ -1283,10 +1260,10 @@ PCRE_PATTERN;
         $indexes = $this->getIndexes($tableName);
         $matches = [];
 
-        foreach ($indexes as $name => $index) {
+        foreach ($indexes as $index) {
             $indexCols = array_map('strtolower', $index['columns']);
             if ($columns == $indexCols) {
-                $matches[] = $name;
+                $matches[] = $index['name'];
             }
         }
 
@@ -1309,8 +1286,8 @@ PCRE_PATTERN;
         $indexName = strtolower($indexName);
         $indexes = $this->getIndexes($tableName);
 
-        foreach (array_keys($indexes) as $index) {
-            if ($indexName === strtolower($index)) {
+        foreach ($indexes as $index) {
+            if ($indexName === strtolower($index['name'])) {
                 return true;
             }
         }
@@ -1352,6 +1329,10 @@ PCRE_PATTERN;
         $indexNames = $this->resolveIndex($tableName, $columns);
         $schema = $this->getSchemaName($tableName, true)['schema'];
         foreach ($indexNames as $indexName) {
+            // Skip the implicit primary key that is reflected.
+            if ($indexName === 'primary') {
+                continue;
+            }
             if (strpos($indexName, 'sqlite_autoindex_') !== 0) {
                 $instructions->addPostStep(sprintf(
                     'DROP INDEX %s%s',
@@ -1374,8 +1355,8 @@ PCRE_PATTERN;
         $indexes = $this->getIndexes($tableName);
 
         $found = false;
-        foreach (array_keys($indexes) as $index) {
-            if ($indexName === strtolower($index)) {
+        foreach ($indexes as $index) {
+            if ($indexName === strtolower($index['name'])) {
                 $found = true;
                 break;
             }
@@ -1383,11 +1364,11 @@ PCRE_PATTERN;
 
         if ($found) {
             $schema = $this->getSchemaName($tableName, true)['schema'];
-                $instructions->addPostStep(sprintf(
-                    'DROP INDEX %s%s',
-                    $schema,
-                    $this->quoteColumnName($indexName),
-                ));
+            $instructions->addPostStep(sprintf(
+                'DROP INDEX %s%s',
+                $schema,
+                $this->quoteColumnName($indexName),
+            ));
         }
 
         return $instructions;
@@ -1422,16 +1403,15 @@ PCRE_PATTERN;
      */
     protected function getPrimaryKey(string $tableName): array
     {
-        $primaryKey = [];
-        $rows = $this->getColumnData($tableName);
-
-        foreach ($rows as $row) {
-            if ($row['pk'] > 0) {
-                $primaryKey[$row['pk'] - 1] = $row['name'];
+        $dialect = $this->getSchemaDialect();
+        $indexes = $dialect->describeIndexes($tableName);
+        foreach ($indexes as $index) {
+            if ($index['type'] == TableSchema::CONSTRAINT_PRIMARY) {
+                return $index['columns'];
             }
         }
 
-        return $primaryKey;
+        return [];
     }
 
     /**
@@ -1439,16 +1419,12 @@ PCRE_PATTERN;
      */
     public function hasForeignKey(string $tableName, $columns, ?string $constraint = null): bool
     {
-        if ($constraint !== null) {
-            return preg_match(
-                "/,?\s*CONSTRAINT\s*" . $this->possiblyQuotedIdentifierRegex($constraint) . '\s*FOREIGN\s+KEY/is',
-                $this->getDeclaringSql($tableName),
-            ) === 1;
-        }
-
         $columns = array_map('mb_strtolower', (array)$columns);
 
         foreach ($this->getForeignKeys($tableName) as $key) {
+            if ($constraint !== null && $key['name'] == $constraint) {
+                return true;
+            }
             if (array_map('mb_strtolower', $key['columns']) === $columns) {
                 return true;
             }
@@ -1465,25 +1441,10 @@ PCRE_PATTERN;
      */
     protected function getForeignKeys(string $tableName): array
     {
-        $foreignKeys = [];
+        $dialect = $this->getSchemaDialect();
+        $keys = $dialect->describeForeignKeys($tableName);
 
-        // Can't use the dialect here because describeForeignKeySql()
-        // doesn't fetch all metadata. If we improve the metadata query
-        // we can simplify here too.
-        $query = sprintf('PRAGMA foreign_key_list(%s)', $this->quoteTableName($tableName));
-        $rows = $this->fetchAll($query);
-
-        foreach ($rows as $row) {
-            if (!isset($foreignKeys[$row['id']])) {
-                $foreignKeys[$row['id']] = [
-                    'columns' => [],
-                    'table' => $row['table'],
-                ];
-            }
-            $foreignKeys[$row['id']]['columns'][$row['seq']] = $row['from'];
-        }
-
-        return $foreignKeys;
+        return $keys;
     }
 
     /**
@@ -1499,7 +1460,7 @@ PCRE_PATTERN;
         $instructions->addPostStep(function ($state) use ($column) {
             $quotedColumn = preg_quote($column);
             $columnPattern = "`{$quotedColumn}`|\"{$quotedColumn}\"|\[{$quotedColumn}\]";
-            $matchPattern = "/($columnPattern)\s+(\w+(\(\d+\))?)\s+((NOT )?NULL)/";
+            $matchPattern = "/($columnPattern)\s+(\w+(\(\d+\))?)(\s+(NOT )?NULL)?/";
 
             $sql = $state['createSQL'];
 
@@ -1577,14 +1538,14 @@ PCRE_PATTERN;
             $schema = $this->getSchemaName($tableName, true)['schema'];
             $tmpTableName = $state['tmpTableName'];
             $indexes = $this->getIndexes($tableName);
-            foreach (array_keys($indexes) as $indexName) {
-                if (strpos($indexName, 'sqlite_autoindex_') !== 0) {
+            foreach ($indexes as $index) {
+                if (strpos($index['name'], 'sqlite_autoindex_') !== 0) {
                     $sql .= sprintf(
                         'DROP INDEX %s%s; ',
                         $schema,
-                        $this->quoteColumnName($indexName),
+                        $this->quoteColumnName($index['name']),
                     );
-                    $createIndexSQL = $this->getDeclaringIndexSQL($tableName, $indexName);
+                    $createIndexSQL = $this->getDeclaringIndexSQL($tableName, $index['name']);
                     $sql .= preg_replace(
                         "/\b{$tableName}\b/",
                         $tmpTableName,
@@ -1770,56 +1731,6 @@ PCRE_PATTERN;
         if (file_exists($name . $this->suffix)) {
             unlink($name . $this->suffix);
         }
-    }
-
-    /**
-     * Gets the SQLite Column Definition for a Column object.
-     *
-     * @param \Migrations\Db\Table\Column $column Column
-     * @return string
-     */
-    protected function getColumnSqlDefinition(Column $column): string
-    {
-        $isLiteralType = $column->getType() instanceof Literal;
-        if ($isLiteralType) {
-            $def = (string)$column->getType();
-        } else {
-            $sqlType = $this->getSqlType($column->getType());
-            $def = strtoupper($sqlType['name']);
-
-            $limitable = in_array(strtoupper($sqlType['name']), $this->definitionsWithLimits, true);
-            if (($column->getLimit() || isset($sqlType['limit'])) && $limitable) {
-                $def .= '(' . ($column->getLimit() ?: $sqlType['limit']) . ')';
-            }
-        }
-        if ($column->getPrecision() && $column->getScale()) {
-            $def .= '(' . $column->getPrecision() . ',' . $column->getScale() . ')';
-        }
-
-        $default = $column->getDefault();
-
-        $def .= $column->isNull() ? ' NULL' : ' NOT NULL';
-        $def .= $this->getDefaultValueDefinition($default, (string)$column->getType());
-        $def .= $column->isIdentity() ? ' PRIMARY KEY AUTOINCREMENT' : '';
-
-        $def .= $this->getCommentDefinition($column);
-
-        return $def;
-    }
-
-    /**
-     * Gets the comment Definition for a Column object.
-     *
-     * @param \Migrations\Db\Table\Column $column Column
-     * @return string
-     */
-    protected function getCommentDefinition(Column $column): string
-    {
-        if ($column->getComment()) {
-            return ' /* ' . $column->getComment() . ' */ ';
-        }
-
-        return '';
     }
 
     /**

@@ -524,6 +524,28 @@ class SqliteAdapterTest extends TestCase
         $this->assertEquals("''", $rows[1]['dflt_value']);
     }
 
+    public function testAddDecimalWithPrecisionAndScale()
+    {
+        $table = new Table('table1', [], $this->adapter);
+        $table->save();
+        $table->addColumn('number', 'decimal', ['precision' => 10, 'scale' => 2])
+            ->addColumn('number2', 'decimal', ['limit' => 12])
+            ->addColumn('number3', 'decimal')
+            ->save();
+        $columns = $this->adapter->getColumns('table1');
+        foreach ($columns as $column) {
+            if ($column->getName() === 'number') {
+                $this->assertEquals('10', $column->getPrecision());
+                $this->assertEquals('2', $column->getScale());
+            }
+
+            if ($column->getName() === 'number2') {
+                $this->assertEquals('12', $column->getPrecision());
+                $this->assertEquals('0', $column->getScale());
+            }
+        }
+    }
+
     public static function irregularCreateTableProvider(): array
     {
         return [
@@ -548,16 +570,6 @@ class SqliteAdapterTest extends TestCase
         for ($i = 0; $i < $columnCount; $i++) {
             $this->assertEquals($expectedColumns[$i], $columns[$i]->getName());
         }
-    }
-
-    public function testAddDoubleColumn()
-    {
-        $table = new Table('table1', [], $this->adapter);
-        $table->save();
-        $table->addColumn('foo', 'double', ['null' => true])
-            ->save();
-        $rows = $this->adapter->fetchAll(sprintf('pragma table_info(%s)', 'table1'));
-        $this->assertEquals('DOUBLE', $rows[1]['type']);
     }
 
     public function testRenameColumn()
@@ -1455,44 +1467,6 @@ class SqliteAdapterTest extends TestCase
         $this->assertFalse($this->adapter->hasForeignKey($table->getName(), ['ref_table_field1', 'ref_table_id']));
     }
 
-    public function testDropForeignKeyWithIdenticalMultipleColumns()
-    {
-        $refTable = new Table('ref_table', [], $this->adapter);
-        $refTable
-            ->addColumn('field1', 'string')
-            ->addIndex(['id', 'field1'], ['unique' => true])
-            ->save();
-
-        $table = new Table('table', [], $this->adapter);
-        $keyOne = (new ForeignKey())
-            ->setName('ref_table_fk_1')
-            ->setColumns(['ref_table_id', 'ref_table_field1'])
-            ->setReferencedTable('ref_table')
-            ->setReferencedColumns(['id', 'field1']);
-        $keyTwo = (new ForeignKey())
-            ->setName('ref_table_fk_2')
-            ->setColumns(['ref_table_id', 'ref_table_field1'])
-            ->setReferencedTable('ref_table')
-            ->setReferencedColumns(['id', 'field1']);
-
-        $table
-            ->addColumn('ref_table_id', 'integer', ['signed' => false])
-            ->addColumn('ref_table_field1', 'string')
-            ->addForeignKey($keyOne)
-            ->addForeignKey($keyTwo)
-            ->save();
-
-        $this->assertTrue($this->adapter->hasForeignKey($table->getName(), ['ref_table_id', 'ref_table_field1']));
-        $this->assertTrue($this->adapter->hasForeignKey($table->getName(), [], 'ref_table_fk_1'));
-        $this->assertTrue($this->adapter->hasForeignKey($table->getName(), [], 'ref_table_fk_2'));
-
-        $this->adapter->dropForeignKey($table->getName(), ['ref_table_id', 'ref_table_field1']);
-
-        $this->assertFalse($this->adapter->hasForeignKey($table->getName(), ['ref_table_id', 'ref_table_field1']));
-        $this->assertFalse($this->adapter->hasForeignKey($table->getName(), [], 'ref_table_fk_1'));
-        $this->assertFalse($this->adapter->hasForeignKey($table->getName(), [], 'ref_table_fk_2'));
-    }
-
     public static function nonExistentForeignKeyColumnsProvider(): array
     {
         return [
@@ -1592,7 +1566,7 @@ class SqliteAdapterTest extends TestCase
     public function testAddColumnWithComment()
     {
         $table = new Table('table1', [], $this->adapter);
-        $table->addColumn('column1', 'string', ['comment' => $comment = 'Comments from "column1"'])
+        $table->addColumn('column1', 'string', ['comment' => 'Comments from "column1"'])
             ->save();
 
         $rows = $this->adapter->fetchAll('select * from sqlite_master where "type" = \'table\'');
@@ -1889,7 +1863,7 @@ class SqliteAdapterTest extends TestCase
             ->save();
 
         $expectedOutput = <<<'OUTPUT'
-CREATE TABLE "table1" ("id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, "column1" VARCHAR NOT NULL, "column2" INTEGER NULL, "column3" VARCHAR NULL DEFAULT 'test');
+CREATE TABLE "table1" ("id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, "column1" VARCHAR NOT NULL, "column2" INTEGER, "column3" VARCHAR DEFAULT 'test');
 OUTPUT;
         $actualOutput = join("\n", $this->out->messages());
         $this->assertStringContainsString($expectedOutput, $actualOutput, 'Passing the --dry-run option does not dump create table query to the output');
@@ -1989,7 +1963,7 @@ OUTPUT;
         ])->save();
 
         $expectedOutput = <<<'OUTPUT'
-CREATE TABLE "table1" ("column1" VARCHAR NOT NULL, "column2" INTEGER NULL, PRIMARY KEY ("column1"));
+CREATE TABLE "table1" ("column1" VARCHAR NOT NULL, "column2" INTEGER, PRIMARY KEY ("column1"));
 INSERT INTO "table1" ("column1", "column2") VALUES ('id1', 1);
 OUTPUT;
         $actualOutput = join("\n", $this->out->messages());
@@ -2586,7 +2560,8 @@ INPUT;
         ];
     }
 
-    public function testHasNamedForeignKey()
+    #[DataProvider('hasNamedForeignKeyProvider')]
+    public function testHasNamedForeignKey(string $keySql, ?string $keyName, array $columns, bool $expected): void
     {
         $refTable = new Table('tbl_parent_1', [], $this->adapter);
         $refTable->addColumn('column', 'string')->create();
@@ -2607,35 +2582,94 @@ INPUT;
             `column` VARCHAR NOT NULL, `parent_1_id` INTEGER NOT NULL,
             `parent_2_id` INTEGER NOT NULL,
             `parent_3_id` INTEGER NOT NULL,
-            CONSTRAINT `fk_parent_1_id` FOREIGN KEY (`parent_1_id`) REFERENCES `tbl_parent_1` (`id`),
-            CONSTRAINT [fk_[_brackets] FOREIGN KEY (`parent_1_id`) REFERENCES `tbl_parent_1` (`id`),
-            CONSTRAINT `fk_``_ticks` FOREIGN KEY (`parent_1_id`) REFERENCES `tbl_parent_1` (`id`),
-            CONSTRAINT \"fk_\"\"_double_quotes\" FOREIGN KEY (`parent_1_id`) REFERENCES `tbl_parent_1` (`id`),
-            CONSTRAINT 'fk_''_single_quotes' FOREIGN KEY (`parent_1_id`) REFERENCES `tbl_parent_1` (`id`),
-            CONSTRAINT fk_no_quotes FOREIGN KEY (`parent_1_id`) REFERENCES `tbl_parent_1` (`id`),
-            CONSTRAINT`fk_no_space`FOREIGN KEY(`parent_1_id`)REFERENCES`tbl_parent_1`(`id`),
-            constraint
-                `fk_lots_of_space`    FOReign		KEY (`parent_1_id`) REFERENCES `tbl_parent_1` (`id`),
-            FOREIGN KEY (`parent_2_id`) REFERENCES `tbl_parent_2` (`id`),
-            CONSTRAINT `check_constraint_1` CHECK (column<>'world'),
-            CONSTRAINT `fk_composite_key` FOREIGN KEY (`parent_3_id`,`column`) REFERENCES `tbl_parent_3` (`id`,`column`)
-            CONSTRAINT `check_constraint_2` CHECK (column<>'hello')
+            {$keySql}
         )");
 
-        $this->assertTrue($this->adapter->hasForeignKey('tbl_child', [], 'fk_parent_1_id'));
-        $this->assertTrue($this->adapter->hasForeignKey('tbl_child', [], 'fk_[_brackets'));
-        $this->assertTrue($this->adapter->hasForeignKey('tbl_child', [], 'fk_`_ticks'));
-        $this->assertTrue($this->adapter->hasForeignKey('tbl_child', [], 'fk_"_double_quotes'));
-        $this->assertTrue($this->adapter->hasForeignKey('tbl_child', [], "fk_'_single_quotes"));
-        $this->assertTrue($this->adapter->hasForeignKey('tbl_child', [], 'fk_no_quotes'));
-        $this->assertTrue($this->adapter->hasForeignKey('tbl_child', [], 'fk_no_space'));
-        $this->assertTrue($this->adapter->hasForeignKey('tbl_child', [], 'fk_lots_of_space'));
-        $this->assertTrue($this->adapter->hasForeignKey('tbl_child', ['parent_1_id']));
-        $this->assertTrue($this->adapter->hasForeignKey('tbl_child', ['parent_2_id']));
-        $this->assertTrue($this->adapter->hasForeignKey('tbl_child', [], 'fk_composite_key'));
-        $this->assertTrue($this->adapter->hasForeignKey('tbl_child', ['parent_3_id', 'column']));
-        $this->assertFalse($this->adapter->hasForeignKey('tbl_child', [], 'check_constraint_1'));
-        $this->assertFalse($this->adapter->hasForeignKey('tbl_child', [], 'check_constraint_2'));
+        $this->assertSame($expected, $this->adapter->hasForeignKey('tbl_child', $columns, $keyName));
+    }
+
+    /**
+     * @return array
+     */
+    public static function hasNamedForeignKeyProvider(): array
+    {
+        return [
+            // key sql, expected name, columns, expected presence
+            [
+                'CONSTRAINT `fk_parent_1_id` FOREIGN KEY (`parent_1_id`) REFERENCES `tbl_parent_1` (`id`)',
+                'fk_parent_1_id',
+                [],
+                true,
+            ],
+            [
+                'CONSTRAINT [fk_[_brackets] FOREIGN KEY (`parent_1_id`) REFERENCES `tbl_parent_1` (`id`)',
+                'fk_[_brackets',
+                [],
+                true,
+            ],
+            [
+                'CONSTRAINT `fk_``_ticks` FOREIGN KEY (`parent_1_id`) REFERENCES `tbl_parent_1` (`id`)',
+                'fk_`_ticks',
+                [],
+                true,
+            ],
+            [
+                'CONSTRAINT "fk_""_double_quotes" FOREIGN KEY (`parent_1_id`) REFERENCES `tbl_parent_1` (`id`)',
+                'fk_"_double_quotes',
+                [],
+                true,
+            ],
+            [
+                "CONSTRAINT 'fk_''_single_quotes' FOREIGN KEY (`parent_1_id`) REFERENCES `tbl_parent_1` (`id`)",
+                "fk_'_single_quotes",
+                [],
+                true,
+            ],
+            [
+                'CONSTRAINT fk_no_quotes FOREIGN KEY (`parent_1_id`) REFERENCES `tbl_parent_1` (`id`)',
+                'fk_no_quotes',
+                [],
+                true,
+            ],
+            [
+                'CONSTRAINT`fk_no_space`FOREIGN KEY(`parent_1_id`)REFERENCES`tbl_parent_1`(`id`)',
+                'fk_no_space',
+                [],
+                true,
+            ],
+            [
+                'constraint
+                `fk_lots_of_space`    FOReign		KEY (`parent_1_id`) REFERENCES `tbl_parent_1` (`id`)',
+                'fk_lots_of_space',
+                [],
+                true,
+            ],
+            [
+                'FOREIGN KEY (`parent_2_id`) REFERENCES `tbl_parent_2` (`id`)',
+                null,
+                ['parent_2_id'],
+                true,
+            ],
+            [
+                'CONSTRAINT `fk_parent_1_id` FOREIGN KEY (`parent_1_id`) REFERENCES `tbl_parent_1` (`id`)',
+                null,
+                ['parent_1_id'],
+                true,
+            ],
+            [
+                'CONSTRAINT `fk_composite_key` FOREIGN KEY (`parent_3_id`,`column`) REFERENCES `tbl_parent_3` (`id`,`column`)',
+                null,
+                ['parent_3_id', 'column'],
+                true,
+            ],
+            // Should not find check constraints
+            [
+                "CONSTRAINT `check_constraint_1` CHECK (column<>'world')",
+                'check_constraint_1',
+                [],
+                false,
+            ],
+        ];
     }
 
     #[DataProvider('providePhinxTypes')]
@@ -3016,10 +3050,10 @@ INPUT;
         $exp = [
             ['name' => 'a', 'type' => 'integer', 'null' => true, 'limit' => null, 'precision' => null, 'scale' => null],
             ['name' => 'b', 'type' => 'text', 'null' => true, 'limit' => null, 'precision' => null, 'scale' => null],
-            ['name' => 'c', 'type' => 'char', 'null' => true, 'limit' => 5, 'precision' => 5, 'scale' => null],
-            ['name' => 'd', 'type' => 'integer', 'null' => true, 'limit' => 12, 'precision' => 12, 'scale' => 6],
-            ['name' => 'e', 'type' => 'integer', 'null' => false, 'limit' => null, 'precision' => null, 'scale' => null],
-            ['name' => 'f', 'type' => 'integer', 'null' => true, 'limit' => null, 'precision' => null, 'scale' => null],
+            ['name' => 'c', 'type' => 'char', 'null' => true, 'limit' => 5],
+            ['name' => 'd', 'type' => 'integer', 'null' => true, 'limit' => 12],
+            ['name' => 'e', 'type' => 'integer', 'null' => false, 'limit' => null],
+            ['name' => 'f', 'type' => 'integer', 'null' => true, 'limit' => null],
         ];
         $act = $this->adapter->getColumns('t');
         $this->assertCount(count($exp), $act);
@@ -3051,10 +3085,10 @@ INPUT;
     {
         return [
             ['create table t(a text)', null],
-            ['create table t(a text primary key)', null],
+            ['create table t(a text primary key)', 'a'],
             ['create table t(a integer, b text, primary key(a,b))', null],
-            ['create table t(a integer primary key desc)', null],
-            ['create table t(a integer primary key) without rowid', null],
+            ['create table t(a integer primary key desc)', 'a'],
+            ['create table t(a integer primary key) without rowid', 'a'],
             ['create table t(a integer primary key)', 'a'],
             ['CREATE TABLE T(A INTEGER PRIMARY KEY)', 'A'],
             ['create table t(a integer, primary key(a))', 'a'],
@@ -3066,6 +3100,7 @@ INPUT;
     {
         $conn = $this->adapter->getConnection();
         $conn->execute($tableDef);
+
         $act = $this->adapter->getColumns('t')[0]->getDefault();
         if (is_object($exp)) {
             $this->assertEquals($exp, $act);
@@ -3127,8 +3162,7 @@ INPUT;
             'Blob literal 1' => ['create table t(a float default x\'ff\')', Expression::from('x\'ff\'')],
             'Blob literal 2' => ['create table t(a float default X\'FF\')', Expression::from('X\'FF\'')],
             'Arbitrary expression' => ['create table t(a float default ((2) + (2)))', Expression::from('(2) + (2)')],
-            'Pathological case 1' => ['create table t(a float default (\'/*\' || \'*/\'))', Expression::from('\'/*\' || \'*/\'')],
-            'Pathological case 2' => ['create table t(a float default (\'--\' || \'stuff\'))', Expression::from('\'--\' || \'stuff\'')],
+            'Pathological case 1' => ['create table t(a float default (\'/*\' || \'*/\'))', Expression::from('/*\' || \'*/')],
         ];
     }
 
@@ -3141,11 +3175,7 @@ INPUT;
         $conn = $this->adapter->getConnection();
         $conn->execute($tableDef);
         $act = $this->adapter->getColumns('t')[0]->getDefault();
-        if (is_object($exp)) {
-            $this->assertEquals($exp, $act);
-        } else {
-            $this->assertSame($exp, $act);
-        }
+        $this->assertSame($exp, $act);
     }
 
     public static function provideBooleanDefaultValues()

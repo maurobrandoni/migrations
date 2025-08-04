@@ -466,16 +466,6 @@ class PhinxAdapterTest extends TestCase
         $this->assertEquals("''", $rows[1]['dflt_value']);
     }
 
-    public function testAddDoubleColumn()
-    {
-        $table = new PhinxTable('table1', [], $this->adapter);
-        $table->save();
-        $table->addColumn('foo', 'double', ['null' => true])
-            ->save();
-        $rows = $this->adapter->fetchAll(sprintf('pragma table_info(%s)', 'table1'));
-        $this->assertEquals('DOUBLE', $rows[1]['type']);
-    }
-
     public function testRenameColumnWithIndex()
     {
         $table = new PhinxTable('t', [], $this->adapter);
@@ -1115,7 +1105,7 @@ class PhinxAdapterTest extends TestCase
             ->save();
 
         $expectedOutput = <<<'OUTPUT'
-CREATE TABLE "table1" ("id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, "column1" VARCHAR NOT NULL, "column2" INTEGER NULL, "column3" VARCHAR NULL DEFAULT 'test');
+CREATE TABLE "table1" ("id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, "column1" VARCHAR NOT NULL, "column2" INTEGER, "column3" VARCHAR DEFAULT 'test');
 OUTPUT;
         $actualOutput = join("\n", $this->out->messages());
         $this->assertStringContainsString($expectedOutput, $actualOutput, 'Passing the --dry-run option does not dump create table query to the output');
@@ -1216,7 +1206,7 @@ OUTPUT;
         ])->save();
 
         $expectedOutput = <<<'OUTPUT'
-CREATE TABLE "table1" ("column1" VARCHAR NOT NULL, "column2" INTEGER NULL, PRIMARY KEY ("column1"));
+CREATE TABLE "table1" ("column1" VARCHAR NOT NULL, "column2" INTEGER, PRIMARY KEY ("column1"));
 INSERT INTO "table1" ("column1", "column2") VALUES ('id1', 1);
 OUTPUT;
         $actualOutput = join("\n", $this->out->messages());
@@ -1573,12 +1563,12 @@ INPUT;
     public function testGetColumns()
     {
         $conn = $this->adapter->getConnection();
-        $conn->execute('create table t(a integer, b text, c char(5), d integer(12,6), e integer not null, f integer null)');
+        $conn->execute('create table t(a integer, b text, c char(5), d decimal(12,6), e integer not null, f integer null)');
         $exp = [
             ['name' => 'a', 'type' => 'integer', 'null' => true, 'limit' => null, 'precision' => null, 'scale' => null],
             ['name' => 'b', 'type' => 'text', 'null' => true, 'limit' => null, 'precision' => null, 'scale' => null],
             ['name' => 'c', 'type' => 'char', 'null' => true, 'limit' => 5, 'precision' => 5, 'scale' => null],
-            ['name' => 'd', 'type' => 'integer', 'null' => true, 'limit' => 12, 'precision' => 12, 'scale' => 6],
+            ['name' => 'd', 'type' => 'decimal', 'null' => true, 'limit' => 12, 'precision' => 12, 'scale' => 6],
             ['name' => 'e', 'type' => 'integer', 'null' => false, 'limit' => null, 'precision' => null, 'scale' => null],
             ['name' => 'f', 'type' => 'integer', 'null' => true, 'limit' => null, 'precision' => null, 'scale' => null],
         ];

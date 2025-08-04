@@ -9,6 +9,7 @@ declare(strict_types=1);
 namespace Migrations\Db\Adapter;
 
 use Cake\Database\Connection;
+use Cake\Database\Schema\TableSchema;
 use Cake\I18n\Date;
 use Cake\I18n\DateTime;
 use InvalidArgumentException;
@@ -146,13 +147,10 @@ class PostgresAdapter extends AbstractAdapter
         $sql = 'CREATE TABLE ';
         $sql .= $this->quoteTableName($table->getName()) . ' (';
 
+        $dialect = $this->getSchemaDialect();
         $this->columnsWithComments = [];
         foreach ($columns as $column) {
-            $sql .= $this->quoteColumnName((string)$column->getName()) . ' ' . $this->getColumnSqlDefinition($column);
-            if ($this->useIdentity && $column->getIdentity() && $column->getGenerated() !== null) {
-                $sql .= sprintf(' GENERATED %s AS IDENTITY', (string)$column->getGenerated());
-            }
-            $sql .= ', ';
+            $sql .= $dialect->columnDefinitionSql($this->mapColumnData($column->toArray())) . ', ';
 
             // set column comments, if needed
             if ($column->getComment()) {
@@ -208,6 +206,25 @@ class PostgresAdapter extends AbstractAdapter
     }
 
     /**
+     * Apply postgres specific translations between the values using migrations constants/types
+     * and the cakephp/database constants. Over time, these can be aligned.
+     *
+     * @param array $data The raw column data.
+     * @return array Modified column data.
+     */
+    protected function mapColumnData(array $data): array
+    {
+        if (
+            $data['type'] === self::PHINX_TYPE_TIMESTAMP &&
+            isset($data['timezone']) && $data['timezone'] === true
+        ) {
+            $data['type'] = 'timestamptimezone';
+        }
+
+        return $data;
+    }
+
+    /**
      * {@inheritDoc}
      *
      * @throws \InvalidArgumentException
@@ -215,7 +232,6 @@ class PostgresAdapter extends AbstractAdapter
     protected function getChangePrimaryKeyInstructions(Table $table, array|string|null $newColumns): AlterInstructions
     {
         $parts = $this->getSchemaName($table->getName());
-
         $instructions = new AlterInstructions();
 
         // Drop the existing primary key
@@ -311,78 +327,30 @@ class PostgresAdapter extends AbstractAdapter
      */
     public function getColumns(string $tableName): array
     {
-        $parts = $this->getSchemaName($tableName);
+        $dialect = $this->getSchemaDialect();
         $columns = [];
-
-        // TODO We can't use cakephp/database here as several attributes are missing
-        // from the query cakephp prepares. We'll need to expand the cakephp/database
-        // query in a future release.
-        $sql = sprintf(
-            'SELECT column_name, data_type, udt_name, is_identity, is_nullable,
-             column_default, character_maximum_length, numeric_precision, numeric_scale,
-             datetime_precision
-             %s
-             FROM information_schema.columns
-             WHERE table_schema = ? AND table_name = ?
-             ORDER BY ordinal_position',
-            $this->useIdentity ? ', identity_generation' : '',
-        );
-        $params = [
-            $parts['schema'],
-            $parts['table'],
-        ];
-        $columnsInfo = $this->query($sql, $params)->fetchAll('assoc');
-        foreach ($columnsInfo as $columnInfo) {
-            $isUserDefined = strtoupper(trim($columnInfo['data_type'])) === 'USER-DEFINED';
-
-            if ($isUserDefined) {
-                $columnType = Literal::from($columnInfo['udt_name']);
-            } else {
-                $columnType = $this->getPhinxType($columnInfo['data_type']);
-            }
-
-            // If the default value begins with a ' or looks like a function mark it as literal
-            if (isset($columnInfo['column_default'][0]) && $columnInfo['column_default'][0] === "'") {
-                if (preg_match('/^\'(.*)\'::[^:]+$/', $columnInfo['column_default'], $match)) {
-                    // '' and \' are replaced with a single '
-                    $columnDefault = preg_replace('/[\'\\\\]\'/', "'", $match[1]);
-                } else {
-                    $columnDefault = Literal::from($columnInfo['column_default']);
-                }
-            } elseif (
-                $columnInfo['column_default'] !== null &&
-                preg_match('/^\D[a-z_\d]*\(.*\)$/', $columnInfo['column_default'])
-            ) {
-                $columnDefault = Literal::from($columnInfo['column_default']);
-            } else {
-                $columnDefault = $columnInfo['column_default'];
-            }
-
+        foreach ($dialect->describeColumns($tableName) as $columnInfo) {
             $column = new Column();
+            $column->setName($columnInfo['name'])
+                   ->setType($columnInfo['type'])
+                   ->setNull($columnInfo['null'])
+                   ->setDefault($columnInfo['default'])
+                   ->setLimit($columnInfo['length'])
+                   ->setScale($columnInfo['precision'] ?? null);
 
-            $column->setName($columnInfo['column_name'])
-                   ->setType($columnType)
-                   ->setNull($columnInfo['is_nullable'] === 'YES')
-                   ->setDefault($columnDefault)
-                   ->setIdentity($columnInfo['is_identity'] === 'YES')
-                   ->setScale($columnInfo['numeric_scale']);
+            if ($columnInfo['autoIncrement'] ?? false) {
+                $column->setIdentity(true);
+            }
 
             if ($this->useIdentity) {
-                $column->setGenerated($columnInfo['identity_generation']);
+                $column->setGenerated($columnInfo['generated'] ?? null);
             }
 
-            if (preg_match('/\bwith time zone$/', $columnInfo['data_type'])) {
+            if ($columnInfo['type'] === TableSchema::TYPE_TIMESTAMP_FRACTIONAL) {
+                $column->setPrecision($columnInfo['precision'] ?? null);
+            }
+            if ($columnInfo['type'] === TableSchema::TYPE_TIMESTAMP_TIMEZONE) {
                 $column->setTimezone(true);
-            }
-
-            if (isset($columnInfo['character_maximum_length'])) {
-                $column->setLimit($columnInfo['character_maximum_length']);
-            }
-
-            if (in_array($columnType, [static::PHINX_TYPE_TIME, static::PHINX_TYPE_DATETIME], true)) {
-                $column->setPrecision($columnInfo['datetime_precision']);
-            } elseif ($columnType === self::PHINX_TYPE_DECIMAL) {
-                $column->setPrecision($columnInfo['numeric_precision']);
             }
             $columns[] = $column;
         }
@@ -413,13 +381,12 @@ class PostgresAdapter extends AbstractAdapter
      */
     protected function getAddColumnInstructions(Table $table, Column $column): AlterInstructions
     {
+        $dialect = $this->getSchemaDialect();
+
         $instructions = new AlterInstructions();
         $instructions->addAlter(sprintf(
-            'ADD %s %s %s',
-            $this->quoteColumnName((string)$column->getName()),
-            $this->getColumnSqlDefinition($column),
-            $column->isIdentity() && $column->getGenerated() !== null && $this->useIdentity ?
-                sprintf('GENERATED %s AS IDENTITY', (string)$column->getGenerated()) : '',
+            'ADD %s',
+            $dialect->columnDefinitionSql($this->mapColumnData($column->toArray())),
         ));
 
         if ($column->getComment()) {
@@ -480,10 +447,16 @@ class PostgresAdapter extends AbstractAdapter
             $sql = sprintf('ALTER COLUMN %s DROP DEFAULT', $quotedColumnName);
             $instructions->addAlter($sql);
         }
+        $dialect = $this->getSchemaDialect();
+
+        $columnSql = $dialect->columnDefinitionSql($this->mapColumnData($newColumn->toArray()));
+        // Remove the column name from $columnSql
+        $columnType = preg_replace('/^"?(?:[^"]+)"?\s+/', '', $columnSql);
+
         $sql = sprintf(
             'ALTER COLUMN %s TYPE %s',
             $quotedColumnName,
-            $this->getColumnSqlDefinition($newColumn),
+            $columnType,
         );
         if (in_array($newColumn->getType(), ['smallinteger', 'integer', 'biginteger'], true)) {
             $sql .= sprintf(
@@ -497,10 +470,10 @@ class PostgresAdapter extends AbstractAdapter
                 $quotedColumnName,
             );
         }
-        //NULL and DEFAULT cannot be set while changing column type
+        // NULL and DEFAULT cannot be set while changing column type
         $sql = preg_replace('/ NOT NULL/', '', $sql);
-        $sql = preg_replace('/ NULL/', '', $sql);
-        //If it is set, DEFAULT is the last definition
+        $sql = preg_replace('/ DEFAULT NULL/', '', $sql);
+        // If it is set, DEFAULT is the last definition
         $sql = preg_replace('/DEFAULT .*/', '', $sql);
         if ($newColumn->getType() === 'boolean') {
             $sql .= sprintf(
@@ -617,25 +590,7 @@ class PostgresAdapter extends AbstractAdapter
     protected function getIndexes(string $tableName): array
     {
         $dialect = $this->getSchemaDialect();
-        $parts = $this->getSchemaName($tableName);
-
-        [$query, $params] = $dialect->describeIndexSql($parts['table'], [
-            'schema' => $parts['schema'],
-            'database' => $this->getOption('database'),
-        ]);
-        $rows = $this->query($query, $params)->fetchAll('assoc');
-
-        $indexes = [];
-        foreach ($rows as $row) {
-            if (!isset($indexes[$row['relname']])) {
-                $indexes[$row['relname']] = [
-                    'isPrimary' => false,
-                    'columns' => [],
-                ];
-            }
-            $indexes[$row['relname']]['columns'][] = $row['attname'];
-            $indexes[$row['relname']]['isPrimary'] = $row['indisprimary'];
-        }
+        $indexes = $dialect->describeIndexes($tableName);
 
         return $indexes;
     }
@@ -664,8 +619,8 @@ class PostgresAdapter extends AbstractAdapter
     public function hasIndexByName(string $tableName, string $indexName): bool
     {
         $indexes = $this->getIndexes($tableName);
-        foreach ($indexes as $name => $index) {
-            if ($name === $indexName) {
+        foreach ($indexes as $index) {
+            if ($index['name'] === $indexName || (isset($index['constraint']) && $index['constraint'] === $indexName)) {
                 return true;
             }
         }
@@ -698,12 +653,12 @@ class PostgresAdapter extends AbstractAdapter
         }
 
         $indexes = $this->getIndexes($tableName);
-        foreach ($indexes as $indexName => $index) {
+        foreach ($indexes as $index) {
             $a = array_diff($columns, $index['columns']);
             if (!$a) {
                 return new AlterInstructions([], [sprintf(
                     'DROP INDEX IF EXISTS %s',
-                    '"' . ($parts['schema'] . '".' . $this->quoteColumnName($indexName)),
+                    '"' . ($parts['schema'] . '".' . $this->quoteColumnName($index['name'])),
                 )]);
             }
         }
@@ -761,15 +716,13 @@ class PostgresAdapter extends AbstractAdapter
     {
         $indexes = $this->getIndexes($tableName);
 
-        foreach ($indexes as $name => $index) {
-            if ($index['isPrimary']) {
-                $index['constraint'] = $name;
-
+        foreach ($indexes as $index) {
+            if ($index['type'] === 'primary') {
                 return $index;
             }
         }
 
-        return ['columns' => []];
+        return ['constraint' => '', 'columns' => []];
     }
 
     /**
@@ -778,12 +731,9 @@ class PostgresAdapter extends AbstractAdapter
     public function hasForeignKey(string $tableName, $columns, ?string $constraint = null): bool
     {
         $foreignKeys = $this->getForeignKeys($tableName);
+        $names = array_column($foreignKeys, 'name');
         if ($constraint) {
-            if (isset($foreignKeys[$constraint])) {
-                return !empty($foreignKeys[$constraint]);
-            }
-
-            return false;
+            return in_array($constraint, $names);
         }
 
         if (is_string($columns)) {
@@ -807,26 +757,8 @@ class PostgresAdapter extends AbstractAdapter
      */
     protected function getForeignKeys(string $tableName): array
     {
-        $parts = $this->getSchemaName($tableName);
         $dialect = $this->getSchemaDialect();
-
-        [$query, $params] = $dialect->describeForeignKeySql($parts['table'], [
-            'schema' => $parts['schema'],
-            'database' => $this->getOption('database'),
-        ]);
-        $rows = $this->query($query, $params)->fetchAll('assoc');
-        $foreignKeys = [];
-        foreach ($rows as $row) {
-            $name = $row['name'];
-            $foreignKeys[$name]['table'] = $parts['table'];
-            $foreignKeys[$name]['columns'][] = $row['column_name'];
-            $foreignKeys[$name]['referenced_table'] = $row['references_table'];
-            $foreignKeys[$name]['referenced_columns'][] = $row['references_field'];
-        }
-        foreach ($foreignKeys as $name => $key) {
-            $foreignKeys[$name]['columns'] = array_values(array_unique($key['columns']));
-            $foreignKeys[$name]['referenced_columns'] = array_values(array_unique($key['referenced_columns']));
-        }
+        $foreignKeys = $dialect->describeForeignKeys($tableName);
 
         return $foreignKeys;
     }
@@ -866,9 +798,9 @@ class PostgresAdapter extends AbstractAdapter
 
         $matches = [];
         $foreignKeys = $this->getForeignKeys($tableName);
-        foreach ($foreignKeys as $name => $key) {
+        foreach ($foreignKeys as $key) {
             if ($key['columns'] === $columns) {
-                $matches[] = $name;
+                $matches[] = $key['name'];
             }
         }
 
@@ -1062,78 +994,6 @@ class PostgresAdapter extends AbstractAdapter
         $this->execute(sprintf('DROP DATABASE IF EXISTS %s', $name));
         $this->createdTables = [];
         $this->connect();
-    }
-
-    /**
-     * Gets the PostgreSQL Column Definition for a Column object.
-     *
-     * @param \Migrations\Db\Table\Column $column Column
-     * @return string
-     */
-    protected function getColumnSqlDefinition(Column $column): string
-    {
-        $buffer = [];
-
-        if ($column->isIdentity() && (!$this->useIdentity || $column->getGenerated() === null)) {
-            if ($column->getType() === 'smallinteger') {
-                $buffer[] = 'SMALLSERIAL';
-            } elseif ($column->getType() === 'biginteger') {
-                $buffer[] = 'BIGSERIAL';
-            } else {
-                $buffer[] = 'SERIAL';
-            }
-        } elseif ($column->getType() instanceof Literal) {
-            $buffer[] = (string)$column->getType();
-        } else {
-            $sqlType = $this->getSqlType($column->getType(), $column->getLimit());
-            $buffer[] = strtoupper($sqlType['name']);
-
-            // integers cant have limits in postgres
-            if ($sqlType['name'] === static::PHINX_TYPE_DECIMAL && ($column->getPrecision() || $column->getScale())) {
-                $buffer[] = sprintf(
-                    '(%s, %s)',
-                    $column->getPrecision() ?: $sqlType['precision'],
-                    $column->getScale() ?: $sqlType['scale'],
-                );
-            } elseif ($sqlType['name'] === self::PHINX_TYPE_GEOMETRY) {
-                // geography type must be written with geometry type and srid, like this: geography(POLYGON,4326)
-                $buffer[] = sprintf(
-                    '(%s,%s)',
-                    strtoupper($sqlType['type']),
-                    $column->getSrid() ?: $sqlType['srid'],
-                );
-            } elseif (in_array($sqlType['name'], [self::PHINX_TYPE_TIME, self::PHINX_TYPE_TIMESTAMP], true)) {
-                if (is_numeric($column->getPrecision())) {
-                    $buffer[] = sprintf('(%s)', (string)$column->getPrecision());
-                }
-
-                if ($column->isTimezone()) {
-                    $buffer[] = strtoupper('with time zone');
-                }
-            } elseif (
-                !in_array($column->getType(), [
-                    self::PHINX_TYPE_TINY_INTEGER,
-                    self::PHINX_TYPE_SMALL_INTEGER,
-                    self::PHINX_TYPE_INTEGER,
-                    self::PHINX_TYPE_BIG_INTEGER,
-                    self::PHINX_TYPE_BOOLEAN,
-                    self::PHINX_TYPE_TEXT,
-                    self::PHINX_TYPE_BINARY,
-                ], true)
-            ) {
-                if ($column->getLimit() || isset($sqlType['limit'])) {
-                    $buffer[] = sprintf('(%s)', $column->getLimit() ?: $sqlType['limit']);
-                }
-            }
-        }
-
-        $buffer[] = $column->isNull() ? 'NULL' : 'NOT NULL';
-
-        if ($column->getDefault() !== null) {
-            $buffer[] = $this->getDefaultValueDefinition($column->getDefault(), (string)$column->getType());
-        }
-
-        return implode(' ', $buffer);
     }
 
     /**

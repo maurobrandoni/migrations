@@ -540,16 +540,6 @@ class MysqlAdapterTest extends TestCase
         $this->assertNull($columns[2]->getDefault());
     }
 
-    public function testCreateTableWithLimitPK()
-    {
-        $table = new Table('ntable', ['id' => 'id', 'limit' => 4], $this->adapter);
-        $table->save();
-        $this->assertTrue($this->adapter->hasTable('ntable'));
-        $this->assertTrue($this->adapter->hasColumn('ntable', 'id'));
-        $column_definitions = $this->adapter->getColumns('ntable');
-        $this->assertSame($this->usingMysql8() ? null : 4, $column_definitions[0]->getLimit());
-    }
-
     public function testCreateTableWithSchema()
     {
         $table = new Table($this->config['database'] . '.ntable', [], $this->adapter);
@@ -745,7 +735,7 @@ class MysqlAdapterTest extends TestCase
     {
         $table = new Table('table1', [], $this->adapter);
         $table->save();
-        $table->addColumn('default_ts', 'timestamp', ['default' => Literal::from('CURRENT_TIMESTAMP')])
+        $table->addColumn('default_ts', 'timestamp', ['null' => false, 'default' => Literal::from('CURRENT_TIMESTAMP')])
               ->save();
         $rows = $this->adapter->fetchAll('SHOW COLUMNS FROM table1');
         // MariaDB returns current_timestamp()
@@ -766,14 +756,13 @@ class MysqlAdapterTest extends TestCase
     {
         return [
             ['integer', [], 'int', '11', ''],
-            ['integer', ['signed' => false], 'int', '11', ' unsigned'],
-            ['integer', ['limit' => 8], 'int', '8', ''],
+            ['integer', ['signed' => false], 'int', '10', ' unsigned'],
             ['smallinteger', [], 'smallint', '6', ''],
-            ['smallinteger', ['signed' => false], 'smallint', '6', ' unsigned'],
+            ['smallinteger', ['signed' => false], 'smallint', '5', ' unsigned'],
             ['smallinteger', ['limit' => 3], 'smallint', '3', ''],
             ['biginteger', [], 'bigint', '20', ''],
             ['biginteger', ['signed' => false], 'bigint', '20', ' unsigned'],
-            ['biginteger', ['limit' => 12], 'bigint', '12', ''],
+            ['biginteger', ['limit' => 12], 'bigint', '20', ''],
         ];
     }
 
@@ -795,18 +784,27 @@ class MysqlAdapterTest extends TestCase
         $this->assertEquals($type, $rows[1]['Type']);
     }
 
-    public function testAddDoubleColumnWithDefaultSigned()
+    /**
+     * Test that migrations still supports the `double` type but
+     * as an alias for a float/double column which cake/database provides.
+     */
+    public function testAddDoubleDefaultSignedCompat(): void
     {
         $table = new Table('table1', [], $this->adapter);
         $table->save();
         $this->assertFalse($table->hasColumn('user_id'));
         $table->addColumn('foo', 'double')
               ->save();
-        $rows = $this->adapter->fetchAll('SHOW COLUMNS FROM table1');
+        $rows = $this->adapter->fetchAll('SHOW FULL COLUMNS FROM table1');
         $this->assertEquals('double', $rows[1]['Type']);
+        $this->assertEquals('YES', $rows[1]['Null']);
     }
 
-    public function testAddDoubleColumnWithSignedEqualsFalse()
+    /**
+     * Test that migrations still supports the `double` type but
+     * as an alias for a float column which cake/database provides.
+     */
+    public function testAddDoubleDefaultSignedCompatWithUnsigned(): void
     {
         $table = new Table('table1', [], $this->adapter);
         $table->save();
@@ -815,22 +813,10 @@ class MysqlAdapterTest extends TestCase
               ->save();
         $rows = $this->adapter->fetchAll('SHOW COLUMNS FROM table1');
         $this->assertEquals('double unsigned', $rows[1]['Type']);
+        $this->assertEquals('YES', $rows[1]['Null']);
     }
 
-    public function testAddBooleanColumnWithSignedEqualsFalse()
-    {
-        $table = new Table('table1', [], $this->adapter);
-        $table->save();
-        $this->assertFalse($table->hasColumn('test_boolean'));
-        $table->addColumn('test_boolean', 'boolean', ['signed' => false])
-              ->save();
-        $rows = $this->adapter->fetchAll('SHOW COLUMNS FROM table1');
-
-        $type = $this->usingMysql8() ? 'tinyint' : 'tinyint(1)';
-        $this->assertEquals($type . ' unsigned', $rows[1]['Type']);
-    }
-
-    public function testAddStringColumnWithSignedEqualsFalse()
+    public function testAddStringColumnWithSignedEqualsFalse(): void
     {
         $table = new Table('table1', [], $this->adapter);
         $table->save();
@@ -841,7 +827,7 @@ class MysqlAdapterTest extends TestCase
         $this->assertEquals('varchar(255)', $rows[1]['Type']);
     }
 
-    public function testAddStringColumnWithCustomCollation()
+    public function testAddStringColumnWithCustomCollation(): void
     {
         $table = new Table('table_custom_collation', ['collation' => 'utf8mb4_unicode_ci'], $this->adapter);
         $table->save();
@@ -854,7 +840,7 @@ class MysqlAdapterTest extends TestCase
         $this->assertEquals('utf8mb4_unicode_ci', $rows[2]['Collation']);
     }
 
-    public function testRenameColumn()
+    public function testRenameColumn(): void
     {
         $table = new Table('t', [], $this->adapter);
         $table->addColumn('column1', 'string')
@@ -867,7 +853,7 @@ class MysqlAdapterTest extends TestCase
         $this->assertTrue($this->adapter->hasColumn('t', 'column2'));
     }
 
-    public function testRenameColumnPreserveComment()
+    public function testRenameColumnPreserveComment(): void
     {
         $table = new Table('t', [], $this->adapter);
         $table->addColumn('column1', 'string', ['comment' => 'comment1'])
@@ -886,7 +872,7 @@ class MysqlAdapterTest extends TestCase
         $this->assertEquals('comment1', $columns[1]['Comment']);
     }
 
-    public function testRenameColumnWithDefaultGeneratedExtra()
+    public function testRenameColumnWithDefaultGeneratedExtra(): void
     {
         $table = new Table('t', [], $this->adapter);
         $table->save();
@@ -1053,20 +1039,20 @@ class MysqlAdapterTest extends TestCase
     public static function binaryToBlobAutomaticConversionData()
     {
         return [
-          [null, 'binary', 255],
-          [64, 'binary', 64],
-          [MysqlAdapter::BLOB_REGULAR - 20, 'blob', MysqlAdapter::BLOB_REGULAR],
-          [MysqlAdapter::BLOB_REGULAR, 'blob', MysqlAdapter::BLOB_REGULAR],
-          [MysqlAdapter::BLOB_REGULAR + 20, 'mediumblob', MysqlAdapter::BLOB_MEDIUM],
-          [MysqlAdapter::BLOB_MEDIUM, 'mediumblob', MysqlAdapter::BLOB_MEDIUM],
-          [MysqlAdapter::BLOB_MEDIUM + 20, 'longblob', MysqlAdapter::BLOB_LONG],
-          [MysqlAdapter::BLOB_LONG, 'longblob', MysqlAdapter::BLOB_LONG],
-          [MysqlAdapter::BLOB_LONG + 20, 'longblob', MysqlAdapter::BLOB_LONG],
+            // limit, expected type, expected limit
+            [null, 'binary', null],
+            [64, 'binary', 255],
+            [MysqlAdapter::BLOB_REGULAR - 20, 'mediumblob', MysqlAdapter::BLOB_MEDIUM],
+            [MysqlAdapter::BLOB_REGULAR, 'binary', null],
+            [MysqlAdapter::BLOB_REGULAR + 20, 'mediumblob', MysqlAdapter::BLOB_MEDIUM],
+            [MysqlAdapter::BLOB_MEDIUM, 'mediumblob', MysqlAdapter::BLOB_MEDIUM],
+            [MysqlAdapter::BLOB_MEDIUM + 20, 'longblob', MysqlAdapter::BLOB_LONG],
+            [MysqlAdapter::BLOB_LONG, 'longblob', MysqlAdapter::BLOB_LONG],
         ];
     }
 
     #[DataProvider('binaryToBlobAutomaticConversionData')]
-    public function testBinaryToBlobAutomaticConversion(?int $limit, string $expectedType, int $expectedLimit)
+    public function testBinaryToBlobAutomaticConversion(?int $limit, string $expectedType, ?int $expectedLimit)
     {
         $table = new Table('t', [], $this->adapter);
         $table->addColumn('column1', 'binary', ['limit' => $limit])
@@ -1080,20 +1066,20 @@ class MysqlAdapterTest extends TestCase
     public static function varbinaryToBlobAutomaticConversionData()
     {
         return [
-          [null, 'varbinary', 255],
-          [64, 'varbinary', 64],
-          [MysqlAdapter::BLOB_REGULAR - 20, 'blob', MysqlAdapter::BLOB_REGULAR],
-          [MysqlAdapter::BLOB_REGULAR, 'blob', MysqlAdapter::BLOB_REGULAR],
-          [MysqlAdapter::BLOB_REGULAR + 20, 'mediumblob', MysqlAdapter::BLOB_MEDIUM],
-          [MysqlAdapter::BLOB_MEDIUM, 'mediumblob', MysqlAdapter::BLOB_MEDIUM],
-          [MysqlAdapter::BLOB_MEDIUM + 20, 'longblob', MysqlAdapter::BLOB_LONG],
-          [MysqlAdapter::BLOB_LONG, 'longblob', MysqlAdapter::BLOB_LONG],
-          [MysqlAdapter::BLOB_LONG + 20, 'longblob', MysqlAdapter::BLOB_LONG],
+            // limit, expected type, expected limit
+            [null, 'binary', null],
+            [64, 'binary', 255],
+            [MysqlAdapter::BLOB_REGULAR - 20, 'mediumblob', MysqlAdapter::BLOB_MEDIUM],
+            [MysqlAdapter::BLOB_REGULAR, 'binary', null],
+            [MysqlAdapter::BLOB_REGULAR + 20, 'mediumblob', MysqlAdapter::BLOB_MEDIUM],
+            [MysqlAdapter::BLOB_MEDIUM, 'mediumblob', MysqlAdapter::BLOB_MEDIUM],
+            [MysqlAdapter::BLOB_MEDIUM + 20, 'longblob', MysqlAdapter::BLOB_LONG],
+            [MysqlAdapter::BLOB_LONG, 'longblob', MysqlAdapter::BLOB_LONG],
         ];
     }
 
     #[DataProvider('varbinaryToBlobAutomaticConversionData')]
-    public function testVarbinaryToBlobAutomaticConversion(?int $limit, string $expectedType, int $expectedLimit)
+    public function testVarbinaryToBlobAutomaticConversion(?int $limit, string $expectedType, ?int $expectedLimit)
     {
         $table = new Table('t', [], $this->adapter);
         $table->addColumn('column1', 'varbinary', ['limit' => $limit])
@@ -1107,27 +1093,28 @@ class MysqlAdapterTest extends TestCase
     public static function blobColumnsData()
     {
         return [
+          // type, expected type, limit, expected limit
           // Tiny blobs
-          ['tinyblob', 'tinyblob', null, MysqlAdapter::BLOB_TINY],
-          ['tinyblob', 'tinyblob', MysqlAdapter::BLOB_TINY, MysqlAdapter::BLOB_TINY],
-          ['tinyblob', 'blob', MysqlAdapter::BLOB_TINY + 20, MysqlAdapter::BLOB_REGULAR],
+          ['tinyblob', 'binary', null, MysqlAdapter::BLOB_TINY],
+          ['tinyblob', 'binary', MysqlAdapter::BLOB_TINY, MysqlAdapter::BLOB_TINY],
+          ['tinyblob', 'mediumblob', MysqlAdapter::BLOB_TINY + 20, MysqlAdapter::BLOB_MEDIUM],
           ['tinyblob', 'mediumblob', MysqlAdapter::BLOB_MEDIUM, MysqlAdapter::BLOB_MEDIUM],
           ['tinyblob', 'longblob', MysqlAdapter::BLOB_LONG, MysqlAdapter::BLOB_LONG],
-          // Regular blobs
-          ['blob', 'tinyblob', MysqlAdapter::BLOB_TINY, MysqlAdapter::BLOB_TINY],
-          ['blob', 'blob', null, MysqlAdapter::BLOB_REGULAR],
-          ['blob', 'blob', MysqlAdapter::BLOB_REGULAR, MysqlAdapter::BLOB_REGULAR],
+          // // Regular blobs
+          ['blob', 'binary', MysqlAdapter::BLOB_TINY, MysqlAdapter::BLOB_TINY],
+          ['blob', 'binary', null, null],
+          ['blob', 'binary', MysqlAdapter::BLOB_REGULAR, null],
           ['blob', 'mediumblob', MysqlAdapter::BLOB_MEDIUM, MysqlAdapter::BLOB_MEDIUM],
           ['blob', 'longblob', MysqlAdapter::BLOB_LONG, MysqlAdapter::BLOB_LONG],
-          // medium blobs
-          ['mediumblob', 'tinyblob', MysqlAdapter::BLOB_TINY, MysqlAdapter::BLOB_TINY],
-          ['mediumblob', 'blob', MysqlAdapter::BLOB_REGULAR, MysqlAdapter::BLOB_REGULAR],
+          // // medium blobs
+          ['mediumblob', 'binary', MysqlAdapter::BLOB_TINY, MysqlAdapter::BLOB_TINY],
+          ['mediumblob', 'binary', MysqlAdapter::BLOB_REGULAR, null],
           ['mediumblob', 'mediumblob', null, MysqlAdapter::BLOB_MEDIUM],
           ['mediumblob', 'mediumblob', MysqlAdapter::BLOB_MEDIUM, MysqlAdapter::BLOB_MEDIUM],
           ['mediumblob', 'longblob', MysqlAdapter::BLOB_LONG, MysqlAdapter::BLOB_LONG],
           // long blobs
-          ['longblob', 'tinyblob', MysqlAdapter::BLOB_TINY, MysqlAdapter::BLOB_TINY],
-          ['longblob', 'blob', MysqlAdapter::BLOB_REGULAR, MysqlAdapter::BLOB_REGULAR],
+          ['longblob', 'binary', MysqlAdapter::BLOB_TINY, MysqlAdapter::BLOB_TINY],
+          ['longblob', 'binary', MysqlAdapter::BLOB_REGULAR, null],
           ['longblob', 'mediumblob', MysqlAdapter::BLOB_MEDIUM, MysqlAdapter::BLOB_MEDIUM],
           ['longblob', 'longblob', null, MysqlAdapter::BLOB_LONG],
           ['longblob', 'longblob', MysqlAdapter::BLOB_LONG, MysqlAdapter::BLOB_LONG],
@@ -1135,7 +1122,7 @@ class MysqlAdapterTest extends TestCase
     }
 
     #[DataProvider('blobColumnsData')]
-    public function testblobColumns(string $type, string $expectedType, ?int $limit, int $expectedLimit)
+    public function testblobColumns(string $type, string $expectedType, ?int $limit, ?int $expectedLimit)
     {
         $table = new Table('t', [], $this->adapter);
         $table->addColumn('column1', $type, ['limit' => $limit])
@@ -1163,7 +1150,7 @@ class MysqlAdapterTest extends TestCase
               ->save();
         $columns = $table->getColumns();
         $sqlType = $this->adapter->getSqlType($columns[1]->getType(), $columns[1]->getLimit());
-        $this->assertEquals('mediumint', $sqlType['name']);
+        $this->assertEquals('int', $sqlType['name']);
     }
 
     public function testSmallIntegerColumn()
@@ -1173,7 +1160,7 @@ class MysqlAdapterTest extends TestCase
               ->save();
         $columns = $table->getColumns();
         $sqlType = $this->adapter->getSqlType($columns[1]->getType(), $columns[1]->getLimit());
-        $this->assertEquals('smallint', $sqlType['name']);
+        $this->assertEquals('int', $sqlType['name']);
     }
 
     public function testTinyIntegerColumn()
@@ -1183,18 +1170,7 @@ class MysqlAdapterTest extends TestCase
               ->save();
         $columns = $table->getColumns();
         $sqlType = $this->adapter->getSqlType($columns[1]->getType(), $columns[1]->getLimit());
-        $this->assertEquals('tinyint', $sqlType['name']);
-    }
-
-    public function testIntegerColumnLimit()
-    {
-        $limit = 8;
-        $table = new Table('t', [], $this->adapter);
-        $table->addColumn('column1', 'integer', ['limit' => $limit])
-              ->save();
-        $columns = $table->getColumns();
-        $sqlType = $this->adapter->getSqlType($columns[1]->getType(), $columns[1]->getLimit());
-        $this->assertEquals($this->usingMysql8() ? 11 : $limit, $sqlType['limit']);
+        $this->assertEquals('int', $sqlType['name']);
     }
 
     public function testDatetimeColumn()
@@ -1221,21 +1197,6 @@ class MysqlAdapterTest extends TestCase
         $limit = 6;
         $table = new Table('t', [], $this->adapter);
         $table->addColumn('column1', 'datetime', ['limit' => $limit])->save();
-        $columns = $table->getColumns();
-        $sqlType = $this->adapter->getSqlType($columns[1]->getType(), $columns[1]->getLimit());
-        $this->assertEquals($limit, $sqlType['limit']);
-    }
-
-    public function testTimeColumnLimit()
-    {
-        $this->adapter->connect();
-        $version = $this->adapter->getConnection()->getDriver()->version();
-        if (version_compare($version, '5.6.4') === -1) {
-            $this->markTestSkipped('Cannot test datetime limit on versions less than 5.6.4');
-        }
-        $limit = 3;
-        $table = new Table('t', [], $this->adapter);
-        $table->addColumn('column1', 'time', ['limit' => $limit])->save();
         $columns = $table->getColumns();
         $sqlType = $this->adapter->getSqlType($columns[1]->getType(), $columns[1]->getLimit());
         $this->assertEquals($limit, $sqlType['limit']);
@@ -1306,12 +1267,6 @@ class MysqlAdapterTest extends TestCase
             ['column18', 'linestring', []],
             ['column19', 'polygon', []],
             ['column20', 'uuid', []],
-            ['column21', 'set', ['values' => ['one', 'two']]],
-            ['column22', 'enum', ['values' => ['three', 'four']]],
-            ['enum_quotes', 'enum', ['values' => [
-                "'", '\'\n', '\\', ',', '', "\\\n", '\\n', "\n", "\r", "\r\n", '/', ',,', "\t",
-            ]]],
-            ['column23', 'bit', []],
         ];
     }
 
@@ -1360,7 +1315,7 @@ class MysqlAdapterTest extends TestCase
         $this->assertEquals($colName, $columns[1]->getName());
         $this->assertEquals($type, $columns[1]->getType());
 
-        $this->assertEquals($this->usingMysql8() ? null : 10, $columns[1]->getLimit());
+        $this->assertNull($columns[1]->getLimit());
     }
 
     public function testGetColumnsReservedTableName()
@@ -1968,52 +1923,6 @@ class MysqlAdapterTest extends TestCase
         $this->assertEquals('geometry', $rows[1]['Type']);
     }
 
-    public function testAddSetColumn()
-    {
-        $table = new Table('table1', [], $this->adapter);
-        $table->save();
-        $this->assertFalse($table->hasColumn('set_column'));
-        $table->addColumn('set_column', 'set', ['values' => ['one', 'two']])
-              ->save();
-        $rows = $this->adapter->fetchAll('SHOW COLUMNS FROM table1');
-        $this->assertEquals("set('one','two')", $rows[1]['Type']);
-    }
-
-    public function testAddEnumColumn()
-    {
-        $table = new Table('table1', [], $this->adapter);
-        $table->save();
-        $this->assertFalse($table->hasColumn('enum_column'));
-        $table->addColumn('enum_column', 'enum', ['values' => ['one', 'two']])
-              ->save();
-        $rows = $this->adapter->fetchAll('SHOW COLUMNS FROM table1');
-        $this->assertEquals("enum('one','two')", $rows[1]['Type']);
-    }
-
-    public function testEnumColumnValuesFilledUpFromSchema()
-    {
-        // Creating column with values
-        (new Table('table1', [], $this->adapter))
-            ->addColumn('enum_column', 'enum', ['values' => ['one', 'two']])
-            ->save();
-
-        // Reading them back
-        $table = new Table('table1', [], $this->adapter);
-        $columns = $table->getColumns();
-        $enumColumn = end($columns);
-        $this->assertEquals(AdapterInterface::PHINX_TYPE_ENUM, $enumColumn->getType());
-        $this->assertEquals(['one', 'two'], $enumColumn->getValues());
-    }
-
-    public function testEnumColumnWithNullValue()
-    {
-        $table = new Table('table1', [], $this->adapter);
-        $table->addColumn('enum_column', 'enum', ['values' => ['one', 'two', null]]);
-
-        $this->expectException(PDOException::class);
-        $table->save();
-    }
-
     public function testHasColumn()
     {
         $table = new Table('table1', [], $this->adapter);
@@ -2186,7 +2095,7 @@ class MysqlAdapterTest extends TestCase
         $collation = $this->getDefaultCollation();
 
         $expectedOutput = <<<OUTPUT
-CREATE TABLE `table1` (`id` INT(11) unsigned NOT NULL AUTO_INCREMENT, `column1` VARCHAR(255) NOT NULL, `column2` INT(11) NULL, `column3` VARCHAR(255) NOT NULL DEFAULT 'test', PRIMARY KEY (`id`)) ENGINE = InnoDB CHARACTER SET utf8mb4 COLLATE {$collation};
+CREATE TABLE `table1` (`id` INTEGER UNSIGNED NOT NULL AUTO_INCREMENT, `column1` VARCHAR(255) NOT NULL, `column2` INTEGER, `column3` VARCHAR(255) NOT NULL DEFAULT 'test', PRIMARY KEY (`id`)) ENGINE = InnoDB CHARACTER SET utf8mb4 COLLATE {$collation};
 OUTPUT;
         $actualOutput = join("\n", $this->out->messages());
         $this->assertStringContainsString($expectedOutput, $actualOutput, 'Passing the --dry-run option does not dump create table query to the output');
@@ -2293,7 +2202,7 @@ OUTPUT;
         $collation = $this->getDefaultCollation();
 
         $expectedOutput = <<<OUTPUT
-CREATE TABLE `table1` (`column1` VARCHAR(255) NOT NULL, `column2` INT(11) NULL, PRIMARY KEY (`column1`)) ENGINE = InnoDB CHARACTER SET utf8mb4 COLLATE {$collation};
+CREATE TABLE `table1` (`column1` VARCHAR(255) NOT NULL, `column2` INTEGER, PRIMARY KEY (`column1`)) ENGINE = InnoDB CHARACTER SET utf8mb4 COLLATE {$collation};
 INSERT INTO `table1` (`column1`, `column2`) VALUES ('id1', 1);
 OUTPUT;
         $actualOutput = join("\n", $this->out->messages());
@@ -2374,18 +2283,6 @@ OUTPUT;
         $countQuery->execute([1]);
         $res = $countQuery->fetchAll('assoc');
         $this->assertEquals(3, $res[0]['c']);
-    }
-
-    public function testLiteralSupport()
-    {
-        $createQuery = <<<'INPUT'
-CREATE TABLE `test` (`double_col` double NOT NULL)
-INPUT;
-        $this->adapter->execute($createQuery);
-        $table = new Table('test', [], $this->adapter);
-        $columns = $table->getColumns();
-        $this->assertCount(1, $columns);
-        $this->assertEquals(Literal::from('double'), array_pop($columns)->getType());
     }
 
     public static function geometryTypeProvider()

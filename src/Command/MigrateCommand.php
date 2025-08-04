@@ -20,6 +20,7 @@ use Cake\Console\ConsoleOptionParser;
 use Cake\Event\EventDispatcherTrait;
 use DateTime;
 use Exception;
+use LogicException;
 use Migrations\Config\ConfigInterface;
 use Migrations\Migration\ManagerFactory;
 use Throwable;
@@ -125,29 +126,36 @@ class MigrateCommand extends Command
         $version = $args->getOption('target') !== null ? (int)$args->getOption('target') : null;
         $date = $args->getOption('date');
         $fake = (bool)$args->getOption('fake');
-        $dryRun = (bool)$args->getOption('dry-run');
 
-        $count = $args->getOption('count');
-        if ($count) {
-            $io->abort('The `--count` option is not supported yet in this command. Use `--target` instead.');
+        $count = $args->getOption('count') !== null ? (int)$args->getOption('count') : null;
+        if ($count !== null && $count < 1) {
+            throw new LogicException('Count must be > 0.');
+        }
+        if ($count && $date) {
+            throw new LogicException('Can only use one of `--count` or `--date` options at a time.');
+        }
+        if ($version && $date) {
+            throw new LogicException('Can only use one of `--version` or `--date` options at a time.');
         }
 
         $factory = new ManagerFactory([
             'plugin' => $args->getOption('plugin'),
             'source' => $args->getOption('source'),
             'connection' => $args->getOption('connection'),
-            'dry-run' => $dryRun,
+            'dry-run' => (bool)$args->getOption('dry-run'),
         ]);
+
         $manager = $factory->createManager($io);
         $config = $manager->getConfig();
 
         $versionOrder = $config->getVersionOrder();
-        if ($dryRun) {
-            $io->out('<warning>dry-run mode enabled</warning>');
+
+        if ($config->isDryRun()) {
+            $io->info('DRY-RUN mode enabled');
         }
-        $io->out('<info>using connection</info> ' . (string)$args->getOption('connection'));
-        $io->out('<info>using paths</info> ' . $config->getMigrationPath());
-        $io->out('<info>ordering by</info> ' . $versionOrder . ' time');
+        $io->verbose('<info>using connection</info> ' . (string)$args->getOption('connection'));
+        $io->verbose('<info>using paths</info> ' . $config->getMigrationPath());
+        $io->verbose('<info>ordering by</info> ' . $versionOrder . ' time');
 
         if ($fake) {
             $io->out('<warning>warning</warning> performing fake migrations');
@@ -159,31 +167,31 @@ class MigrateCommand extends Command
             if ($date !== null) {
                 $manager->migrateToDateTime(new DateTime((string)$date), $fake);
             } else {
-                $manager->migrate($version, $fake);
+                $manager->migrate($version, $fake, $count);
             }
             $end = microtime(true);
         } catch (Exception $e) {
             $io->err('<error>' . $e->getMessage() . '</error>');
-            $io->out($e->getTraceAsString(), 1, ConsoleIo::VERBOSE);
+            $io->verbose($e->getTraceAsString());
 
             return self::CODE_ERROR;
         } catch (Throwable $e) {
             $io->err('<error>' . $e->getMessage() . '</error>');
-            $io->out($e->getTraceAsString(), 1, ConsoleIo::VERBOSE);
+            $io->verbose($e->getTraceAsString());
 
             return self::CODE_ERROR;
         }
 
+        $io->comment('All Done. Took ' . sprintf('%.4fs', $end - $start));
         $io->out('');
-        $io->out('<comment>All Done. Took ' . sprintf('%.4fs', $end - $start) . '</comment>');
 
         $exitCode = self::CODE_SUCCESS;
 
         // Run dump command to generate lock file
         if (!$args->getOption('no-lock') && !$args->getOption('dry-run')) {
-            $io->out('');
-            $io->out('Dumping the current schema of the database to be used while baking a diff');
-            $io->out('');
+            $io->verbose('');
+            $io->verbose('Dumping the current schema of the database to be used while baking a diff');
+            $io->verbose('');
 
             $newArgs = DumpCommand::extractArgs($args);
             $exitCode = $this->executeCommand(DumpCommand::class, $newArgs, $io);

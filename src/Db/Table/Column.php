@@ -19,6 +19,7 @@ use RuntimeException;
  */
 class Column
 {
+    // TODO use cakephp/database constants instead at next major.
     public const BIGINTEGER = AdapterInterface::PHINX_TYPE_BIG_INTEGER;
     public const SMALLINTEGER = AdapterInterface::PHINX_TYPE_SMALL_INTEGER;
     public const TINYINTEGER = AdapterInterface::PHINX_TYPE_TINY_INTEGER;
@@ -801,5 +802,55 @@ class Column
         }
 
         return $this;
+    }
+
+    /**
+     * Convert the column into the array shape
+     * used by cakephp/database.
+     *
+     * @return array
+     */
+    public function toArray(): array
+    {
+        $default = $this->getDefault();
+        if ($default instanceof Literal) {
+            $default = (string)$default;
+        }
+
+        $type = $this->getType();
+        $length = $this->getLimit();
+        $precision = $this->getPrecision();
+        $scale = $this->getScale();
+        if ($precision !== null) {
+            if ($type === self::TIMESTAMP) {
+                $type = 'timestampfractional';
+            } elseif ($type === self::DATETIME) {
+                $type = 'datetimefractional';
+            }
+        }
+        // Decimal types in cakephp/database use
+        // (length, precision) while phinx used (precision ?? length, scale)
+        if ($type === self::DECIMAL) {
+            $length = $precision ?? $length;
+            $precision = $scale;
+        } else {
+            $precision = $scale ?? $precision;
+        }
+
+        return [
+            'name' => $this->getName(),
+            'type' => $type,
+            'length' => $length,
+            'null' => $this->getNull(),
+            'default' => $default,
+            'unsigned' => !$this->getSigned(),
+            'onUpdate' => $this->getUpdate(),
+            'collate' => $this->getCollation(),
+            'precision' => $precision,
+            'srid' => $this->getSrid(),
+            'timezone' => $this->getTimezone(),
+            'comment' => $this->getComment(),
+            'autoIncrement' => $this->getIdentity(),
+        ];
     }
 }

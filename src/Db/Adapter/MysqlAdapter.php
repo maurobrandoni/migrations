@@ -11,6 +11,7 @@ namespace Migrations\Db\Adapter;
 use Cake\Core\Configure;
 use Cake\Database\Connection;
 use Cake\Database\Exception\QueryException;
+use Cake\Database\Schema\TableSchema;
 use InvalidArgumentException;
 use Migrations\Db\AlterInstructions;
 use Migrations\Db\Literal;
@@ -61,16 +62,17 @@ class MysqlAdapter extends AbstractAdapter
     // to keep consistent the type hints for getSqlType and Column::$limit being integers.
     public const TEXT_TINY = 255;
     public const TEXT_SMALL = 255; /* deprecated, alias of TEXT_TINY */
+    /** @deprecated Use length of null instead **/
     public const TEXT_REGULAR = 65535;
     public const TEXT_MEDIUM = 16777215;
     public const TEXT_LONG = 2147483647;
 
     // According to https://dev.mysql.com/doc/refman/5.0/en/blob.html BLOB sizes are the same as TEXT
-    public const BLOB_TINY = 255;
-    public const BLOB_SMALL = 255; /* deprecated, alias of BLOB_TINY */
+    public const BLOB_TINY = TableSchema::LENGTH_TINY;
+    public const BLOB_SMALL = TableSchema::LENGTH_TINY; /* deprecated, alias of BLOB_TINY */
     public const BLOB_REGULAR = 65535;
-    public const BLOB_MEDIUM = 16777215;
-    public const BLOB_LONG = 2147483647;
+    public const BLOB_MEDIUM = TableSchema::LENGTH_MEDIUM;
+    public const BLOB_LONG = TableSchema::LENGTH_LONG;
 
     public const INT_TINY = 255;
     public const INT_SMALL = 65535;
@@ -225,10 +227,12 @@ class MysqlAdapter extends AbstractAdapter
             $optionsStr .= sprintf(' ROW_FORMAT=%s ', $options['row_format']);
         }
 
+        $dialect = $this->getSchemaDialect();
         $sql = 'CREATE TABLE ';
         $sql .= $this->quoteTableName($table->getName()) . ' (';
         foreach ($columns as $column) {
-            $sql .= $this->quoteColumnName((string)$column->getName()) . ' ' . $this->getColumnSqlDefinition($column) . ', ';
+            $columnData = $this->mapColumnData($column->toArray());
+            $sql .= $dialect->columnDefinitionSql($columnData) . ', ';
         }
 
         // set the primary key(s)
@@ -259,6 +263,70 @@ class MysqlAdapter extends AbstractAdapter
         $this->execute($sql);
 
         $this->addCreatedTable($table->getName());
+    }
+
+    /**
+     * Apply MySQL specific translations between the values using migrations constants/types
+     * and the cakephp/database constants. Over time, these can be aligned.
+     *
+     * @param array $data The raw column data.
+     * @return array Modified column data.
+     */
+    protected function mapColumnData(array $data): array
+    {
+        if ($data['type'] == self::PHINX_TYPE_TEXT && $data['length'] !== null) {
+            $data['length'] = match ($data['length']) {
+                self::TEXT_LONG => TableSchema::LENGTH_LONG,
+                self::TEXT_MEDIUM => TableSchema::LENGTH_MEDIUM,
+                self::TEXT_REGULAR => null,
+                self::TEXT_TINY => TableSchema::LENGTH_TINY,
+                default => null,
+            };
+        }
+        $binaryTypes = [
+            self::PHINX_TYPE_BLOB,
+            self::PHINX_TYPE_TINYBLOB,
+            self::PHINX_TYPE_MEDIUMBLOB,
+            self::PHINX_TYPE_LONGBLOB,
+            self::PHINX_TYPE_VARBINARY,
+            self::PHINX_TYPE_BINARY,
+        ];
+        if (in_array($data['type'], $binaryTypes, true)) {
+            if (!isset($data['length'])) {
+                $data['length'] = match ($data['type']) {
+                    self::PHINX_TYPE_TINYBLOB => TableSchema::LENGTH_TINY,
+                    self::PHINX_TYPE_MEDIUMBLOB => TableSchema::LENGTH_MEDIUM,
+                    self::PHINX_TYPE_LONGBLOB => TableSchema::LENGTH_LONG,
+                    default => $data['length'],
+                };
+            }
+            if ($data['length'] === self::BLOB_REGULAR) {
+                $data['type'] = TableSchema::TYPE_BINARY;
+                $data['length'] = null;
+            }
+            $standardLengths = [TableSchema::LENGTH_TINY, TableSchema::LENGTH_MEDIUM, TableSchema::LENGTH_LONG];
+            if ($data['length'] !== null && !in_array($data['length'], $standardLengths, true)) {
+                foreach ($standardLengths as $bucket) {
+                    if ($bucket < $data['length']) {
+                        continue;
+                    }
+                    $data['length'] = $bucket;
+                    break;
+                }
+            }
+            $data['type'] = 'binary';
+        } elseif ($data['type'] === self::PHINX_TYPE_INTEGER) {
+            if (isset($data['length']) && $data['length'] === self::INT_BIG) {
+                $data['type'] = TableSchema::TYPE_BIGINTEGER;
+                unset($data['length']);
+            }
+            unset($data['length']);
+        } elseif ($data['type'] == self::PHINX_TYPE_DOUBLE) {
+            $data['type'] = TableSchema::TYPE_FLOAT;
+            $data['length'] = 52;
+        }
+
+        return $data;
     }
 
     /**
@@ -351,57 +419,59 @@ class MysqlAdapter extends AbstractAdapter
     }
 
     /**
+     * Convert from cakephp/database conventions to migrations\column
+     *
+     * - converts datetimefractional -> datetime + length
+     *
+     * @param array $columnData The cakephp/database column data to transform
+     * @return array The extracted/converted type and length.
+     */
+    protected function mapColumnType(array $columnData): array
+    {
+        $type = $columnData['type'];
+        $length = $columnData['length'];
+        // Compatibility for precision
+        if ($type === TableSchema::TYPE_DATETIME_FRACTIONAL) {
+            $type = 'datetime';
+            $length = $columnData['precision'] ?? $length;
+        } elseif ($type === TableSchema::TYPE_TIMESTAMP_FRACTIONAL) {
+            $type = 'timestamp';
+            $length = $columnData['precision'] ?? $length;
+        }
+
+        return [$type, $length];
+    }
+
+    /**
      * @inheritDoc
      */
     public function getColumns(string $tableName): array
     {
         $dialect = $this->getSchemaDialect();
-        [$query, $params] = $dialect->describeColumnSql($tableName, []);
-        $rows = $this->query($query, $params)->fetchAll('assoc');
-
+        $columnRecords = $dialect->describeColumns($tableName);
         $columns = [];
-        foreach ($rows as $columnInfo) {
-            $phinxType = $this->getPhinxType($columnInfo['Type']);
+        foreach ($columnRecords as $record) {
+            [$type, $length] = $this->mapColumnType($record);
 
-            $column = new Column();
-            $column->setName($columnInfo['Field'])
-                   ->setNull($columnInfo['Null'] !== 'NO')
-                   ->setType($phinxType['name'])
-                   ->setSigned(strpos($columnInfo['Type'], 'unsigned') === false)
-                   ->setLimit($phinxType['limit'])
-                   ->setScale($phinxType['scale'])
-                   ->setComment($columnInfo['Comment']);
+            $column = (new Column())
+                ->setName($record['name'])
+                ->setNull($record['null'])
+                ->setType($type)
+                ->setLimit($length)
+                ->setDefault($record['default'])
+                // cakephp uses precision not scale
+                ->setScale($record['precision'] ?? null)
+                ->setComment($record['comment']);
 
-            if ($columnInfo['Extra'] === 'auto_increment') {
+            if ($record['unsigned'] ?? false) {
+                $column->setSigned(!$record['unsigned']);
+            }
+            if ($record['autoIncrement'] ?? false) {
                 $column->setIdentity(true);
-            } elseif ($columnInfo['Extra'] === 'on update CURRENT_TIMESTAMP') {
-                $column->setUpdate('CURRENT_TIMESTAMP');
-            } elseif ($columnInfo['Extra'] === 'on update current_timestamp()') {
-                $column->setUpdate('CURRENT_TIMESTAMP');
             }
-
-            if (isset($phinxType['values'])) {
-                $column->setValues($phinxType['values']);
+            if ($record['onUpdate'] ?? false) {
+                $column->setUpdate($record['onUpdate']);
             }
-
-            $default = $columnInfo['Default'];
-            if (
-                is_string($default) &&
-                in_array(
-                    $column->getType(),
-                    array_merge(
-                        static::PHINX_TYPES_GEOSPATIAL,
-                        [static::PHINX_TYPE_BLOB, static::PHINX_TYPE_JSON, static::PHINX_TYPE_TEXT],
-                    ),
-                )
-            ) {
-                // The default that comes back from MySQL for these types prefixes the collation type and
-                // surrounds the value with escaped single quotes, for example "_utf8mbf4\'abc\'", and so
-                // this converts that then down to the default value of "abc" to correspond to what the user
-                // would have specified in a migration.
-                $default = preg_replace("/^_(?:[a-zA-Z0-9]+?)\\\'(.*)\\\'$/", '\1', $default);
-            }
-            $column->setDefault($default);
 
             $columns[] = $column;
         }
@@ -429,10 +499,10 @@ class MysqlAdapter extends AbstractAdapter
      */
     protected function getAddColumnInstructions(Table $table, Column $column): AlterInstructions
     {
+        $dialect = $this->getSchemaDialect();
         $alter = sprintf(
-            'ADD %s %s',
-            $this->quoteColumnName((string)$column->getName()),
-            $this->getColumnSqlDefinition($column),
+            'ADD %s',
+            $dialect->columnDefinitionSql($this->mapColumnData($column->toArray())),
         );
 
         $alter .= $this->afterClause($column);
@@ -510,11 +580,12 @@ class MysqlAdapter extends AbstractAdapter
      */
     protected function getChangeColumnInstructions(string $tableName, string $columnName, Column $newColumn): AlterInstructions
     {
+        $dialect = $this->getSchemaDialect();
+
         $alter = sprintf(
-            'CHANGE %s %s %s%s',
+            'CHANGE %s %s%s',
             $this->quoteColumnName($columnName),
-            $this->quoteColumnName((string)$newColumn->getName()),
-            $this->getColumnSqlDefinition($newColumn),
+            $dialect->columnDefinitionSql($this->mapColumnData($newColumn->toArray())),
             $this->afterClause($newColumn),
         );
 
@@ -540,15 +611,7 @@ class MysqlAdapter extends AbstractAdapter
     protected function getIndexes(string $tableName): array
     {
         $dialect = $this->getSchemaDialect();
-        [$query, $params] = $dialect->describeIndexSql($tableName, []);
-        $rows = $this->query($query, $params)->fetchAll('assoc');
-        $indexes = [];
-        foreach ($rows as $row) {
-            if (!isset($indexes[$row['Key_name']])) {
-                $indexes[$row['Key_name']] = ['columns' => []];
-            }
-            $indexes[$row['Key_name']]['columns'][] = strtolower($row['Column_name']);
-        }
+        $indexes = $dialect->describeIndexes($tableName);
 
         return $indexes;
     }
@@ -581,8 +644,8 @@ class MysqlAdapter extends AbstractAdapter
     {
         $indexes = $this->getIndexes($tableName);
 
-        foreach ($indexes as $name => $index) {
-            if ($name === $indexName) {
+        foreach ($indexes as $index) {
+            if ($index['name'] === $indexName) {
                 return true;
             }
         }
@@ -633,11 +696,11 @@ class MysqlAdapter extends AbstractAdapter
         $indexes = $this->getIndexes($tableName);
         $columns = array_map('strtolower', $columns);
 
-        foreach ($indexes as $indexName => $index) {
+        foreach ($indexes as $index) {
             if ($columns == $index['columns']) {
                 return new AlterInstructions([sprintf(
                     'DROP INDEX %s',
-                    $this->quoteColumnName($indexName),
+                    $this->quoteColumnName($index['name']),
                 )]);
             }
         }
@@ -657,8 +720,8 @@ class MysqlAdapter extends AbstractAdapter
     {
         $indexes = $this->getIndexes($tableName);
 
-        foreach ($indexes as $name => $index) {
-            if ($name === $indexName) {
+        foreach ($indexes as $index) {
+            if ($index['name'] === $indexName) {
                 return new AlterInstructions([sprintf(
                     'DROP INDEX %s',
                     $this->quoteColumnName($indexName),
@@ -675,21 +738,18 @@ class MysqlAdapter extends AbstractAdapter
     /**
      * @inheritDoc
      */
-    public function hasPrimaryKey(string $tableName, $columns, ?string $constraint = null): bool
+    public function hasPrimaryKey(string $tableName, string|array $columns, ?string $constraint = null): bool
     {
         $primaryKey = $this->getPrimaryKey($tableName);
 
-        if (empty($primaryKey['constraint'])) {
+        if (empty($primaryKey['name'])) {
             return false;
         }
 
         if ($constraint) {
-            return $primaryKey['constraint'] === $constraint;
+            return $primaryKey['name'] === $constraint;
         } else {
-            if (is_string($columns)) {
-                $columns = [$columns]; // str to array
-            }
-            $missingColumns = array_diff($columns, $primaryKey['columns']);
+            $missingColumns = array_diff((array)$columns, (array)$primaryKey['columns']);
 
             return empty($missingColumns);
         }
@@ -705,12 +765,14 @@ class MysqlAdapter extends AbstractAdapter
     {
         $indexes = $this->getIndexes($tableName);
         $primaryKey = [
-            'constraint' => '',
+            'name' => '',
             'columns' => [],
         ];
-        foreach ($indexes as $name => $row) {
-            $primaryKey['constraint'] = $name;
-            $primaryKey['columns'] = (array)$row['columns'];
+        foreach ($indexes as $index) {
+            if ($index['type'] === TableSchema::CONSTRAINT_PRIMARY) {
+                $primaryKey = $index;
+                break;
+            }
         }
 
         return $primaryKey;
@@ -722,12 +784,9 @@ class MysqlAdapter extends AbstractAdapter
     public function hasForeignKey(string $tableName, $columns, ?string $constraint = null): bool
     {
         $foreignKeys = $this->getForeignKeys($tableName);
+        $names = array_map(fn($key) => $key['name'], $foreignKeys);
         if ($constraint) {
-            if (isset($foreignKeys[$constraint])) {
-                return !empty($foreignKeys[$constraint]);
-            }
-
-            return false;
+            return in_array($constraint, $names, true);
         }
 
         $columns = array_map('mb_strtolower', (array)$columns);
@@ -750,22 +809,7 @@ class MysqlAdapter extends AbstractAdapter
     protected function getForeignKeys(string $tableName): array
     {
         $dialect = $this->getSchemaDialect();
-        $schema = (string)$this->getOption('database');
-        if (strpos($tableName, '.') !== false) {
-            [$schema, $tableName] = explode('.', $tableName);
-        }
-        $config = ['database' => $schema];
-
-        [$query, $params] = $dialect->describeForeignKeySql($tableName, $config);
-        $rows = $this->query($query, $params)->fetchAll('assoc');
-
-        $foreignKeys = [];
-        foreach ($rows as $row) {
-            $foreignKeys[$row['CONSTRAINT_NAME']]['table'] = $row['TABLE_NAME'];
-            $foreignKeys[$row['CONSTRAINT_NAME']]['columns'][] = $row['COLUMN_NAME'];
-            $foreignKeys[$row['CONSTRAINT_NAME']]['referenced_table'] = $row['REFERENCED_TABLE_NAME'];
-            $foreignKeys[$row['CONSTRAINT_NAME']]['referenced_columns'][] = $row['REFERENCED_COLUMN_NAME'];
-        }
+        $foreignKeys = $dialect->describeForeignKeys($tableName);
 
         return $foreignKeys;
     }
@@ -809,9 +853,9 @@ class MysqlAdapter extends AbstractAdapter
 
         $matches = [];
         $foreignKeys = $this->getForeignKeys($tableName);
-        foreach ($foreignKeys as $name => $key) {
+        foreach ($foreignKeys as $key) {
             if (array_map('mb_strtolower', $key['columns']) === $columns) {
-                $matches[] = $name;
+                $matches[] = $key['name'];
             }
         }
 
@@ -1234,81 +1278,6 @@ class MysqlAdapter extends AbstractAdapter
     {
         $this->execute(sprintf('DROP DATABASE IF EXISTS %s', $this->quoteTableName($name)));
         $this->createdTables = [];
-    }
-
-    /**
-     * Gets the MySQL Column Definition for a Column object.
-     *
-     * @param \Migrations\Db\Table\Column $column Column
-     * @return string
-     */
-    protected function getColumnSqlDefinition(Column $column): string
-    {
-        if ($column->getType() instanceof Literal) {
-            $def = (string)$column->getType();
-        } else {
-            $sqlType = $this->getSqlType($column->getType(), $column->getLimit());
-            $def = strtoupper($sqlType['name']);
-        }
-        if ($column->getPrecision() && $column->getScale()) {
-            $def .= '(' . $column->getPrecision() . ',' . $column->getScale() . ')';
-        } elseif (isset($sqlType['limit'])) {
-            $def .= '(' . $sqlType['limit'] . ')';
-        }
-
-        $values = $column->getValues();
-        if ($values) {
-            $def .= '(' . implode(', ', array_map(function ($value) {
-                // we special case NULL as it's not actually allowed an enum value,
-                // and we want MySQL to issue an error on the create statement, but
-                // quote coerces it to an empty string, which will not error
-                return $value === null ? 'NULL' : $this->quoteString($value);
-            }, $values)) . ')';
-        }
-
-        $def .= $column->getEncoding() ? ' CHARACTER SET ' . $column->getEncoding() : '';
-        $def .= $column->getCollation() ? ' COLLATE ' . $column->getCollation() : '';
-        $def .= !$column->isSigned() && isset($this->signedColumnTypes[(string)$column->getType()]) ? ' unsigned' : '';
-        $def .= $column->isNull() ? ' NULL' : ' NOT NULL';
-
-        $connection = $this->getConnection();
-        $version = $connection->getDriver()->version();
-        if (
-            version_compare($version, '8', '>=')
-            && in_array($column->getType(), static::PHINX_TYPES_GEOSPATIAL)
-            && !is_null($column->getSrid())
-        ) {
-            $def .= " SRID {$column->getSrid()}";
-        }
-
-        $def .= $column->isIdentity() ? ' AUTO_INCREMENT' : '';
-
-        $default = $column->getDefault();
-        // MySQL 8 supports setting default for the following tested types, but only if they are "cast as expressions"
-        if (
-            version_compare($version, '8', '>=') &&
-            is_string($default) &&
-            in_array(
-                $column->getType(),
-                array_merge(
-                    static::PHINX_TYPES_GEOSPATIAL,
-                    [static::PHINX_TYPE_BLOB, static::PHINX_TYPE_JSON, static::PHINX_TYPE_TEXT],
-                ),
-            )
-        ) {
-            $default = Literal::from('(' . $this->quoteString($column->getDefault()) . ')');
-        }
-        $def .= $this->getDefaultValueDefinition($default, (string)$column->getType());
-
-        if ($column->getComment()) {
-            $def .= ' COMMENT ' . $this->quoteString((string)$column->getComment());
-        }
-
-        if ($column->getUpdate()) {
-            $def .= ' ON UPDATE ' . $column->getUpdate();
-        }
-
-        return $def;
     }
 
     /**
