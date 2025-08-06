@@ -17,7 +17,6 @@ declare(strict_types=1);
 namespace Migrations\Test\TestCase\Command;
 
 use Cake\Console\TestSuite\ConsoleIntegrationTestTrait;
-use Cake\Core\Configure;
 use Cake\TestSuite\TestCase;
 
 /**
@@ -30,8 +29,6 @@ class EntryCommandTest extends TestCase
     public function setUp(): void
     {
         parent::setUp();
-
-        Configure::write('Migrations.backend', 'builtin');
     }
 
     /**
@@ -44,7 +41,6 @@ class EntryCommandTest extends TestCase
         $this->exec('migrations --help');
 
         $this->assertExitSuccess();
-        $this->assertOutputContains('Using <info>builtin</info> backend');
         $this->assertOutputContains('Available Commands');
         $this->assertOutputContains('migrations migrate');
         $this->assertOutputContains('migrations status');

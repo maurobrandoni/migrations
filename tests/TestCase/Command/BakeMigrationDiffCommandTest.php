@@ -46,7 +46,6 @@ class BakeMigrationDiffCommandTest extends TestCase
         parent::setUp();
 
         $this->generatedFiles = [];
-        Configure::write('Migrations.backend', 'builtin');
     }
 
     public function tearDown(): void
@@ -60,7 +59,7 @@ class BakeMigrationDiffCommandTest extends TestCase
         if (env('DB_URL_COMPARE')) {
             // Clean up the comparison database each time. Table order is important.
             $connection = ConnectionManager::get('test_comparisons');
-            $tables = ['articles', 'categories', 'comments', 'users', 'phinxlog'];
+            $tables = ['articles', 'categories', 'comments', 'users', 'phinxlog', 'tags'];
             foreach ($tables as $table) {
                 $connection->execute("DROP TABLE IF EXISTS $table");
             }
