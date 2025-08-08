@@ -85,7 +85,6 @@ class ManagerFactory
         // Get the phinxlog table name. Plugins have separate migration history.
         // The names and separate table history is something we could change in the future.
         $table = Util::tableName($plugin);
-        $templatePath = dirname(__DIR__) . DS . 'templates' . DS;
         $connectionName = (string)$this->getOption('connection');
 
         if (str_contains($connectionName, '://')) {
@@ -120,10 +119,6 @@ class ManagerFactory
                 'migrations' => $dir,
                 'seeds' => $dir,
             ],
-            'templates' => [
-                'file' => $templatePath . 'Phinx/create.php.template',
-            ],
-            'migration_base_class' => 'Migrations\AbstractMigration',
             'environment' => $adapterConfig,
             'plugin' => $plugin,
             'source' => $folder,
