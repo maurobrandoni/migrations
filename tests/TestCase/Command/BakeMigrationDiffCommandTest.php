@@ -17,6 +17,7 @@ use Cake\Cache\Cache;
 use Cake\Console\BaseCommand;
 use Cake\Core\Configure;
 use Cake\Core\Plugin;
+use Cake\Database\Driver\Mysql;
 use Cake\Datasource\ConnectionManager;
 use Cake\TestSuite\StringCompareTrait;
 use Cake\Utility\Inflector;
@@ -60,7 +61,7 @@ class BakeMigrationDiffCommandTest extends TestCase
         if (env('DB_URL_COMPARE')) {
             // Clean up the comparison database each time. Table order is important.
             $connection = ConnectionManager::get('test_comparisons');
-            $tables = ['articles', 'categories', 'comments', 'users', 'phinxlog'];
+            $tables = ['articles', 'categories', 'comments', 'users', 'orphan_table', 'phinxlog'];
             foreach ($tables as $table) {
                 $connection->execute("DROP TABLE IF EXISTS $table");
             }
@@ -238,6 +239,92 @@ class BakeMigrationDiffCommandTest extends TestCase
         Configure::write('Migrations.unsigned_primary_keys', false);
 
         $this->runDiffBakingTest('WithAutoIdIncompatibleUnsignedPrimaryKeys');
+    }
+
+    /**
+     * Tests that baking a diff with --plugin option only includes tables with Table classes
+     */
+    public function testBakingDiffWithPluginOnlyIncludesTablesWithTableClasses(): void
+    {
+        $this->skipIf(!env('DB_URL_COMPARE'));
+
+        // Create some test tables in the comparison database
+        $connection = ConnectionManager::get('test_comparisons');
+
+        // For now, only test MySQL as the original test was MySQL-specific
+        $driver = $connection->getDriver();
+        if (!($driver instanceof Mysql)) {
+            $this->markTestSkipped('This test currently only works with MySQL');
+        }
+
+        // Create a table that has a Table class in the TestBlog plugin
+        $connection->execute('CREATE TABLE IF NOT EXISTS articles (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            title VARCHAR(255)
+        )');
+
+        // Create a table that does NOT have a Table class in the TestBlog plugin
+        $connection->execute('CREATE TABLE IF NOT EXISTS orphan_table (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            name VARCHAR(255)
+        )');
+
+        // Don't create phinxlog - let the migration system handle it
+
+        // Create a schema dump for the initial state (empty)
+        $pluginPath = Plugin::path('TestBlog');
+        $migrationsPath = $pluginPath . 'config' . DS . 'Migrations' . DS;
+        if (!is_dir($migrationsPath)) {
+            mkdir($migrationsPath, 0777, true);
+        }
+
+        // Create an initial dummy migration to establish migration history
+        $initialMigration = $migrationsPath . '20200101000000_Initial.php';
+        file_put_contents($initialMigration, '<?php
+use Migrations\BaseMigration;
+
+class Initial extends BaseMigration
+{
+    public function up(): void
+    {
+    }
+
+    public function down(): void
+    {
+    }
+}
+');
+        $this->generatedFiles[] = $initialMigration;
+
+        // Run the initial migration to establish history
+        $this->exec('migrations migrate -c test_comparisons -p TestBlog');
+
+        // Now create a schema dump after the initial migration
+        $dumpPath = $migrationsPath . 'schema-dump-test_comparisons.lock';
+        file_put_contents($dumpPath, serialize([]));
+        $this->generatedFiles[] = $dumpPath;
+
+        // Run the diff command with --plugin option
+        $this->exec('bake migration_diff TestPluginDiff -c test_comparisons -p TestBlog');
+
+        // Find the generated migration file
+        $migrationPath = $pluginPath . 'config' . DS . 'Migrations' . DS;
+        $files = glob($migrationPath . '*_TestPluginDiff.php');
+        $this->assertNotEmpty($files, 'Migration file was not generated');
+        $this->generatedFiles[] = $files[0];
+
+        // Read the generated migration content
+        $content = file_get_contents($files[0]);
+
+        // Assert that only the articles table is included (which has ArticlesTable.php)
+        $this->assertStringContainsString('$this->table(\'articles\')', $content);
+
+        // Assert that orphan_table is NOT included (no Table class)
+        $this->assertStringNotContainsString('orphan_table', $content);
+
+        // Cleanup
+        $connection->execute('DROP TABLE IF EXISTS articles');
+        $connection->execute('DROP TABLE IF EXISTS orphan_table');
     }
 
     protected function runDiffBakingTest(string $scenario): void
