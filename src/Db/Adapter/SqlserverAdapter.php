@@ -849,64 +849,6 @@ ORDER BY IC.[key_ordinal]';
     }
 
     /**
-     * {@inheritDoc}
-     *
-     * @throws \Migrations\Db\Adapter\UnsupportedColumnTypeException
-     */
-    public function getSqlType(Literal|string $type, ?int $limit = null): array
-    {
-        $type = (string)$type;
-        switch ($type) {
-            case static::PHINX_TYPE_FLOAT:
-            case static::PHINX_TYPE_DECIMAL:
-            case static::PHINX_TYPE_DATETIME:
-            case static::PHINX_TYPE_TIME:
-            case static::PHINX_TYPE_DATE:
-                return ['name' => $type];
-            case static::PHINX_TYPE_STRING:
-                return ['name' => 'nvarchar', 'limit' => 255];
-            case static::PHINX_TYPE_CHAR:
-                return ['name' => 'nchar', 'limit' => 255];
-            case static::PHINX_TYPE_TEXT:
-                return ['name' => 'ntext'];
-            case static::PHINX_TYPE_INTEGER:
-                return ['name' => 'int'];
-            case static::PHINX_TYPE_TINY_INTEGER:
-                return ['name' => 'tinyint'];
-            case static::PHINX_TYPE_SMALL_INTEGER:
-                return ['name' => 'smallint'];
-            case static::PHINX_TYPE_BIG_INTEGER:
-                return ['name' => 'bigint'];
-            case static::PHINX_TYPE_TIMESTAMP:
-                return ['name' => 'datetime'];
-            case static::PHINX_TYPE_BLOB:
-            case static::PHINX_TYPE_BINARY:
-                return ['name' => 'varbinary'];
-            case static::PHINX_TYPE_BOOLEAN:
-                return ['name' => 'bit'];
-            case static::PHINX_TYPE_BINARYUUID:
-            case static::PHINX_TYPE_UUID:
-            case static::PHINX_TYPE_NATIVEUUID:
-                return ['name' => 'uniqueidentifier'];
-            case static::PHINX_TYPE_FILESTREAM:
-                return ['name' => 'varbinary', 'limit' => 'max'];
-                // Geospatial database types
-            case static::PHINX_TYPE_GEOGRAPHY:
-            case static::PHINX_TYPE_POINT:
-            case static::PHINX_TYPE_LINESTRING:
-            case static::PHINX_TYPE_POLYGON:
-                // SQL Server stores all spatial data using a single data type.
-                // Specific types (point, polygon, etc) are set at insert time.
-                return ['name' => 'geography'];
-                // Geometry specific type
-            case static::PHINX_TYPE_GEOMETRY:
-                return ['name' => 'geometry'];
-            default:
-                throw new UnsupportedColumnTypeException('Column type "' . $type . '" is not supported by SqlServer.');
-        }
-    }
-
-    /**
      * @inheritDoc
      */
     public function createDatabase(string $name, array $options = []): void

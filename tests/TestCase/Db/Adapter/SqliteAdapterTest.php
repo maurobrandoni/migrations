@@ -9,10 +9,8 @@ use Cake\Console\TestSuite\StubConsoleInput;
 use Cake\Console\TestSuite\StubConsoleOutput;
 use Cake\Database\Connection;
 use Cake\Datasource\ConnectionManager;
-use Exception;
 use InvalidArgumentException;
 use Migrations\Db\Adapter\SqliteAdapter;
-use Migrations\Db\Adapter\UnsupportedColumnTypeException;
 use Migrations\Db\Expression;
 use Migrations\Db\Literal;
 use Migrations\Db\Table;
@@ -2648,95 +2646,6 @@ INPUT;
                 false,
             ],
         ];
-    }
-
-    #[DataProvider('providePhinxTypes')]
-    public function testGetSqlType($phinxType, $limit, $exp)
-    {
-        if ($exp instanceof Exception) {
-            $this->expectException(get_class($exp));
-
-            $this->adapter->getSqlType($phinxType, $limit);
-        } else {
-            $exp = ['name' => $exp, 'limit' => $limit];
-            $this->assertEquals($exp, $this->adapter->getSqlType($phinxType, $limit));
-        }
-    }
-
-    public static function providePhinxTypes()
-    {
-        $unsupported = new UnsupportedColumnTypeException();
-
-        return [
-            [SqliteAdapter::PHINX_TYPE_BIG_INTEGER, null, SqliteAdapter::PHINX_TYPE_BIG_INTEGER],
-            [SqliteAdapter::PHINX_TYPE_BINARY, null, SqliteAdapter::PHINX_TYPE_BINARY . '_blob'],
-            [SqliteAdapter::PHINX_TYPE_BIT, null, $unsupported],
-            [SqliteAdapter::PHINX_TYPE_BLOB, null, SqliteAdapter::PHINX_TYPE_BLOB],
-            [SqliteAdapter::PHINX_TYPE_BOOLEAN, null, SqliteAdapter::PHINX_TYPE_BOOLEAN . '_integer'],
-            [SqliteAdapter::PHINX_TYPE_CHAR, null, SqliteAdapter::PHINX_TYPE_CHAR],
-            [SqliteAdapter::PHINX_TYPE_CIDR, null, $unsupported],
-            [SqliteAdapter::PHINX_TYPE_DATE, null, SqliteAdapter::PHINX_TYPE_DATE . '_text'],
-            [SqliteAdapter::PHINX_TYPE_DATETIME, null, SqliteAdapter::PHINX_TYPE_DATETIME . '_text'],
-            [SqliteAdapter::PHINX_TYPE_DECIMAL, null, SqliteAdapter::PHINX_TYPE_DECIMAL],
-            [SqliteAdapter::PHINX_TYPE_DOUBLE, null, SqliteAdapter::PHINX_TYPE_DOUBLE],
-            [SqliteAdapter::PHINX_TYPE_ENUM, null, $unsupported],
-            [SqliteAdapter::PHINX_TYPE_FILESTREAM, null, $unsupported],
-            [SqliteAdapter::PHINX_TYPE_FLOAT, null, SqliteAdapter::PHINX_TYPE_FLOAT],
-            [SqliteAdapter::PHINX_TYPE_GEOMETRY, null, $unsupported],
-            [SqliteAdapter::PHINX_TYPE_INET, null, $unsupported],
-            [SqliteAdapter::PHINX_TYPE_INTEGER, null, SqliteAdapter::PHINX_TYPE_INTEGER],
-            [SqliteAdapter::PHINX_TYPE_INTERVAL, null, $unsupported],
-            [SqliteAdapter::PHINX_TYPE_JSON, null, SqliteAdapter::PHINX_TYPE_JSON . '_text'],
-            [SqliteAdapter::PHINX_TYPE_JSONB, null, SqliteAdapter::PHINX_TYPE_JSONB . '_text'],
-            [SqliteAdapter::PHINX_TYPE_LINESTRING, null, $unsupported],
-            [SqliteAdapter::PHINX_TYPE_MACADDR, null, $unsupported],
-            [SqliteAdapter::PHINX_TYPE_POINT, null, $unsupported],
-            [SqliteAdapter::PHINX_TYPE_POLYGON, null, $unsupported],
-            [SqliteAdapter::PHINX_TYPE_SET, null, $unsupported],
-            [SqliteAdapter::PHINX_TYPE_SMALL_INTEGER, null, SqliteAdapter::PHINX_TYPE_SMALL_INTEGER],
-            [SqliteAdapter::PHINX_TYPE_STRING, null, 'varchar'],
-            [SqliteAdapter::PHINX_TYPE_TEXT, null, SqliteAdapter::PHINX_TYPE_TEXT],
-            [SqliteAdapter::PHINX_TYPE_TIME, null, SqliteAdapter::PHINX_TYPE_TIME . '_text'],
-            [SqliteAdapter::PHINX_TYPE_TIMESTAMP, null, SqliteAdapter::PHINX_TYPE_TIMESTAMP . '_text'],
-            [SqliteAdapter::PHINX_TYPE_UUID, null, SqliteAdapter::PHINX_TYPE_UUID . '_text'],
-            [SqliteAdapter::PHINX_TYPE_VARBINARY, null, SqliteAdapter::PHINX_TYPE_VARBINARY . '_blob'],
-            [SqliteAdapter::PHINX_TYPE_STRING, 5, 'varchar'],
-            [Literal::from('someType'), 5, Literal::from('someType')],
-            ['notAType', null, $unsupported],
-        ];
-    }
-
-    public function testGetColumnTypes()
-    {
-        $columnTypes = $this->adapter->getColumnTypes();
-        $expected = [
-            SqliteAdapter::PHINX_TYPE_BIG_INTEGER,
-            SqliteAdapter::PHINX_TYPE_BINARY,
-            SqliteAdapter::PHINX_TYPE_BLOB,
-            SqliteAdapter::PHINX_TYPE_BOOLEAN,
-            SqliteAdapter::PHINX_TYPE_CHAR,
-            SqliteAdapter::PHINX_TYPE_DATE,
-            SqliteAdapter::PHINX_TYPE_DATETIME,
-            SqliteAdapter::PHINX_TYPE_DECIMAL,
-            SqliteAdapter::PHINX_TYPE_DOUBLE,
-            SqliteAdapter::PHINX_TYPE_FLOAT,
-            SqliteAdapter::PHINX_TYPE_INTEGER,
-            SqliteAdapter::PHINX_TYPE_JSON,
-            SqliteAdapter::PHINX_TYPE_JSONB,
-            SqliteAdapter::PHINX_TYPE_SMALL_INTEGER,
-            SqliteAdapter::PHINX_TYPE_STRING,
-            SqliteAdapter::PHINX_TYPE_TEXT,
-            SqliteAdapter::PHINX_TYPE_TIME,
-            SqliteAdapter::PHINX_TYPE_UUID,
-            SqliteAdapter::PHINX_TYPE_BINARYUUID,
-            SqliteAdapter::PHINX_TYPE_TIMESTAMP,
-            SqliteAdapter::PHINX_TYPE_TINY_INTEGER,
-            SqliteAdapter::PHINX_TYPE_VARBINARY,
-        ];
-        sort($columnTypes);
-        sort($expected);
-
-        $this->assertEquals($expected, $columnTypes);
     }
 
     #[DataProvider('provideColumnTypesForValidation')]

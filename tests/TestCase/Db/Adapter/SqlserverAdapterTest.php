@@ -19,7 +19,6 @@ use Migrations\Db\Table\Index;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Depends;
 use PHPUnit\Framework\TestCase;
-use RuntimeException;
 
 class SqlserverAdapterTest extends TestCase
 {
@@ -1147,14 +1146,6 @@ class SqlserverAdapterTest extends TestCase
         $this->assertEquals('[schema]', $this->adapter->quoteSchemaName('schema'));
         // Dotted schema names are not supported
         $this->assertEquals('[schema].[schema]', $this->adapter->quoteSchemaName('schema.schema'));
-    }
-
-    public function testInvalidSqlType()
-    {
-        $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('Column type "idontexist" is not supported by SqlServer.');
-
-        $this->adapter->getSqlType('idontexist');
     }
 
     public function testAddColumnComment()

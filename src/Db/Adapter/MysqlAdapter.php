@@ -14,7 +14,6 @@ use Cake\Database\Exception\QueryException;
 use Cake\Database\Schema\TableSchema;
 use InvalidArgumentException;
 use Migrations\Db\AlterInstructions;
-use Migrations\Db\Literal;
 use Migrations\Db\Table\Column;
 use Migrations\Db\Table\ForeignKey;
 use Migrations\Db\Table\Index;
@@ -59,7 +58,7 @@ class MysqlAdapter extends AbstractAdapter
     // except for the `_LONG` and `_BIG` variants, which are maxed at 32-bit
     // PHP_INT_MAX value. The `INT_REGULAR` field is just arbitrarily half of INT_BIG
     // as its actual value is its regular value is larger than PHP_INT_MAX. We do this
-    // to keep consistent the type hints for getSqlType and Column::$limit being integers.
+    // to keep consistent the type hints for Column::$limit being integers.
     public const TEXT_TINY = 255;
     public const TEXT_SMALL = 255; /* deprecated, alias of TEXT_TINY */
     /** @deprecated Use length of null instead **/
@@ -873,186 +872,6 @@ class MysqlAdapter extends AbstractAdapter
         }
 
         return $instructions;
-    }
-
-    /**
-     * {@inheritDoc}
-     *
-     * @throws \Migrations\Db\Adapter\UnsupportedColumnTypeException
-     */
-    public function getSqlType(Literal|string $type, ?int $limit = null): array
-    {
-        $type = (string)$type;
-        switch ($type) {
-            case static::PHINX_TYPE_FLOAT:
-            case static::PHINX_TYPE_DOUBLE:
-            case static::PHINX_TYPE_DECIMAL:
-            case static::PHINX_TYPE_DATE:
-            case static::PHINX_TYPE_ENUM:
-            case static::PHINX_TYPE_SET:
-            case static::PHINX_TYPE_JSON:
-            // Geospatial database types
-            case static::PHINX_TYPE_GEOMETRY:
-            case static::PHINX_TYPE_POINT:
-            case static::PHINX_TYPE_LINESTRING:
-            case static::PHINX_TYPE_POLYGON:
-                return ['name' => $type];
-            case static::PHINX_TYPE_DATETIME:
-            case static::PHINX_TYPE_TIMESTAMP:
-            case static::PHINX_TYPE_TIME:
-                return ['name' => $type, 'limit' => $limit];
-            case static::PHINX_TYPE_STRING:
-                return ['name' => 'varchar', 'limit' => $limit ?: 255];
-            case static::PHINX_TYPE_CHAR:
-                return ['name' => 'char', 'limit' => $limit ?: 255];
-            case static::PHINX_TYPE_TEXT:
-                if ($limit) {
-                    $sizes = [
-                        // Order matters! Size must always be tested from longest to shortest!
-                        'longtext' => static::TEXT_LONG,
-                        'mediumtext' => static::TEXT_MEDIUM,
-                        'text' => static::TEXT_REGULAR,
-                        'tinytext' => static::TEXT_SMALL,
-                    ];
-                    foreach ($sizes as $name => $length) {
-                        if ($limit >= $length) {
-                            return ['name' => $name];
-                        }
-                    }
-                }
-
-                return ['name' => 'text'];
-            case static::PHINX_TYPE_BINARY:
-                if ($limit === null) {
-                    $limit = 255;
-                }
-
-                if ($limit > 255) {
-                    return $this->getSqlType(static::PHINX_TYPE_BLOB, $limit);
-                }
-
-                return ['name' => 'binary', 'limit' => $limit];
-            case static::PHINX_TYPE_BINARYUUID:
-                return ['name' => 'binary', 'limit' => 16];
-            case static::PHINX_TYPE_VARBINARY:
-                if ($limit === null) {
-                    $limit = 255;
-                }
-
-                if ($limit > 255) {
-                    return $this->getSqlType(static::PHINX_TYPE_BLOB, $limit);
-                }
-
-                return ['name' => 'varbinary', 'limit' => $limit];
-            case static::PHINX_TYPE_BLOB:
-                if ($limit !== null) {
-                    // Rework this part as the chosen types were always UNDER the required length
-                    $sizes = [
-                        'tinyblob' => static::BLOB_SMALL,
-                        'blob' => static::BLOB_REGULAR,
-                        'mediumblob' => static::BLOB_MEDIUM,
-                    ];
-
-                    foreach ($sizes as $name => $length) {
-                        if ($limit <= $length) {
-                            return ['name' => $name];
-                        }
-                    }
-
-                    // For more length requirement, the longblob is used
-                    return ['name' => 'longblob'];
-                }
-
-                // If not limit is provided, fallback on blob
-                return ['name' => 'blob'];
-            case static::PHINX_TYPE_TINYBLOB:
-                // Automatically reprocess blob type to ensure that correct blob subtype is selected given provided limit
-                return $this->getSqlType(static::PHINX_TYPE_BLOB, $limit ?: static::BLOB_TINY);
-            case static::PHINX_TYPE_MEDIUMBLOB:
-                // Automatically reprocess blob type to ensure that correct blob subtype is selected given provided limit
-                return $this->getSqlType(static::PHINX_TYPE_BLOB, $limit ?: static::BLOB_MEDIUM);
-            case static::PHINX_TYPE_LONGBLOB:
-                // Automatically reprocess blob type to ensure that correct blob subtype is selected given provided limit
-                return $this->getSqlType(static::PHINX_TYPE_BLOB, $limit ?: static::BLOB_LONG);
-            case static::PHINX_TYPE_BIT:
-                return ['name' => 'bit', 'limit' => $limit ?: 64];
-            case static::PHINX_TYPE_BIG_INTEGER:
-                if ($limit === static::INT_BIG) {
-                    $limit = static::INT_DISPLAY_BIG;
-                }
-
-                return ['name' => 'bigint', 'limit' => $limit ?: 20];
-            case static::PHINX_TYPE_MEDIUM_INTEGER:
-                if ($limit === static::INT_MEDIUM) {
-                    $limit = static::INT_DISPLAY_MEDIUM;
-                }
-
-                return ['name' => 'mediumint', 'limit' => $limit ?: 8];
-            case static::PHINX_TYPE_SMALL_INTEGER:
-                if ($limit === static::INT_SMALL) {
-                    $limit = static::INT_DISPLAY_SMALL;
-                }
-
-                return ['name' => 'smallint', 'limit' => $limit ?: 6];
-            case static::PHINX_TYPE_TINY_INTEGER:
-                if ($limit === static::INT_TINY) {
-                    $limit = static::INT_DISPLAY_TINY;
-                }
-
-                return ['name' => 'tinyint', 'limit' => $limit ?: 4];
-            case static::PHINX_TYPE_INTEGER:
-                if ($limit && $limit >= static::INT_TINY) {
-                    $sizes = [
-                        // Order matters! Size must always be tested from longest to shortest!
-                        'bigint' => static::INT_BIG,
-                        'int' => static::INT_REGULAR,
-                        'mediumint' => static::INT_MEDIUM,
-                        'smallint' => static::INT_SMALL,
-                        'tinyint' => static::INT_TINY,
-                    ];
-                    $limits = [
-                        'tinyint' => static::INT_DISPLAY_TINY,
-                        'smallint' => static::INT_DISPLAY_SMALL,
-                        'mediumint' => static::INT_DISPLAY_MEDIUM,
-                        'int' => static::INT_DISPLAY_REGULAR,
-                        'bigint' => static::INT_DISPLAY_BIG,
-                    ];
-                    foreach ($sizes as $name => $length) {
-                        if ($limit >= $length) {
-                            $def = ['name' => $name];
-                            if (isset($limits[$name])) {
-                                $def['limit'] = $limits[$name];
-                            }
-
-                            return $def;
-                        }
-                    }
-                } elseif (!$limit) {
-                    $limit = static::INT_DISPLAY_REGULAR;
-                }
-
-                return ['name' => 'int', 'limit' => $limit];
-            case static::PHINX_TYPE_BOOLEAN:
-                return ['name' => 'tinyint', 'limit' => 1];
-            case static::PHINX_TYPE_UUID:
-                return ['name' => 'char', 'limit' => 36];
-            case static::PHINX_TYPE_NATIVEUUID:
-                if (!$this->hasNativeUuid()) {
-                    throw new UnsupportedColumnTypeException(
-                        'Column type "' . $type . '" is not supported by this version of MySQL.',
-                    );
-                }
-
-                return ['name' => 'uuid'];
-            case static::PHINX_TYPE_YEAR:
-                if (!$limit || in_array($limit, [2, 4])) {
-                    $limit = 4;
-                }
-
-                return ['name' => 'year', 'limit' => $limit];
-            default:
-                throw new UnsupportedColumnTypeException('Column type "' . $type . '" is not supported by MySQL.');
-        }
     }
 
     /**
