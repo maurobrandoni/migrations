@@ -11,7 +11,6 @@ use Cake\Datasource\ConnectionManager;
 use InvalidArgumentException;
 use Migrations\Db\Adapter\AdapterInterface;
 use Migrations\Db\Adapter\PostgresAdapter;
-use Migrations\Db\Adapter\UnsupportedColumnTypeException;
 use Migrations\Db\Literal;
 use Migrations\Db\Table;
 use Migrations\Db\Table\Column;
@@ -1860,14 +1859,6 @@ class PostgresAdapterTest extends TestCase
         $this->adapter->dropAllSchemas();
         $this->assertFalse($this->adapter->hasSchema('foo'));
         $this->assertFalse($this->adapter->hasSchema('bar'));
-    }
-
-    public function testInvalidSqlType()
-    {
-        $this->expectException(UnsupportedColumnTypeException::class);
-        $this->expectExceptionMessage('Column type `idontexist` is not supported by Postgresql.');
-
-        $this->adapter->getSqlType('idontexist');
     }
 
     public function testCreateTableWithComment()

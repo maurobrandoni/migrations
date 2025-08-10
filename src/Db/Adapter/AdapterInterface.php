@@ -15,7 +15,6 @@ use Cake\Database\Query\DeleteQuery;
 use Cake\Database\Query\InsertQuery;
 use Cake\Database\Query\SelectQuery;
 use Cake\Database\Query\UpdateQuery;
-use Migrations\Db\Literal;
 use Migrations\Db\Table\Column;
 use Migrations\Db\Table\Table;
 use Migrations\MigrationInterface;
@@ -445,15 +444,6 @@ interface AdapterInterface
      * @return bool
      */
     public function isValidColumnType(Column $column): bool;
-
-    /**
-     * Converts the Phinx logical type to the adapter's SQL type.
-     *
-     * @param \Migrations\Db\Literal|string $type Type
-     * @param int|null $limit Limit
-     * @return array
-     */
-    public function getSqlType(Literal|string $type, ?int $limit = null): array;
 
     /**
      * Creates a new database.

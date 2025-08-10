@@ -1628,30 +1628,6 @@ PCRE_PATTERN;
     }
 
     /**
-     * {@inheritDoc}
-     *
-     * @throws \Migrations\Db\Adapter\UnsupportedColumnTypeException
-     */
-    public function getSqlType(Literal|string $type, ?int $limit = null): array
-    {
-        if ($type instanceof Literal) {
-            $name = $type;
-        } else {
-            $typeLC = strtolower($type);
-
-            if (isset(static::$supportedColumnTypes[$typeLC])) {
-                $name = static::$supportedColumnTypes[$typeLC];
-            } elseif (in_array($typeLC, static::$unsupportedColumnTypes, true)) {
-                throw new UnsupportedColumnTypeException('Column type "' . $type . '" is not supported by SQLite.');
-            } else {
-                throw new UnsupportedColumnTypeException('Column type "' . $type . '" is not known by SQLite.');
-            }
-        }
-
-        return ['name' => $name, 'limit' => $limit];
-    }
-
-    /**
      * @inheritDoc
      */
     public function createDatabase(string $name, array $options = []): void

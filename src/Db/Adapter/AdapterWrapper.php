@@ -15,7 +15,6 @@ use Cake\Database\Query\DeleteQuery;
 use Cake\Database\Query\InsertQuery;
 use Cake\Database\Query\SelectQuery;
 use Cake\Database\Query\UpdateQuery;
-use Migrations\Db\Literal;
 use Migrations\Db\Table\Column;
 use Migrations\Db\Table\Table;
 use Migrations\MigrationInterface;
@@ -363,14 +362,6 @@ abstract class AdapterWrapper implements WrapperInterface
     public function hasForeignKey(string $tableName, $columns, ?string $constraint = null): bool
     {
         return $this->getAdapter()->hasForeignKey($tableName, $columns, $constraint);
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function getSqlType(Literal|string $type, ?int $limit = null): array
-    {
-        return $this->getAdapter()->getSqlType($type, $limit);
     }
 
     /**

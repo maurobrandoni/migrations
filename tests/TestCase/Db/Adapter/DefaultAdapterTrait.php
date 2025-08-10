@@ -4,7 +4,6 @@ declare(strict_types=1);
 namespace Migrations\Test\TestCase\Db\Adapter;
 
 use Migrations\Db\AlterInstructions;
-use Migrations\Db\Literal;
 use Migrations\Db\Table\Column;
 use Migrations\Db\Table\ForeignKey;
 use Migrations\Db\Table\Index;
@@ -80,11 +79,6 @@ trait DefaultAdapterTrait
     public function hasForeignKey(string $tableName, array|string $columns, ?string $constraint = null): bool
     {
         return false;
-    }
-
-    public function getSqlType(Literal|string $type, ?int $limit = null): array
-    {
-        return [];
     }
 
     public function createDatabase(string $name, array $options = []): void
