@@ -39,21 +39,6 @@ class MysqlAdapter extends AbstractAdapter
         self::PHINX_TYPE_MEDIUM_INTEGER,
     ];
 
-    /**
-     * @var bool[]
-     */
-    protected array $signedColumnTypes = [
-        self::PHINX_TYPE_INTEGER => true,
-        self::PHINX_TYPE_TINY_INTEGER => true,
-        self::PHINX_TYPE_SMALL_INTEGER => true,
-        self::PHINX_TYPE_MEDIUM_INTEGER => true,
-        self::PHINX_TYPE_BIG_INTEGER => true,
-        self::PHINX_TYPE_FLOAT => true,
-        self::PHINX_TYPE_DECIMAL => true,
-        self::PHINX_TYPE_DOUBLE => true,
-        self::PHINX_TYPE_BOOLEAN => true,
-    ];
-
     // These constants roughly correspond to the maximum allowed value for each field,
     // except for the `_LONG` and `_BIG` variants, which are maxed at 32-bit
     // PHP_INT_MAX value. The `INT_REGULAR` field is just arbitrarily half of INT_BIG

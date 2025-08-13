@@ -42,16 +42,6 @@ class SqlserverAdapter extends AbstractAdapter
     protected string $schema = 'dbo';
 
     /**
-     * @var bool[]
-     */
-    protected array $signedColumnTypes = [
-        self::PHINX_TYPE_INTEGER => true,
-        self::PHINX_TYPE_BIG_INTEGER => true,
-        self::PHINX_TYPE_FLOAT => true,
-        self::PHINX_TYPE_DECIMAL => true,
-    ];
-
-    /**
      * Quotes a schema name for use in a query.
      *
      * @param string $schemaName Schema Name

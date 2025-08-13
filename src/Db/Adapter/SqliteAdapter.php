@@ -61,62 +61,6 @@ class SqliteAdapter extends AbstractAdapter
     ];
 
     /**
-     * List of aliases of supported column types
-     *
-     * @var string[]
-     */
-    protected static array $supportedColumnTypeAliases = [
-        'varchar' => self::PHINX_TYPE_STRING,
-        'tinyint' => self::PHINX_TYPE_TINY_INTEGER,
-        'tinyinteger' => self::PHINX_TYPE_TINY_INTEGER,
-        'smallint' => self::PHINX_TYPE_SMALL_INTEGER,
-        'int' => self::PHINX_TYPE_INTEGER,
-        'mediumint' => self::PHINX_TYPE_INTEGER,
-        'mediuminteger' => self::PHINX_TYPE_INTEGER,
-        'bigint' => self::PHINX_TYPE_BIG_INTEGER,
-        'tinytext' => self::PHINX_TYPE_TEXT,
-        'mediumtext' => self::PHINX_TYPE_TEXT,
-        'longtext' => self::PHINX_TYPE_TEXT,
-        'tinyblob' => self::PHINX_TYPE_BLOB,
-        'mediumblob' => self::PHINX_TYPE_BLOB,
-        'longblob' => self::PHINX_TYPE_BLOB,
-        'real' => self::PHINX_TYPE_FLOAT,
-    ];
-
-    /**
-     * List of known but unsupported Phinx column types
-     *
-     * @var string[]
-     */
-    protected static array $unsupportedColumnTypes = [
-        self::PHINX_TYPE_BIT,
-        self::PHINX_TYPE_CIDR,
-        self::PHINX_TYPE_ENUM,
-        self::PHINX_TYPE_FILESTREAM,
-        self::PHINX_TYPE_GEOMETRY,
-        self::PHINX_TYPE_INET,
-        self::PHINX_TYPE_INTERVAL,
-        self::PHINX_TYPE_LINESTRING,
-        self::PHINX_TYPE_MACADDR,
-        self::PHINX_TYPE_POINT,
-        self::PHINX_TYPE_POLYGON,
-        self::PHINX_TYPE_SET,
-    ];
-
-    /**
-     * @var string[]
-     */
-    protected array $definitionsWithLimits = [
-        'CHAR',
-        'CHARACTER',
-        'VARCHAR',
-        'VARYING CHARACTER',
-        'NCHAR',
-        'NATIVE CHARACTER',
-        'NVARCHAR',
-    ];
-
-    /**
      * @var string
      */
     protected string $suffix = '.sqlite3';
