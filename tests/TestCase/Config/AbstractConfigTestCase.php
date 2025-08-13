@@ -39,19 +39,9 @@ abstract class AbstractConfigTestCase extends TestCase
         ];
 
         return [
-            'default' => [
-                'paths' => [
-                    'migrations' => '%%PHINX_CONFIG_PATH%%/testmigrations2',
-                    'seeds' => '%%PHINX_CONFIG_PATH%%/db/seeds',
-                ],
-            ],
             'paths' => [
                 'migrations' => $this->getMigrationPath(),
                 'seeds' => $this->getSeedPath(),
-            ],
-            'templates' => [
-                'file' => '%%PHINX_CONFIG_PATH%%/tpl/testtemplate.txt',
-                'class' => '%%PHINX_CONFIG_PATH%%/tpl/testtemplate.php',
             ],
             'environment' => $adapter,
         ];

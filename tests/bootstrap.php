@@ -122,10 +122,6 @@ Plugin::getCollection()
     ->add(new SimpleSnapshotPlugin())
     ->add(new TestBlogPlugin());
 
-if (!defined('PHINX_VERSION')) {
-    define('PHINX_VERSION', strpos('@PHINX_VERSION@', '@PHINX_VERSION') === 0 ? 'UNKNOWN' : '@PHINX_VERSION@');
-}
-
 // Create test database schema
 if (env('FIXTURE_SCHEMA_METADATA')) {
     $loader = new SchemaLoader();
