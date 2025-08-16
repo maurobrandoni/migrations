@@ -16,7 +16,6 @@ use Cake\Database\Query\InsertQuery;
 use Cake\Database\Query\SelectQuery;
 use Cake\Database\Query\UpdateQuery;
 use Cake\Database\Schema\TableSchemaInterface;
-use Migrations\Db\Literal;
 use Migrations\Db\Table\Column;
 use Migrations\Db\Table\Table;
 use Migrations\MigrationInterface;
