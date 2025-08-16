@@ -95,6 +95,7 @@ class ManagerFactory
                 ConnectionManager::setConfig($connectionName, $connectionConfig);
             }
         } else {
+            /** @var array<string, string> $connectionConfig */
             $connectionConfig = ConnectionManager::getConfig($connectionName);
         }
         if (!$connectionConfig) {
@@ -104,7 +105,6 @@ class ManagerFactory
             throw new RuntimeException("The `{$connectionName}` connection has no `database` key defined.");
         }
 
-        /** @var array<string, string> $connectionConfig */
         $adapter = $connectionConfig['scheme'] ?? null;
         $adapterConfig = [
             'adapter' => $adapter,

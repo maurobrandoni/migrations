@@ -25,6 +25,7 @@ use Cake\Datasource\ConnectionManager;
 use Cake\Event\Event;
 use Cake\Event\EventManager;
 use Migrations\Migration\ManagerFactory;
+use Migrations\Util\TableFinder;
 use Migrations\Util\UtilTrait;
 
 /**
@@ -542,7 +543,19 @@ class BakeMigrationDiffCommand extends BakeSimpleMigrationCommand
         assert($connection instanceof Connection);
         $connection->cacheMetadata(false);
         $collection = $connection->getSchemaCollection();
-        foreach ($this->tables as $table) {
+
+        // Filter tables based on plugin option
+        $tablesToDescribe = $this->tables;
+        if ($this->plugin) {
+            $tableFinder = new TableFinder($this->connection);
+            $options = [
+                'plugin' => $this->plugin,
+                'require-table' => true,
+            ];
+            $tablesToDescribe = $tableFinder->getTablesToBake($collection, $options);
+        }
+
+        foreach ($tablesToDescribe as $table) {
             if (preg_match('/^.*phinxlog$/', $table) === 1) {
                 continue;
             }
@@ -577,6 +590,9 @@ class BakeMigrationDiffCommand extends BakeSimpleMigrationCommand
         )->addArgument('name', [
             'help' => 'Name of the migration to bake. Can use Plugin.name to bake migration files into plugins.',
             'required' => true,
+        ])->addOption('generate-only', [
+            'help' => 'Only generate the migration file without marking it as applied',
+            'boolean' => true,
         ]);
 
         return $parser;
