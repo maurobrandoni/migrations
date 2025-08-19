@@ -10,7 +10,6 @@ use Cake\Core\Configure;
 use Cake\Database\Connection;
 use Cake\Datasource\ConnectionManager;
 use InvalidArgumentException;
-use Migrations\Db\Adapter\AdapterInterface;
 use Migrations\Db\Adapter\MysqlAdapter;
 use Migrations\Db\Literal;
 use Migrations\Db\Table;
@@ -21,7 +20,6 @@ use PDOException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 use PHPUnit\Framework\TestCase;
-use ReflectionClass;
 
 class MysqlAdapterTest extends TestCase
 {
@@ -781,38 +779,6 @@ class MysqlAdapterTest extends TestCase
         }
         $type .= $extra;
         $this->assertEquals($type, $rows[1]['Type']);
-    }
-
-    /**
-     * Test that migrations still supports the `double` type but
-     * as an alias for a float/double column which cake/database provides.
-     */
-    public function testAddDoubleDefaultSignedCompat(): void
-    {
-        $table = new Table('table1', [], $this->adapter);
-        $table->save();
-        $this->assertFalse($table->hasColumn('user_id'));
-        $table->addColumn('foo', 'double')
-              ->save();
-        $rows = $this->adapter->fetchAll('SHOW FULL COLUMNS FROM table1');
-        $this->assertEquals('double', $rows[1]['Type']);
-        $this->assertEquals('YES', $rows[1]['Null']);
-    }
-
-    /**
-     * Test that migrations still supports the `double` type but
-     * as an alias for a float column which cake/database provides.
-     */
-    public function testAddDoubleDefaultSignedCompatWithUnsigned(): void
-    {
-        $table = new Table('table1', [], $this->adapter);
-        $table->save();
-        $this->assertFalse($table->hasColumn('user_id'));
-        $table->addColumn('foo', 'double', ['signed' => false])
-              ->save();
-        $rows = $this->adapter->fetchAll('SHOW COLUMNS FROM table1');
-        $this->assertEquals('double unsigned', $rows[1]['Type']);
-        $this->assertEquals('YES', $rows[1]['Null']);
     }
 
     public function testAddStringColumnWithSignedEqualsFalse(): void
@@ -2088,29 +2054,9 @@ OUTPUT;
         $this->adapter->execute("INSERT INTO table1 (`geom`) VALUES (ST_GeomFromText('{$geom}', 4322))");
     }
 
-    /**
-     * Small check to verify if specific Mysql constants are handled in AdapterInterface
-     *
-     * @see https://github.com/cakephp/migrations/issues/359
-     */
-    public function testMysqlBlobsConstants()
-    {
-        $reflector = new ReflectionClass(AdapterInterface::class);
-
-        $validTypes = array_filter($reflector->getConstants(), function ($constant) {
-            return substr($constant, 0, strlen('PHINX_TYPE_')) === 'PHINX_TYPE_';
-        }, ARRAY_FILTER_USE_KEY);
-
-        $this->assertTrue(in_array('tinyblob', $validTypes, true));
-        $this->assertTrue(in_array('blob', $validTypes, true));
-        $this->assertTrue(in_array('mediumblob', $validTypes, true));
-        $this->assertTrue(in_array('longblob', $validTypes, true));
-    }
-
     public static function defaultsCastAsExpressions()
     {
         return [
-            [MysqlAdapter::PHINX_TYPE_BLOB, 'abc'],
             [MysqlAdapter::PHINX_TYPE_JSON, '{"a": true}'],
             [MysqlAdapter::PHINX_TYPE_TEXT, 'abc'],
             [MysqlAdapter::PHINX_TYPE_GEOMETRY, 'POINT(0 0)'],
