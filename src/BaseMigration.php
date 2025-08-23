@@ -256,7 +256,7 @@ class BaseMigration implements MigrationInterface
      * Queries executed through the query builder are always sent to the database, regardless of
      * the dry-run settings.
      *
-     * @see https://api.cakephp.org/3.6/class-Cake.Database.Query.html
+     * @see https://api.cakephp.org/5.2/class-Cake.Database.Query.html
      * @param string $type Query
      * @return \Cake\Database\Query
      */
