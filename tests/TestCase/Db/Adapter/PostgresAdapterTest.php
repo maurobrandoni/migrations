@@ -653,6 +653,19 @@ class PostgresAdapterTest extends TestCase
         }
     }
 
+    /**
+     * Test that shims from PHINX_TYPE_JSONB to 'json' type work.
+     */
+    public function testAddColumnJsonbCompat()
+    {
+        $table = new Table('table1', [], $this->adapter);
+        $table->save();
+        $this->assertFalse($table->hasColumn('config'));
+        $table->addColumn('config', 'jsonb')
+              ->save();
+        $this->assertTrue($table->hasColumn('config'));
+    }
+
     public static function providerAddColumnIdentity(): array
     {
         return [
