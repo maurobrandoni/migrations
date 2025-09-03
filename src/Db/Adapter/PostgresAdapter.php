@@ -220,6 +220,10 @@ class PostgresAdapter extends AbstractAdapter
         ) {
             $data['type'] = 'timestamptimezone';
         }
+        // CakePHP only has a json type (which uses the JSONB storage type)
+        if ($data['type'] === self::PHINX_TYPE_JSONB) {
+            $data['type'] = 'json';
+        }
 
         return $data;
     }
