@@ -9,8 +9,8 @@ declare(strict_types=1);
 namespace Migrations\Db\Table;
 
 use Cake\Core\Configure;
-use Cake\Database\Schema\TableSchemaInterface;
 use Cake\Database\Expression\QueryExpression;
+use Cake\Database\Schema\TableSchemaInterface;
 use Migrations\Db\Adapter\AdapterInterface;
 use Migrations\Db\Adapter\PostgresAdapter;
 use Migrations\Db\Literal;
