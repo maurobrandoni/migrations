@@ -44,18 +44,11 @@ class AddColumnIndexFk extends BaseMigration
                 'unique' => false,
             ]);
 
-        if ($this->getAdapter()->getConnection()->getAttribute(\PDO::ATTR_DRIVER_NAME) === 'sqlite') {
-            $table->addForeignKey('user_id', 'users', 'id', [
-                'update' => ForeignKey::NO_ACTION,
-                'delete' => ForeignKey::NO_ACTION,
-            ]);
-        } else {
-            $table->addForeignKey('user_id', 'users', 'id', [
-                'constraint' => 'statuses_users_id',
-                'update' => ForeignKey::NO_ACTION,
-                'delete' => ForeignKey::NO_ACTION,
-            ]);
-        }
+        $table->addForeignKey('user_id', 'users', 'id', [
+            'constraint' => 'statuses_users_id',
+            'update' => ForeignKey::NO_ACTION,
+            'delete' => ForeignKey::NO_ACTION,
+        ]);
 
         $table->update();
     }

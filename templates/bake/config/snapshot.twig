@@ -35,6 +35,7 @@ class {{ name }} extends BaseMigration
      *
      * More information on this method is available here:
      * https://book.cakephp.org/migrations/5/en/migrations.html#the-up-method
+     *
      * @return void
      */
     public function up(): void
@@ -51,25 +52,26 @@ class {{ name }} extends BaseMigration
      *
      * More information on this method is available here:
      * https://book.cakephp.org/migrations/5/en/migrations.html#the-down-method
+     *
      * @return void
      */
     public function down(): void
     {
-{%  set returnedData = Migration.getReturnedData() %}
-{%  if returnedData and returnedData['dropForeignKeys'] is not empty %}
-{%      for table, columnsList in Migration.returnedData['dropForeignKeys'] %}
-{%          set maxKey = columnsList|length - 1 %}
+{%~ set returnedData = Migration.getReturnedData() %}
+{%~ if returnedData and returnedData['dropForeignKeys'] is not empty %}
+    {%~ for table, columnsList in Migration.returnedData['dropForeignKeys'] %}
+        {%~ set maxKey = columnsList|length - 1 %}
         $this->table('{{ table }}')
-{%          for key, columns in columnsList %}
+        {%~ for key, columns in columnsList %}
             ->dropForeignKey(
                 {{ columns|raw }}
             ){{ (key == maxKey) ? '->save();' : '' }}
-{%          endfor %}
+        {%~ endfor %}
 
-{%      endfor %}
-{%  endif %}
-{%      for table in tables %}
+    {%~ endfor %}
+{% endif %}
+{% for table in tables %}
         $this->table('{{ table }}')->drop()->save();
-{%      endfor %}
+{% endfor %}
     }
 }

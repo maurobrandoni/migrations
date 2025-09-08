@@ -145,6 +145,7 @@ class ManagerTest extends TestCase
             'pass' => $connectionConfig['password'],
             'host' => $connectionConfig['host'],
             'name' => $connectionConfig['database'],
+            'database' => $connectionConfig['database'],
         ];
 
         $configArray['environment'] = $adapterConfig;
@@ -161,6 +162,9 @@ class ManagerTest extends TestCase
             $adapter->createDatabase($adapterConfig['name']);
         }
         $adapter->disconnect();
+
+        // Recreate the migration state table.
+        $adapter->createSchemaTable();
 
         return $adapter;
     }
@@ -2459,7 +2463,9 @@ class ManagerTest extends TestCase
 
     public function testReversibleMigrationsWorkAsExpected(): void
     {
-        $this->markTestIncomplete('Need to finish updating adapters to use Connection');
+        if ($this->getDriverType() === 'sqlite') {
+            $this->markTestSkipped('Test is not compatible with sqlite');
+        }
         $adapter = $this->prepareEnvironment([
             'migrations' => ROOT . '/config/Reversiblemigrations',
         ]);
@@ -2503,7 +2509,6 @@ class ManagerTest extends TestCase
 
     public function testReversibleMigrationWithIndexConflict(): void
     {
-        $this->markTestIncomplete('Need to finish updating adapters to use Connection');
         if ($this->getDriverType() !== 'mysql') {
             $this->markTestSkipped('Test requires mysql connection');
         }
@@ -2520,6 +2525,7 @@ class ManagerTest extends TestCase
         $adapter->dropDatabase($dbName);
         $adapter->createDatabase($dbName);
         $adapter->disconnect();
+        $adapter->createSchemaTable();
 
         // migrate to the latest version
         $this->manager->setConfig($config);
@@ -2544,7 +2550,6 @@ class ManagerTest extends TestCase
 
     public function testReversibleMigrationWithFKConflictOnTableDrop(): void
     {
-        $this->markTestIncomplete('Need to finish updating adapters to use Connection');
         if ($this->getDriverType() !== 'mysql') {
             $this->markTestSkipped('Test requires mysql');
         }
@@ -2561,6 +2566,7 @@ class ManagerTest extends TestCase
         $adapter->dropDatabase($dbName);
         $adapter->createDatabase($dbName);
         $adapter->disconnect();
+        $adapter->createSchemaTable();
 
         // migrate to the latest version
         $this->manager->setConfig($config);
@@ -2590,7 +2596,6 @@ class ManagerTest extends TestCase
 
     public function testBreakpointsTogglingOperateAsExpected(): void
     {
-        $this->markTestIncomplete('Need to finish updating adapters to use Connection');
         if ($this->getDriverType() !== 'mysql') {
             $this->markTestSkipped('Test requires mysql');
         }
@@ -2605,6 +2610,7 @@ class ManagerTest extends TestCase
         $adapter->dropDatabase($dbName);
         $adapter->createDatabase($dbName);
         $adapter->disconnect();
+        $adapter->createSchemaTable();
 
         // migrate to the latest version
         $this->manager->setConfig($config);
@@ -2760,7 +2766,6 @@ class ManagerTest extends TestCase
 
     public function testBreakpointWithInvalidVersion(): void
     {
-        $this->markTestIncomplete('Need to finish updating adapters to use Connection');
         if ($this->getDriverType() !== 'mysql') {
             $this->markTestSkipped('test requires mysql');
         }
@@ -2775,17 +2780,16 @@ class ManagerTest extends TestCase
         $adapter->dropDatabase($dbName);
         $adapter->createDatabase($dbName);
         $adapter->disconnect();
+        $adapter->createSchemaTable();
 
         // migrate to the latest version
         $this->manager->setConfig($config);
         $this->manager->migrate();
-        $this->manager->getOutput()->setDecorated(false);
 
         // set breakpoint on most recent migration
         $this->manager->toggleBreakpoint(999);
 
-        rewind($this->manager->getOutput()->getStream());
-        $output = stream_get_contents($this->manager->getOutput()->getStream());
+        $output = implode("\n", $this->out->messages());
 
         $this->assertStringContainsString('is not a valid version', $output);
     }
@@ -2915,7 +2919,6 @@ class ManagerTest extends TestCase
 
     public function testMigrationWillNotBeExecuted(): void
     {
-        $this->markTestIncomplete('Need to finish updating adapters to use Connection');
         if ($this->getDriverType() !== 'mysql') {
             $this->markTestSkipped('Test requires mysql');
         }
