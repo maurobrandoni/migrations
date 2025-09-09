@@ -35,6 +35,7 @@ class PostgresAdapter extends AbstractAdapter
      */
     protected static array $specificColumnTypes = [
         self::PHINX_TYPE_JSON,
+        self::PHINX_TYPE_JSONB,
         self::PHINX_TYPE_CIDR,
         self::PHINX_TYPE_INET,
         self::PHINX_TYPE_MACADDR,
@@ -454,6 +455,8 @@ class PostgresAdapter extends AbstractAdapter
         $columnSql = $dialect->columnDefinitionSql($this->mapColumnData($newColumn->toArray()));
         // Remove the column name from $columnSql
         $columnType = preg_replace('/^"?(?:[^"]+)"?\s+/', '', $columnSql);
+        // Remove generated clause
+        $columnType = preg_replace('/GENERATED (?:ALWAYS|BY DEFAULT) AS IDENTITY/', '', $columnType);
 
         $sql = sprintf(
             'ALTER COLUMN %s TYPE %s',
