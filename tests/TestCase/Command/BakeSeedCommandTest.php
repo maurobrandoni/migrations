@@ -84,6 +84,27 @@ class BakeSeedCommandTest extends TestCase
     }
 
     /**
+     * Test using an application template
+     *
+     * @return void
+     */
+    public function testBakeWithApplicationTemplate()
+    {
+        copy(
+            ROOT . '/App/Template/plugin/Migrations/bake/Seed/custom-seed.twig',
+            ROOT . '/App/Template/plugin/Migrations/bake/Seed/seed.twig',
+        );
+        $this->generatedFiles[] = ROOT . '/config/Seeds/ArticlesSeed.php';
+        $this->generatedFiles[] = ROOT . '/App/Template/plugin/Migrations/bake/Seed/seed.twig';
+
+        $this->exec('bake seed Articles --connection test');
+
+        $this->assertExitCode(BaseCommand::CODE_SUCCESS);
+        $result = file_get_contents($this->generatedFiles[0]);
+        $this->assertSameAsFile(__FUNCTION__ . '.php', $result);
+    }
+
+    /**
      * Test with data, all fields, no limit
      *
      * @return void
