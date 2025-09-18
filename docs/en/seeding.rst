@@ -2,12 +2,11 @@ Database Seeding
 ################
 
 Seed classes are a great way to easily fill your database with data after
-it's created. By default, they are stored in the `seeds` directory; however, this
-path can be changed in your configuration file.
+it's created. By default, they are stored in the ``config/Seeds`` directory.
 
 .. note::
 
-    Database seeding is entirely optional, and Migrations does not create a `Seeds`
+    Database seeding is entirely optional, and Migrations does not create a Seeds
     directory by default.
 
 Creating a New Seed Class
@@ -79,6 +78,22 @@ include as a comma separated value string:
 
     Of course you can use both the ``--limit`` and ``--fields`` options in the
     same command call.
+
+.. _custom-seed-migration-templates:
+
+Customizing Seed and Migration templates
+----------------------------------------
+
+Because migrations uses `bake <https://book.cakephp.org/bake>`__ under the hood
+you can customize the templates that migrations uses for creating seeds and
+migrations by creating templates in your application. Custom templates for
+migrations should be on one of the following paths:
+
+- ``ROOT/templates/plugin/Migrations/bake/``
+- ``ROOT/templates/bake/``
+
+For example the seed template is ``Seed/seed.twig`` and its full path would be
+**ROOT/templates/plugin/Migrations/bake/Seed/seed.twig**
 
 The BaseSeed Class
 ==================
