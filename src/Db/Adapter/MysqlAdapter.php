@@ -121,19 +121,12 @@ class MysqlAdapter extends AbstractAdapter
     protected function hasTableWithSchema(string $schema, string $tableName): bool
     {
         $dialect = $this->getSchemaDialect();
-        [$query, $params] = $dialect->listTablesSql(['database' => $schema]);
 
         try {
-            $statement = $this->query($query, $params);
-        } catch (QueryException $e) {
+            return $dialect->hasTable($tableName, $schema);
+        } catch (QueryException) {
             return false;
         }
-        $tables = [];
-        foreach ($statement->fetchAll() as $row) {
-            $tables[] = $row[0];
-        }
-
-        return in_array($tableName, $tables, true);
     }
 
     /**
@@ -443,14 +436,9 @@ class MysqlAdapter extends AbstractAdapter
      */
     public function hasColumn(string $tableName, string $columnName): bool
     {
-        $rows = $this->fetchAll(sprintf('SHOW COLUMNS FROM %s', $this->quoteTableName($tableName)));
-        foreach ($rows as $column) {
-            if (strcasecmp($column['Field'], $columnName) === 0) {
-                return true;
-            }
-        }
+        $dialect = $this->getSchemaDialect();
 
-        return false;
+        return $dialect->hasColumn($tableName, $columnName);
     }
 
     /**
@@ -578,43 +566,6 @@ class MysqlAdapter extends AbstractAdapter
     /**
      * @inheritDoc
      */
-    public function hasIndex(string $tableName, string|array $columns): bool
-    {
-        if (is_string($columns)) {
-            $columns = [$columns]; // str to array
-        }
-
-        $columns = array_map('strtolower', $columns);
-        $indexes = $this->getIndexes($tableName);
-
-        foreach ($indexes as $index) {
-            if ($columns == $index['columns']) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function hasIndexByName(string $tableName, string $indexName): bool
-    {
-        $indexes = $this->getIndexes($tableName);
-
-        foreach ($indexes as $index) {
-            if ($index['name'] === $indexName) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * @inheritDoc
-     */
     protected function getAddIndexInstructions(Table $table, Index $index): AlterInstructions
     {
         $instructions = new AlterInstructions();
@@ -735,28 +686,6 @@ class MysqlAdapter extends AbstractAdapter
         }
 
         return $primaryKey;
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function hasForeignKey(string $tableName, $columns, ?string $constraint = null): bool
-    {
-        $foreignKeys = $this->getForeignKeys($tableName);
-        $names = array_map(fn($key) => $key['name'], $foreignKeys);
-        if ($constraint) {
-            return in_array($constraint, $names, true);
-        }
-
-        $columns = array_map('mb_strtolower', (array)$columns);
-
-        foreach ($foreignKeys as $key) {
-            if (array_map('mb_strtolower', $key['columns']) === $columns) {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     /**

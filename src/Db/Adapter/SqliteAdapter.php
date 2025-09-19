@@ -544,20 +544,6 @@ PCRE_PATTERN;
     /**
      * @inheritDoc
      */
-    public function hasColumn(string $tableName, string $columnName): bool
-    {
-        foreach ($this->getColumnData($tableName) as $column) {
-            if (strcasecmp($column['name'], $columnName) === 0) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * @inheritDoc
-     */
     protected function getAddColumnInstructions(Table $table, Column $column): AlterInstructions
     {
         $tableName = $table->getName();
@@ -682,6 +668,7 @@ PCRE_PATTERN;
             $state['triggers'] = [];
 
             $params = [$tableName];
+            // TODO use cakephp/database SelectQuery here
             $rows = $this->query(
                 "SELECT *
                 FROM sqlite_master
@@ -1213,31 +1200,6 @@ PCRE_PATTERN;
     /**
      * @inheritDoc
      */
-    public function hasIndex(string $tableName, string|array $columns): bool
-    {
-        return (bool)$this->resolveIndex($tableName, $columns);
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function hasIndexByName(string $tableName, string $indexName): bool
-    {
-        $indexName = strtolower($indexName);
-        $indexes = $this->getIndexes($tableName);
-
-        foreach ($indexes as $index) {
-            if ($indexName === strtolower($index['name'])) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * @inheritDoc
-     */
     protected function getAddIndexInstructions(Table $table, Index $index): AlterInstructions
     {
         $indexColumnArray = [];
@@ -1352,25 +1314,6 @@ PCRE_PATTERN;
         }
 
         return [];
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function hasForeignKey(string $tableName, $columns, ?string $constraint = null): bool
-    {
-        $columns = array_map('mb_strtolower', (array)$columns);
-
-        foreach ($this->getForeignKeys($tableName) as $key) {
-            if ($constraint !== null && $key['name'] == $constraint) {
-                return true;
-            }
-            if (array_map('mb_strtolower', $key['columns']) === $columns) {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     /**

@@ -69,15 +69,10 @@ class SqlserverAdapter extends AbstractAdapter
         if ($this->hasCreatedTable($tableName)) {
             return true;
         }
+        $parts = $this->getSchemaName($tableName);
         $dialect = $this->getSchemaDialect();
 
-        $parts = $this->getSchemaName($tableName);
-        [$query, $params] = $dialect->listTablesSql(['schema' => $parts['schema']]);
-
-        $rows = $this->query($query, $params)->fetchAll();
-        $tables = array_column($rows, 0);
-
-        return in_array($parts['table'], $tables, true);
+        return $dialect->hasTable($tableName, $parts['schema']);
     }
 
     /**
@@ -350,21 +345,6 @@ class SqlserverAdapter extends AbstractAdapter
     /**
      * @inheritDoc
      */
-    public function hasColumn(string $tableName, string $columnName): bool
-    {
-        $parts = $this->getSchemaName($tableName);
-        $sql = "SELECT count(*) as [count]
-             FROM INFORMATION_SCHEMA.COLUMNS
-             WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?";
-        /** @var array<string, mixed> $result */
-        $result = $this->query($sql, [$parts['schema'], $parts['table'], $columnName])->fetch('assoc');
-
-        return $result['count'] > 0;
-    }
-
-    /**
-     * @inheritDoc
-     */
     protected function getAddColumnInstructions(Table $table, Column $column): AlterInstructions
     {
         $dialect = $this->getSchemaDialect();
@@ -589,44 +569,6 @@ ORDER BY IC.[key_ordinal]';
     /**
      * @inheritDoc
      */
-    public function hasIndex(string $tableName, string|array $columns): bool
-    {
-        if (is_string($columns)) {
-            $columns = [$columns]; // str to array
-        }
-
-        $columns = array_map('strtolower', $columns);
-        $indexes = $this->getIndexes($tableName);
-
-        foreach ($indexes as $index) {
-            $a = array_diff($columns, $index['columns']);
-            if (!$a) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function hasIndexByName(string $tableName, string $indexName): bool
-    {
-        $indexes = $this->getIndexes($tableName);
-
-        foreach ($indexes as $index) {
-            if ($index['name'] === $indexName) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * @inheritDoc
-     */
     protected function getAddIndexInstructions(Table $table, Index $index): AlterInstructions
     {
         $sql = $this->getIndexSqlDefinition($index, $table->getName());
@@ -732,35 +674,6 @@ ORDER BY IC.[key_ordinal]';
         }
 
         return $primaryKey;
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function hasForeignKey(string $tableName, $columns, ?string $constraint = null): bool
-    {
-        $foreignKeys = $this->getForeignKeys($tableName);
-        if ($constraint) {
-            foreach ($foreignKeys as $key) {
-                if ($key['name'] === $constraint) {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        if (is_string($columns)) {
-            $columns = [$columns];
-        }
-
-        foreach ($foreignKeys as $key) {
-            if ($key['columns'] === $columns) {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     /**

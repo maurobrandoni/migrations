@@ -105,12 +105,8 @@ class PostgresAdapter extends AbstractAdapter
         $tableName = $parts['table'];
 
         $dialect = $this->getSchemaDialect();
-        [$query, $params] = $dialect->listTablesSql(['schema' => $parts['schema']]);
 
-        $rows = $this->query($query, $params)->fetchAll();
-        $tables = array_column($rows, 0);
-
-        return in_array($tableName, $tables, true);
+        return $dialect->hasTable($tableName, $parts['schema']);
     }
 
     /**
@@ -364,24 +360,6 @@ class PostgresAdapter extends AbstractAdapter
     /**
      * @inheritDoc
      */
-    public function hasColumn(string $tableName, string $columnName): bool
-    {
-        $parts = $this->getSchemaName($tableName);
-        $connection = $this->getConnection();
-        $sql = 'SELECT count(*)
-            FROM information_schema.columns
-            WHERE table_schema = ? AND table_name = ? AND column_name = ?';
-
-        $result = $connection->execute($sql, [$parts['schema'], $parts['table'], $columnName]);
-        $row = $result->fetch('assoc');
-        $result->closeCursor();
-
-        return $row['count'] > 0;
-    }
-
-    /**
-     * @inheritDoc
-     */
     protected function getAddColumnInstructions(Table $table, Column $column): AlterInstructions
     {
         $dialect = $this->getSchemaDialect();
@@ -603,39 +581,6 @@ class PostgresAdapter extends AbstractAdapter
     /**
      * @inheritDoc
      */
-    public function hasIndex(string $tableName, string|array $columns): bool
-    {
-        if (is_string($columns)) {
-            $columns = [$columns];
-        }
-        $indexes = $this->getIndexes($tableName);
-        foreach ($indexes as $index) {
-            if (array_diff($index['columns'], $columns) === array_diff($columns, $index['columns'])) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function hasIndexByName(string $tableName, string $indexName): bool
-    {
-        $indexes = $this->getIndexes($tableName);
-        foreach ($indexes as $index) {
-            if ($index['name'] === $indexName || (isset($index['constraint']) && $index['constraint'] === $indexName)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * @inheritDoc
-     */
     protected function getAddIndexInstructions(Table $table, Index $index): AlterInstructions
     {
         $instructions = new AlterInstructions();
@@ -728,30 +673,6 @@ class PostgresAdapter extends AbstractAdapter
         }
 
         return ['constraint' => '', 'columns' => []];
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function hasForeignKey(string $tableName, $columns, ?string $constraint = null): bool
-    {
-        $foreignKeys = $this->getForeignKeys($tableName);
-        $names = array_column($foreignKeys, 'name');
-        if ($constraint) {
-            return in_array($constraint, $names);
-        }
-
-        if (is_string($columns)) {
-            $columns = [$columns];
-        }
-
-        foreach ($foreignKeys as $key) {
-            if ($key['columns'] === $columns) {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     /**
