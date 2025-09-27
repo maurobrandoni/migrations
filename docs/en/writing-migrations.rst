@@ -1631,6 +1631,11 @@ plan migrations when more than one table is involved.
             }
         }
 
+Changing templates
+------------------
+
+See :ref:`custom-seed-migration-templates` for how to customize the templates
+used to generate migrations.
 
 
 Using the Query Builder
