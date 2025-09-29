@@ -481,6 +481,24 @@ abstract class AbstractAdapter implements AdapterInterface, DirectActionInterfac
     }
 
     /**
+     * Execute a Query object. Handles logging and dry-run modes.
+     *
+     * @param \Cake\Database\Query $query The query to execute
+     * @return int The number of affected rows.
+     */
+    public function executeQuery(Query $query): int
+    {
+        $this->verboseLog($query->sql());
+
+        if ($this->isDryRunEnabled()) {
+            return 0;
+        }
+        $stmt = $query->execute();
+
+        return $stmt->rowCount();
+    }
+
+    /**
      * @inheritDoc
      */
     public function execute(string $sql, array $params = []): int
@@ -611,7 +629,6 @@ abstract class AbstractAdapter implements AdapterInterface, DirectActionInterfac
      */
     protected function generateInsertSql(TableMetadata $table, array $row): string
     {
-        // TODO use cakephp/database InsertQuery here.
         $sql = sprintf(
             'INSERT INTO %s ',
             $this->quoteTableName($table->getName()),
@@ -731,7 +748,6 @@ abstract class AbstractAdapter implements AdapterInterface, DirectActionInterfac
      */
     protected function generateBulkInsertSql(TableMetadata $table, array $rows): string
     {
-        // TODO use cakephp/database InsertQuery here.
         $sql = sprintf(
             'INSERT INTO %s ',
             $this->quoteTableName($table->getName()),
@@ -785,24 +801,25 @@ abstract class AbstractAdapter implements AdapterInterface, DirectActionInterfac
      */
     public function getVersionLog(): array
     {
-        $result = [];
-
-        // TODO use cakephp/database SelectQuery here.
         switch ($this->options['version_order']) {
             case Config::VERSION_ORDER_CREATION_TIME:
-                $orderBy = 'version ASC';
+                $orderBy = ['version' => 'ASC'];
                 break;
             case Config::VERSION_ORDER_EXECUTION_TIME:
-                $orderBy = 'start_time ASC, version ASC';
+                $orderBy = ['start_time' => 'ASC', 'version' => 'ASC'];
                 break;
             default:
                 throw new RuntimeException('Invalid version_order configuration option');
         }
+        $query = $this->getSelectBuilder();
+        $query->select('*')
+            ->from($this->getSchemaTableName())
+            ->orderBy($orderBy);
 
         // This will throw an exception if doing a --dry-run without any migrations as phinxlog
         // does not exist, so in that case, we can just expect to trivially return empty set
         try {
-            $rows = $this->fetchAll(sprintf('SELECT * FROM %s ORDER BY %s', $this->quoteTableName($this->getSchemaTableName()), $orderBy));
+            $rows = $query->execute()->fetchAll('assoc');
         } catch (PDOException $e) {
             if (!$this->isDryRunEnabled()) {
                 throw $e;
@@ -810,6 +827,7 @@ abstract class AbstractAdapter implements AdapterInterface, DirectActionInterfac
             $rows = [];
         }
 
+        $result = [];
         foreach ($rows as $version) {
             $result[(int)$version['version']] = $version;
         }
@@ -823,37 +841,24 @@ abstract class AbstractAdapter implements AdapterInterface, DirectActionInterfac
     public function migrated(MigrationInterface $migration, string $direction, string $startTime, string $endTime): AdapterInterface
     {
         if (strcasecmp($direction, MigrationInterface::UP) === 0) {
-            // TODO use cakephp/database InsertQuery here.
-            // up
-            $sql = sprintf(
-                'INSERT INTO %s (%s, %s, %s, %s, %s) VALUES (?, ?, ?, ?, ?);',
-                $this->quoteTableName($this->getSchemaTableName()),
-                $this->quoteColumnName('version'),
-                $this->quoteColumnName('migration_name'),
-                $this->quoteColumnName('start_time'),
-                $this->quoteColumnName('end_time'),
-                $this->quoteColumnName('breakpoint'),
-            );
-            $params = [
-                $migration->getVersion(),
-                substr($migration->getName(), 0, 100),
-                $startTime,
-                $endTime,
-                $this->castToBool(false),
-            ];
-
-            $this->execute($sql, $params);
+            $query = $this->getInsertBuilder();
+            $query->insert(['version', 'migration_name', 'start_time', 'end_time', 'breakpoint'])
+                ->into($this->getSchemaTableName())
+                ->values([
+                    'version' => (string)$migration->getVersion(),
+                    'migration_name' => substr($migration->getName(), 0, 100),
+                    'start_time' => $startTime,
+                    'end_time' => $endTime,
+                    'breakpoint' => 0,
+                ]);
+            $this->executeQuery($query);
         } else {
-            // TODO use cakephp/database DeleteQuery here.
             // down
-            $sql = sprintf(
-                'DELETE FROM %s WHERE %s = ?',
-                $this->quoteTableName($this->getSchemaTableName()),
-                $this->quoteColumnName('version'),
-            );
-            $params = [$migration->getVersion()];
-
-            $this->execute($sql, $params);
+            $query = $this->getDeleteBuilder();
+            $query->delete()
+                ->from($this->getSchemaTableName())
+                ->where(['version' => $migration->getVersion()]);
+            $this->executeQuery($query);
         }
 
         return $this;
@@ -886,16 +891,17 @@ abstract class AbstractAdapter implements AdapterInterface, DirectActionInterfac
      */
     public function resetAllBreakpoints(): int
     {
-        // TODO use cakephp/database UpdateQuery here.
-        return $this->execute(
-            sprintf(
-                'UPDATE %1$s SET %2$s = %3$s, %4$s = %4$s WHERE %2$s <> %3$s;',
-                $this->quoteTableName($this->getSchemaTableName()),
-                $this->quoteColumnName('breakpoint'),
-                $this->castToBool(false),
-                $this->quoteColumnName('start_time'),
-            ),
-        );
+        $query = $this->getUpdateBuilder();
+        $query->update($this->getSchemaTableName())
+            ->set([
+                'breakpoint' => 0,
+                'start_time' => $query->identifier('start_time'),
+            ])
+            ->where([
+                'breakpoint !=' => 0,
+            ]);
+
+        return $this->executeQuery($query);
     }
 
     /**
@@ -927,21 +933,16 @@ abstract class AbstractAdapter implements AdapterInterface, DirectActionInterfac
      */
     protected function markBreakpoint(MigrationInterface $migration, bool $state): AdapterInterface
     {
-        $params = [
-            $this->castToBool($state),
-            $migration->getVersion(),
-        ];
-        // TODO use cakephp/database UpdateQuery here.
-        $this->query(
-            sprintf(
-                'UPDATE %1$s SET %2$s = ?, %3$s = %3$s WHERE %4$s = ?;',
-                $this->quoteTableName($this->getSchemaTableName()),
-                $this->quoteColumnName('breakpoint'),
-                $this->quoteColumnName('start_time'),
-                $this->quoteColumnName('version'),
-            ),
-            $params,
-        );
+        $query = $this->getUpdateBuilder();
+        $query->update($this->getSchemaTableName())
+            ->set([
+                'breakpoint' => (int)$state,
+                'start_time' => $query->identifier('start_time'),
+            ])
+            ->where([
+                'version' => $migration->getVersion(),
+            ]);
+        $this->executeQuery($query);
 
         return $this;
     }
