@@ -11,6 +11,7 @@ namespace Migrations\Db\Adapter;
 use Cake\Core\Configure;
 use Cake\Database\Connection;
 use Cake\Database\Exception\QueryException;
+use Cake\Database\Schema\SchemaDialect;
 use Cake\Database\Schema\TableSchema;
 use InvalidArgumentException;
 use Migrations\Db\AlterInstructions;
@@ -231,8 +232,7 @@ class MysqlAdapter extends AbstractAdapter
         $sql = 'CREATE TABLE ';
         $sql .= $this->quoteTableName($table->getName()) . ' (';
         foreach ($columns as $column) {
-            $columnData = $this->mapColumnData($column->toArray());
-            $sql .= $dialect->columnDefinitionSql($columnData) . ', ';
+            $sql .= $this->columnDefinitionSql($dialect, $column) . ', ';
         }
 
         // set the primary key(s)
@@ -327,6 +327,38 @@ class MysqlAdapter extends AbstractAdapter
         }
 
         return $data;
+    }
+
+    /**
+     * Get the SQL fragment for a column definition.
+     *
+     * This method provides backwards compatibility for enum and set types
+     * as userland migrations use those types, but they are not supported
+     * in cakephp/database.
+     *
+     * @param \Cake\Database\Schema\SchemaDialect $dialect The dialect to use.
+     * @param \Migrations\Db\Table\Column $column The column to get the SQL for.
+     * @return string
+     */
+    protected function columnDefinitionSql(SchemaDialect $dialect, Column $column): string
+    {
+        $columnData = $column->toArray();
+        $deprecatedTypes = [self::PHINX_TYPE_ENUM, self::PHINX_TYPE_SET];
+        if (in_array($columnData['type'], $deprecatedTypes, true)) {
+            $sql = $this->quoteColumnName($columnData['name']) . ' ' . $columnData['type'];
+            $values = $column->getValues();
+            if ($values && is_array($values)) {
+                $sql .= '(' . implode(', ', array_map(function ($value) {
+                    // Special case NULL to trigger errors as it isn't allowed
+                    // in enum values.
+                    return $value === null ? 'NULL' : $this->quoteString($value);
+                }, $values)) . ')';
+            }
+
+            return $sql;
+        }
+
+        return $dialect->columnDefinitionSql($this->mapColumnData($columnData));
     }
 
     /**
@@ -502,7 +534,7 @@ class MysqlAdapter extends AbstractAdapter
         $dialect = $this->getSchemaDialect();
         $alter = sprintf(
             'ADD %s',
-            $dialect->columnDefinitionSql($this->mapColumnData($column->toArray())),
+            $this->columnDefinitionSql($dialect, $column),
         );
 
         $alter .= $this->afterClause($column);
@@ -585,7 +617,7 @@ class MysqlAdapter extends AbstractAdapter
         $alter = sprintf(
             'CHANGE %s %s%s',
             $this->quoteColumnName($columnName),
-            $dialect->columnDefinitionSql($this->mapColumnData($newColumn->toArray())),
+            $this->columnDefinitionSql($dialect, $newColumn),
             $this->afterClause($newColumn),
         );
 
