@@ -347,7 +347,7 @@ class MysqlAdapter extends AbstractAdapter
         if (in_array($columnData['type'], $deprecatedTypes, true)) {
             $sql = $this->quoteColumnName($columnData['name']) . ' ' . $columnData['type'];
             $values = $column->getValues();
-            if ($values && is_array($values)) {
+            if ($values) {
                 $sql .= '(' . implode(', ', array_map(function ($value) {
                     // Special case NULL to trigger errors as it isn't allowed
                     // in enum values.
