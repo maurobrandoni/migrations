@@ -496,6 +496,18 @@ class MysqlAdapterTest extends TestCase
         $this->assertFalse($this->adapter->hasColumn('ntable', 'address'));
     }
 
+    public function testCreateTableWithSetEnumTypes()
+    {
+        $table = new Table('enum_test', [], $this->adapter);
+        $table->addColumn('status', 'enum', ['values' => ['pending', 'active', 'archived']])
+              ->addColumn('kind', 'set', ['values' => ['a', 'b']])
+              ->save();
+
+        $this->assertTrue($this->adapter->hasTable('enum_test'));
+        $this->assertTrue($this->adapter->hasColumn('enum_test', 'status'));
+        $this->assertTrue($this->adapter->hasColumn('enum_test', 'kind'));
+    }
+
     #[RunInSeparateProcess]
     public function testUnsignedPksFeatureFlag()
     {
@@ -966,6 +978,21 @@ class MysqlAdapterTest extends TestCase
         $table->changeColumn('column1', $newColumn1)->save();
         $rows = $this->adapter->fetchAll('SHOW COLUMNS FROM t');
         $this->assertNull($rows[1]['Default']);
+    }
+
+    public function testChangeColumnEnum()
+    {
+        $table = new Table('t', [], $this->adapter);
+        $table->addColumn('column1', 'string')
+              ->save();
+        $this->assertTrue($this->adapter->hasColumn('t', 'column1'));
+
+        $table->changeColumn('column1', 'enum', ['values' => ['a', 'b']])->save();
+        $this->assertTrue($this->adapter->hasColumn('t', 'column1'));
+
+        $rows = $this->adapter->fetchAll('SHOW COLUMNS FROM t');
+        $this->assertNull($rows[1]['Default']);
+        $this->assertEquals("enum('a','b')", $rows[1]['Type']);
     }
 
     public static function sqlTypeIntConversionProvider()
@@ -1913,6 +1940,20 @@ class MysqlAdapterTest extends TestCase
 
         $this->assertSame('column1', $columnWithComment['COLUMN_NAME'], "Didn't set column name correctly");
         $this->assertEquals($comment, $columnWithComment['COLUMN_COMMENT'], "Didn't set column comment correctly");
+    }
+
+    public function testAddColumnEnum()
+    {
+        $table = new Table('t', [], $this->adapter);
+        $table->addColumn('column1', 'string')
+              ->save();
+        $this->assertTrue($this->adapter->hasColumn('t', 'column1'));
+
+        $table->addColumn('column2', 'enum', ['values' => ['a', 'b']])->save();
+        $this->assertTrue($this->adapter->hasColumn('t', 'column2'));
+
+        $rows = $this->adapter->fetchAll('SHOW COLUMNS FROM t');
+        $this->assertEquals("enum('a','b')", $rows[2]['Type']);
     }
 
     public function testAddGeoSpatialColumns()
