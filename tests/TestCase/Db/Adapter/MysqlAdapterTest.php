@@ -1069,11 +1069,12 @@ class MysqlAdapterTest extends TestCase
     public static function binaryToBlobAutomaticConversionData()
     {
         return [
-            // limit, expected type, expected limit
-            [null, 'binary', null],
-            [64, 'binary', 255],
+            // When creating binary with limit > 255, MySQL auto-converts to BLOB
+            // input limit, expected SQL type name, expected column limit after round-trip
+            [null, 'blob', MysqlAdapter::BLOB_REGULAR], // binary(null) becomes BLOB
+            [64, 'tinyblob', MysqlAdapter::BLOB_TINY], // binary(64) becomes TINYBLOB
             [MysqlAdapter::BLOB_REGULAR - 20, 'mediumblob', MysqlAdapter::BLOB_MEDIUM],
-            [MysqlAdapter::BLOB_REGULAR, 'binary', null],
+            [MysqlAdapter::BLOB_REGULAR, 'blob', MysqlAdapter::BLOB_REGULAR],
             [MysqlAdapter::BLOB_REGULAR + 20, 'mediumblob', MysqlAdapter::BLOB_MEDIUM],
             [MysqlAdapter::BLOB_MEDIUM, 'mediumblob', MysqlAdapter::BLOB_MEDIUM],
             [MysqlAdapter::BLOB_MEDIUM + 20, 'longblob', MysqlAdapter::BLOB_LONG],
@@ -1096,11 +1097,12 @@ class MysqlAdapterTest extends TestCase
     public static function varbinaryToBlobAutomaticConversionData()
     {
         return [
-            // limit, expected type, expected limit
-            [null, 'binary', null],
-            [64, 'binary', 255],
+            // When creating varbinary with limit > 255, MySQL auto-converts to BLOB
+            // input limit, expected SQL type name, expected column limit after round-trip
+            [null, 'blob', MysqlAdapter::BLOB_REGULAR], // varbinary(null) becomes BLOB
+            [64, 'tinyblob', MysqlAdapter::BLOB_TINY], // varbinary(64) becomes TINYBLOB
             [MysqlAdapter::BLOB_REGULAR - 20, 'mediumblob', MysqlAdapter::BLOB_MEDIUM],
-            [MysqlAdapter::BLOB_REGULAR, 'binary', null],
+            [MysqlAdapter::BLOB_REGULAR, 'blob', MysqlAdapter::BLOB_REGULAR],
             [MysqlAdapter::BLOB_REGULAR + 20, 'mediumblob', MysqlAdapter::BLOB_MEDIUM],
             [MysqlAdapter::BLOB_MEDIUM, 'mediumblob', MysqlAdapter::BLOB_MEDIUM],
             [MysqlAdapter::BLOB_MEDIUM + 20, 'longblob', MysqlAdapter::BLOB_LONG],
@@ -1123,28 +1125,29 @@ class MysqlAdapterTest extends TestCase
     public static function blobColumnsData()
     {
         return [
-          // type, expected type, limit, expected limit
+          // BLOB columns with various limits - MySQL auto-selects appropriate BLOB subtype
+          // input type, expected SQL type, input limit, expected column limit after round-trip
           // Tiny blobs
-          ['tinyblob', 'binary', null, MysqlAdapter::BLOB_TINY],
-          ['tinyblob', 'binary', MysqlAdapter::BLOB_TINY, MysqlAdapter::BLOB_TINY],
+          ['tinyblob', 'tinyblob', null, MysqlAdapter::BLOB_TINY],
+          ['tinyblob', 'tinyblob', MysqlAdapter::BLOB_TINY, MysqlAdapter::BLOB_TINY],
           ['tinyblob', 'mediumblob', MysqlAdapter::BLOB_TINY + 20, MysqlAdapter::BLOB_MEDIUM],
           ['tinyblob', 'mediumblob', MysqlAdapter::BLOB_MEDIUM, MysqlAdapter::BLOB_MEDIUM],
           ['tinyblob', 'longblob', MysqlAdapter::BLOB_LONG, MysqlAdapter::BLOB_LONG],
-          // // Regular blobs
-          ['blob', 'binary', MysqlAdapter::BLOB_TINY, MysqlAdapter::BLOB_TINY],
-          ['blob', 'binary', null, null],
-          ['blob', 'binary', MysqlAdapter::BLOB_REGULAR, null],
+          // Regular blobs
+          ['blob', 'tinyblob', MysqlAdapter::BLOB_TINY, MysqlAdapter::BLOB_TINY],
+          ['blob', 'blob', null, MysqlAdapter::BLOB_REGULAR],
+          ['blob', 'blob', MysqlAdapter::BLOB_REGULAR, MysqlAdapter::BLOB_REGULAR],
           ['blob', 'mediumblob', MysqlAdapter::BLOB_MEDIUM, MysqlAdapter::BLOB_MEDIUM],
           ['blob', 'longblob', MysqlAdapter::BLOB_LONG, MysqlAdapter::BLOB_LONG],
-          // // medium blobs
-          ['mediumblob', 'binary', MysqlAdapter::BLOB_TINY, MysqlAdapter::BLOB_TINY],
-          ['mediumblob', 'binary', MysqlAdapter::BLOB_REGULAR, null],
+          // Medium blobs
+          ['mediumblob', 'tinyblob', MysqlAdapter::BLOB_TINY, MysqlAdapter::BLOB_TINY],
+          ['mediumblob', 'blob', MysqlAdapter::BLOB_REGULAR, MysqlAdapter::BLOB_REGULAR],
           ['mediumblob', 'mediumblob', null, MysqlAdapter::BLOB_MEDIUM],
           ['mediumblob', 'mediumblob', MysqlAdapter::BLOB_MEDIUM, MysqlAdapter::BLOB_MEDIUM],
           ['mediumblob', 'longblob', MysqlAdapter::BLOB_LONG, MysqlAdapter::BLOB_LONG],
-          // long blobs
-          ['longblob', 'binary', MysqlAdapter::BLOB_TINY, MysqlAdapter::BLOB_TINY],
-          ['longblob', 'binary', MysqlAdapter::BLOB_REGULAR, null],
+          // Long blobs
+          ['longblob', 'tinyblob', MysqlAdapter::BLOB_TINY, MysqlAdapter::BLOB_TINY],
+          ['longblob', 'blob', MysqlAdapter::BLOB_REGULAR, MysqlAdapter::BLOB_REGULAR],
           ['longblob', 'mediumblob', MysqlAdapter::BLOB_MEDIUM, MysqlAdapter::BLOB_MEDIUM],
           ['longblob', 'longblob', null, MysqlAdapter::BLOB_LONG],
           ['longblob', 'longblob', MysqlAdapter::BLOB_LONG, MysqlAdapter::BLOB_LONG],
@@ -1161,6 +1164,42 @@ class MysqlAdapterTest extends TestCase
         $sqlType = $this->adapter->getSqlType($columns[1]->getType(), $columns[1]->getLimit());
         $this->assertSame($expectedType, $sqlType['name']);
         $this->assertSame($expectedLimit, $columns[1]->getLimit());
+    }
+
+    public static function blobRoundTripData()
+    {
+        return [
+            // type, limit, expected type after round-trip, expected limit after round-trip
+            ['blob', null, 'blob', MysqlAdapter::BLOB_REGULAR],
+            ['blob', MysqlAdapter::BLOB_REGULAR, 'blob', MysqlAdapter::BLOB_REGULAR],
+            ['tinyblob', null, 'tinyblob', MysqlAdapter::BLOB_TINY],
+            ['mediumblob', null, 'mediumblob', MysqlAdapter::BLOB_MEDIUM],
+            ['longblob', null, 'longblob', MysqlAdapter::BLOB_LONG],
+        ];
+    }
+
+    #[DataProvider('blobRoundTripData')]
+    public function testBlobRoundTrip(string $type, ?int $limit, string $expectedType, int $expectedLimit)
+    {
+        // Create a table with a BLOB column
+        $table = new Table('blob_round_trip_test', [], $this->adapter);
+        $table->addColumn('blob_col', $type, ['limit' => $limit])
+              ->save();
+
+        // Read the column back from the database
+        $columns = $this->adapter->getColumns('blob_round_trip_test');
+
+        $blobColumn = $columns[1];
+        $this->assertNotNull($blobColumn, 'BLOB column not found');
+        $this->assertSame($expectedType, $blobColumn->getType(), 'Type mismatch after round-trip');
+        $this->assertSame($expectedLimit, $blobColumn->getLimit(), 'Limit mismatch after round-trip');
+
+        // Verify that the SQL type is correct
+        $sqlType = $this->adapter->getSqlType($blobColumn->getType(), $blobColumn->getLimit());
+        $this->assertSame($type, $sqlType['name']);
+
+        // Clean up
+        $this->adapter->dropTable('blob_round_trip_test');
     }
 
     public function testBigIntegerColumn()
@@ -1289,7 +1328,7 @@ class MysqlAdapterTest extends TestCase
             ['column9', 'time', []],
             ['column10', 'timestamp', []],
             ['column11', 'date', []],
-            ['column12', 'binary', []],
+            ['column12', 'blob', []], // binary with no limit becomes BLOB in MySQL
             ['column13', 'boolean', ['comment' => 'Lorem ipsum']],
             ['column14', 'string', ['limit' => 10]],
             ['column16', 'geometry', []],
