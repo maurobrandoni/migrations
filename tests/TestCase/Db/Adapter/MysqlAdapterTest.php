@@ -1952,8 +1952,28 @@ class MysqlAdapterTest extends TestCase
         $table->addColumn('column2', 'enum', ['values' => ['a', 'b']])->save();
         $this->assertTrue($this->adapter->hasColumn('t', 'column2'));
 
+        $comment = 'Comments from "column3"';
+        $table->addColumn('column3', 'enum', ['values' => ['c', 'd'], 'null' => false, 'default' => 'd', 'comment' => $comment])->save();
+        $this->assertTrue($this->adapter->hasColumn('t', 'column3'));
+
         $rows = $this->adapter->fetchAll('SHOW COLUMNS FROM t');
         $this->assertEquals("enum('a','b')", $rows[2]['Type']);
+        $this->assertEquals('YES', $rows[2]['Null']);
+        $this->assertNull($rows[2]['Default']);
+        $this->assertEquals("enum('c','d')", $rows[3]['Type']);
+        $this->assertEquals('NO', $rows[3]['Null']);
+        $this->assertEquals('d', $rows[3]['Default']);
+
+        $rows = $this->adapter->fetchAll(sprintf(
+            "SELECT COLUMN_NAME, COLUMN_COMMENT
+            FROM information_schema.columns
+            WHERE TABLE_SCHEMA='%s' AND TABLE_NAME='t'
+            ORDER BY ORDINAL_POSITION",
+            $this->config['database'],
+        ));
+        $columnWithComment = $rows[3];
+        $this->assertSame('column3', $columnWithComment['COLUMN_NAME'], "Didn't set column name correctly");
+        $this->assertEquals($comment, $columnWithComment['COLUMN_COMMENT'], "Didn't set column comment correctly");
     }
 
     public function testAddGeoSpatialColumns()
