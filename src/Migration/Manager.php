@@ -227,9 +227,27 @@ class Manager
 
         $migrationFile = $migrationFile[0];
         $className = $this->getMigrationClassName($migrationFile);
-        require_once $migrationFile;
 
-        $migration = new $className($version);
+        // For anonymous classes, we need to use require instead of require_once
+        $migrationInstance = null;
+        if (!class_exists($className)) {
+            $migrationInstance = require $migrationFile;
+        } else {
+            require_once $migrationFile;
+        }
+
+        // Check if the file returns an anonymous class instance
+        if (is_object($migrationInstance) && $migrationInstance instanceof MigrationInterface) {
+            $migration = $migrationInstance;
+            $migration->setVersion($version);
+        } elseif (class_exists($className)) {
+            $migration = new $className($version);
+        } else {
+            throw new RuntimeException(
+                sprintf('Could not find class `%s` in file `%s` and file did not return a migration instance', $className, $migrationFile),
+            );
+        }
+
         /** @var \Migrations\MigrationInterface $migration */
         $config = $this->getConfig();
         $migration->setConfig($config);
@@ -850,19 +868,35 @@ class Manager
                     // load the migration file
                     $orig_display_errors_setting = ini_get('display_errors');
                     ini_set('display_errors', 'On');
-                    /** @noinspection PhpIncludeInspection */
-                    require_once $filePath;
-                    ini_set('display_errors', $orig_display_errors_setting);
+
+                    // For anonymous classes, we need to use require instead of require_once
+                    // to get the returned instance
+                    $migrationInstance = null;
                     if (!class_exists($class)) {
+                        $migrationInstance = require $filePath;
+                    } else {
+                        require_once $filePath;
+                    }
+
+                    ini_set('display_errors', $orig_display_errors_setting);
+
+                    // Check if the file returns an anonymous class instance
+                    if (is_object($migrationInstance) && $migrationInstance instanceof MigrationInterface) {
+                        $io->verbose("Using anonymous class from <info>$filePath</info>.");
+                        $migration = $migrationInstance;
+                        $migration->setVersion($version);
+                    } elseif (class_exists($class)) {
+                        // Fall back to traditional class-based migration
+                        $io->verbose("Constructing <info>$class</info>.");
+                        $migration = new $class($version);
+                    } else {
                         throw new InvalidArgumentException(sprintf(
-                            'Could not find class `%s` in file `%s`',
+                            'Could not find class `%s` in file `%s` and file did not return a migration instance',
                             $class,
                             $filePath,
                         ));
                     }
 
-                    $io->verbose("Constructing <info>$class</info>.");
-                    $migration = new $class($version);
                     /** @var \Migrations\MigrationInterface $migration */
                     $config = $this->getConfig();
                     $migration->setConfig($config);
@@ -976,7 +1010,6 @@ class Manager
                     $fileNames[$class] = basename($filePath);
 
                     // load the seed file
-                    /** @noinspection PhpIncludeInspection */
                     require_once $filePath;
                     if (!class_exists($class)) {
                         throw new InvalidArgumentException(sprintf(

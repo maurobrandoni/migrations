@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace Migrations\Test\TestCase\Command;
 
 use Cake\Console\BaseCommand;
+use Cake\Core\Configure;
 use Cake\Core\Plugin;
 use Cake\TestSuite\StringCompareTrait;
 use Migrations\Command\BakeMigrationCommand;
@@ -42,7 +43,7 @@ class BakeMigrationCommandTest extends TestCase
     public function tearDown(): void
     {
         parent::tearDown();
-        $files = glob(ROOT . DS . 'config' . DS . 'Migrations' . DS . '*_*Users.php');
+        $files = glob(ROOT . DS . 'config' . DS . 'Migrations' . DS . '*Users.php');
         if ($files) {
             foreach ($files as $file) {
                 unlink($file);
@@ -366,6 +367,62 @@ class BakeMigrationCommandTest extends TestCase
 
         $this->assertExitCode(BaseCommand::CODE_ERROR);
         $this->assertErrorContains('When applying fields the migration name should start with one of the following prefixes: `Create`, `Drop`, `Add`, `Remove`, `Alter`.');
+    }
+
+    /**
+     * Test creating migrations with anonymous style
+     *
+     * @return void
+     */
+    public function testCreateAnonymousStyle()
+    {
+        $this->exec('bake migration CreateUsers name:string --style=anonymous --connection test');
+
+        $files = glob(ROOT . DS . 'config' . DS . 'Migrations' . DS . '????_??_??_??????_CreateUsers.php');
+        $this->assertCount(1, $files);
+
+        $filePath = current($files);
+        $fileName = basename($filePath);
+
+        // Check the file name format
+        $this->assertMatchesRegularExpression('/^\d{4}_\d{2}_\d{2}_\d{6}_CreateUsers\.php$/', $fileName);
+
+        $this->assertExitCode(BaseCommand::CODE_SUCCESS);
+        $result = file_get_contents($filePath);
+
+        // Check that it returns an anonymous class directly
+        $this->assertStringContainsString('return new class extends BaseMigration', $result);
+        $this->assertStringNotContainsString('class CreateUsers extends', $result);
+        $this->assertStringNotContainsString('function (int $version)', $result);
+    }
+
+    /**
+     * Test creating migrations with anonymous style with configure
+     *
+     * @return void
+     */
+    public function testCreateAnonymousStyleWithConfigure()
+    {
+        Configure::write('Migrations.style', 'anonymous');
+
+        $this->exec('bake migration CreateUsers name:string --connection test');
+
+        $files = glob(ROOT . DS . 'config' . DS . 'Migrations' . DS . '????_??_??_??????_CreateUsers.php');
+        $this->assertCount(1, $files);
+
+        $filePath = current($files);
+        $fileName = basename($filePath);
+
+        // Check the file name format
+        $this->assertMatchesRegularExpression('/^\d{4}_\d{2}_\d{2}_\d{6}_CreateUsers\.php$/', $fileName);
+
+        $this->assertExitCode(BaseCommand::CODE_SUCCESS);
+        $result = file_get_contents($filePath);
+
+        // Check that it returns an anonymous class directly
+        $this->assertStringContainsString('return new class extends BaseMigration', $result);
+        $this->assertStringNotContainsString('class CreateUsers extends', $result);
+        $this->assertStringNotContainsString('function (int $version)', $result);
     }
 
     public function testBakeMigrationWithoutBake()
