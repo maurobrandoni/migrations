@@ -355,6 +355,12 @@ class MysqlAdapter extends AbstractAdapter
                 }, $values)) . ')';
             }
 
+            $sql .= $column->getEncoding() ? ' CHARACTER SET ' . $column->getEncoding() : '';
+            $sql .= $column->getCollation() ? ' COLLATE ' . $column->getCollation() : '';
+            $sql .= $column->isNull() ? ' NULL' : ' NOT NULL';
+            $sql .= $column->getDefault() ? ' DEFAULT ' . $this->quoteString($column->getDefault()) : '';
+            $sql .= $column->getComment() ? ' COMMENT ' . $this->quoteString($column->getComment()) : '';
+
             return $sql;
         }
 
