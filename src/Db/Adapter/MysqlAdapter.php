@@ -32,7 +32,42 @@ class MysqlAdapter extends AbstractAdapter
         self::PHINX_TYPE_YEAR,
         self::PHINX_TYPE_JSON,
         self::PHINX_TYPE_BINARYUUID,
+        self::PHINX_TYPE_ENUM,
+        self::PHINX_TYPE_SET,
+        self::PHINX_TYPE_BLOB,
+        self::PHINX_TYPE_TINYBLOB,
+        self::PHINX_TYPE_MEDIUMBLOB,
+        self::PHINX_TYPE_LONGBLOB,
     ];
+
+    /**
+     * @deprecated 5.0.0 Enum column support will be removed in a future release.
+     */
+    public const PHINX_TYPE_ENUM = 'enum';
+    /**
+     * @deprecated 5.0.0 Set column support will be removed in a future release.
+     */
+    public const PHINX_TYPE_SET = 'set';
+    /**
+     * @deprecated 5.0.0 Use binary type with with no limit instead.
+     */
+    public const PHINX_TYPE_BLOB = 'blob';
+    /**
+     * @deprecated 5.0.0 Use binary type with with limit BLOB_SMALL instead.
+     */
+    public const PHINX_TYPE_TINYBLOB = 'tinyblob';
+    /**
+     * @deprecated 5.0.0 Use binary type with with limit BLOB_MEDIUM instead.
+     */
+    public const PHINX_TYPE_MEDIUMBLOB = 'mediumblob';
+    /**
+     * @deprecated 5.0.0 Use binary type with with limit BLOB_LONG instead.
+     */
+    public const PHINX_TYPE_LONGBLOB = 'longblob';
+    /**
+     * @deprecated 5.0.0 Use binary type instead.
+     */
+    public const PHINX_TYPE_VARBINARY = 'varbinary';
 
     // These constants roughly correspond to the maximum allowed value for each field,
     // except for the `_LONG` and `_BIG` variants, which are maxed at 32-bit
@@ -254,7 +289,15 @@ class MysqlAdapter extends AbstractAdapter
                 default => null,
             };
         }
-        if ($data['type'] === self::PHINX_TYPE_BINARY) {
+        $blobTypes = [
+            self::PHINX_TYPE_BINARY,
+            self::PHINX_TYPE_VARBINARY,
+            self::PHINX_TYPE_BLOB,
+            self::PHINX_TYPE_TINYBLOB,
+            self::PHINX_TYPE_MEDIUMBLOB,
+            self::PHINX_TYPE_LONGBLOB,
+        ];
+        if (in_array($data['type'], $blobTypes, true)) {
             if ($data['length'] === self::BLOB_REGULAR) {
                 $data['type'] = TableSchema::TYPE_BINARY;
                 $data['length'] = null;
@@ -268,6 +311,14 @@ class MysqlAdapter extends AbstractAdapter
                     $data['length'] = $bucket;
                     break;
                 }
+            }
+            if ($data['length'] === null) {
+                $data['length'] = match ($data['type']) {
+                    self::PHINX_TYPE_TINYBLOB => TableSchema::LENGTH_TINY,
+                    self::PHINX_TYPE_MEDIUMBLOB => TableSchema::LENGTH_MEDIUM,
+                    self::PHINX_TYPE_LONGBLOB => TableSchema::LENGTH_LONG,
+                    default => null,
+                };
             }
             $data['type'] = 'binary';
         } elseif ($data['type'] === self::PHINX_TYPE_INTEGER) {

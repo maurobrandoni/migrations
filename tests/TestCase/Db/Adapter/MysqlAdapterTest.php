@@ -1010,7 +1010,6 @@ class MysqlAdapterTest extends TestCase
         $table->addColumn('column1', 'varbinary', ['limit' => $limit])
               ->save();
         $columns = $table->getColumns();
-        $sqlType = $this->adapter->getSqlType($columns[1]->getType(), $columns[1]->getLimit());
         $this->assertSame($expectedType, $columns[1]->getType());
         $this->assertSame($expectedLimit, $columns[1]->getLimit());
     }
@@ -1051,7 +1050,7 @@ class MysqlAdapterTest extends TestCase
     public function testblobColumns(string $type, string $expectedType, ?int $limit, ?int $expectedLimit)
     {
         $table = new Table('t', [], $this->adapter);
-        $table->addColumn('column1', $type, ['limit' => $limit])
+        $table->addColumn('blob_col', $type, ['limit' => $limit])
               ->save();
         $columns = $table->getColumns();
         $this->assertSame($expectedType, $columns[1]->getType());

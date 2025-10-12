@@ -72,6 +72,15 @@ interface AdapterInterface
     public const PHINX_TYPE_INTERVAL = TableSchemaInterface::TYPE_INTERVAL;
 
     /**
+     * @deprecated 5.0.0 Enum column support will be removed in a future release.
+     */
+    public const PHINX_TYPE_ENUM = 'enum';
+    /**
+     * @deprecated 5.0.0 Set column support will be removed in a future release.
+     */
+    public const PHINX_TYPE_SET = 'set';
+
+    /**
      * Get all migrated version numbers.
      *
      * @return array<int>
