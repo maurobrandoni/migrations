@@ -4,5 +4,7 @@
 
     /index
     /writing-migrations
+    /using-the-query-builder
+    /executing-queries
     /seeding
     /upgrading-to-builtin-backend

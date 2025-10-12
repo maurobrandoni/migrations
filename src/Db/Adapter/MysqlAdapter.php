@@ -11,6 +11,7 @@ namespace Migrations\Db\Adapter;
 use Cake\Core\Configure;
 use Cake\Database\Connection;
 use Cake\Database\Exception\QueryException;
+use Cake\Database\Schema\SchemaDialect;
 use Cake\Database\Schema\TableSchema;
 use InvalidArgumentException;
 use Migrations\Db\AlterInstructions;
@@ -202,8 +203,7 @@ class MysqlAdapter extends AbstractAdapter
         $sql = 'CREATE TABLE ';
         $sql .= $this->quoteTableName($table->getName()) . ' (';
         foreach ($columns as $column) {
-            $columnData = $this->mapColumnData($column->toArray());
-            $sql .= $dialect->columnDefinitionSql($columnData) . ', ';
+            $sql .= $this->columnDefinitionSql($dialect, $column) . ', ';
         }
 
         // set the primary key(s)
@@ -279,6 +279,44 @@ class MysqlAdapter extends AbstractAdapter
         }
 
         return $data;
+    }
+
+    /**
+     * Get the SQL fragment for a column definition.
+     *
+     * This method provides backwards compatibility for enum and set types
+     * as userland migrations use those types, but they are not supported
+     * in cakephp/database.
+     *
+     * @param \Cake\Database\Schema\SchemaDialect $dialect The dialect to use.
+     * @param \Migrations\Db\Table\Column $column The column to get the SQL for.
+     * @return string
+     */
+    protected function columnDefinitionSql(SchemaDialect $dialect, Column $column): string
+    {
+        $columnData = $column->toArray();
+        $deprecatedTypes = [self::PHINX_TYPE_ENUM, self::PHINX_TYPE_SET];
+        if (in_array($columnData['type'], $deprecatedTypes, true)) {
+            $sql = $this->quoteColumnName($columnData['name']) . ' ' . $columnData['type'];
+            $values = $column->getValues();
+            if ($values) {
+                $sql .= '(' . implode(', ', array_map(function ($value) {
+                    // Special case NULL to trigger errors as it isn't allowed
+                    // in enum values.
+                    return $value === null ? 'NULL' : $this->quoteString($value);
+                }, $values)) . ')';
+            }
+
+            $sql .= $column->getEncoding() ? ' CHARACTER SET ' . $column->getEncoding() : '';
+            $sql .= $column->getCollation() ? ' COLLATE ' . $column->getCollation() : '';
+            $sql .= $column->isNull() ? ' NULL' : ' NOT NULL';
+            $sql .= $column->getDefault() ? ' DEFAULT ' . $this->quoteString($column->getDefault()) : '';
+            $sql .= $column->getComment() ? ' COMMENT ' . $this->quoteString($column->getComment()) : '';
+
+            return $sql;
+        }
+
+        return $dialect->columnDefinitionSql($this->mapColumnData($columnData));
     }
 
     /**
@@ -374,6 +412,7 @@ class MysqlAdapter extends AbstractAdapter
      * Convert from cakephp/database conventions to migrations\column
      *
      * - converts datetimefractional -> datetime + length
+     * - converts binary types to mysql blob type constants.
      *
      * @param array $columnData The cakephp/database column data to transform
      * @return array The extracted/converted type and length.
@@ -389,6 +428,28 @@ class MysqlAdapter extends AbstractAdapter
         } elseif ($type === TableSchema::TYPE_TIMESTAMP_FRACTIONAL) {
             $type = 'timestamp';
             $length = $columnData['precision'] ?? $length;
+        } elseif ($type === TableSchema::TYPE_BINARY) {
+            // CakePHP returns BLOB columns as 'binary' with specific lengths
+            // Check the raw MySQL type to distinguish BLOB from BINARY columns
+            $rawType = $columnData['rawType'] ?? '';
+            if (str_contains($rawType, 'blob')) {
+                // Map BLOB columns back to the appropriate BLOB types
+                if (str_contains($rawType, 'tinyblob')) {
+                    $type = static::PHINX_TYPE_TINYBLOB;
+                    $length = static::BLOB_TINY;
+                } elseif (str_contains($rawType, 'mediumblob')) {
+                    $type = static::PHINX_TYPE_MEDIUMBLOB;
+                    $length = static::BLOB_MEDIUM;
+                } elseif (str_contains($rawType, 'longblob')) {
+                    $type = static::PHINX_TYPE_LONGBLOB;
+                    $length = static::BLOB_LONG;
+                } else {
+                    // Regular BLOB
+                    $type = static::PHINX_TYPE_BLOB;
+                    $length = static::BLOB_REGULAR;
+                }
+            }
+            // else: keep as binary or varbinary (actual BINARY/VARBINARY column)
         }
 
         return [$type, $length];
@@ -401,8 +462,17 @@ class MysqlAdapter extends AbstractAdapter
     {
         $dialect = $this->getSchemaDialect();
         $columnRecords = $dialect->describeColumns($tableName);
+
+        // Fetch raw column types to distinguish BLOB from BINARY columns
+        $rawTypes = [];
+        $rows = $this->fetchAll(sprintf('SHOW COLUMNS FROM %s', $this->quoteTableName($tableName)));
+        foreach ($rows as $row) {
+            $rawTypes[$row['Field']] = strtolower($row['Type']);
+        }
+
         $columns = [];
         foreach ($columnRecords as $record) {
+            $record['rawType'] = $rawTypes[$record['name']] ?? null;
             [$type, $length] = $this->mapColumnType($record);
 
             $column = (new Column())
@@ -449,7 +519,7 @@ class MysqlAdapter extends AbstractAdapter
         $dialect = $this->getSchemaDialect();
         $alter = sprintf(
             'ADD %s',
-            $dialect->columnDefinitionSql($this->mapColumnData($column->toArray())),
+            $this->columnDefinitionSql($dialect, $column),
         );
 
         $alter .= $this->afterClause($column);
@@ -532,7 +602,7 @@ class MysqlAdapter extends AbstractAdapter
         $alter = sprintf(
             'CHANGE %s %s%s',
             $this->quoteColumnName($columnName),
-            $dialect->columnDefinitionSql($this->mapColumnData($newColumn->toArray())),
+            $this->columnDefinitionSql($dialect, $newColumn),
             $this->afterClause($newColumn),
         );
 
