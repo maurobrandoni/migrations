@@ -21,45 +21,32 @@ replaced with the current timestamp down to the second.
 If you have specified multiple migration paths, you will be asked to select
 which path to create the new migration in.
 
-Bake will automatically creates a skeleton migration file with a single method:
+Bake will automatically creates a skeleton migration file with a single method::
 
-.. code-block:: php
+    <?php
 
-        <?php
+    use Migrations\BaseMigration;
 
-        use Migrations\BaseMigration;
-
-        class MyNewMigration extends BaseMigration
+    class MyNewMigration extends BaseMigration
+    {
+        /**
+         * Change Method.
+         *
+         * Write your reversible migrations in this method.
+         */
+        public function change(): void
         {
-            /**
-             * Change Method.
-             *
-             * Write your reversible migrations using this method.
-             *
-             * More information on writing migrations is available here:
-             * https://book.cakephp.org/migrations/4/en/migrations.html#the-change-method
-             *
-             * Remember to call "create()" or "update()" and NOT "save()" when working
-             * with the Table class.
-             *
-             */
-            public function change(): void
-            {
-
-            }
         }
 
-All migrations extend from the ``BaseMigration`` or ``BaseMigration``. These
-classes provides the necessary support to create your database migrations.
-Database migrations can transform your database in many ways, such as creating
-new tables, inserting rows, adding indexes and modifying columns.
+    }
+
 
 The Change Method
 =================
 
 Migrations supports 'reversible migrations'. In many scenarios, you
-only need to define the ``up`` logic, and Migrations can figure out how to migrate
-down automatically for you. For example:
+only need to define the ``up`` logic, and Migrations can figure out how to
+generate the rollback operations for you. For example:
 
 .. code-block:: php
 
@@ -81,7 +68,7 @@ down automatically for you. For example:
 
 When executing this migration, Migrations will create the ``user_logins`` table on
 the way up and automatically figure out how to drop the table on the way down.
-Please be aware that when a ``change`` method exists, Migrations will automatically
+Please be aware that when a ``change`` method exists, Migrations will
 ignore the ``up`` and ``down`` methods. If you need to use these methods it is
 recommended to create a separate migration file.
 
@@ -106,29 +93,28 @@ If a command cannot be reversed then Migrations will throw an
 ``IrreversibleMigrationException`` when it's migrating down. If you wish to
 use a command that cannot be reversed in the change function, you can use an
 if statement with  ``$this->isMigratingUp()`` to only run things in the
-up or down direction. For example:
+up or down direction. For example::
 
-.. code-block:: php
+    <?php
 
-        <?php
+    use Migrations\BaseMigration;
 
-        use Migrations\BaseMigration;
-
-        class CreateUserLoginsTable extends BaseMigration
+    class CreateUserLoginsTable extends BaseMigration
+    {
+        public function change(): void
         {
-            public function change(): void
-            {
-                // create the table
-                $table = $this->table('user_logins');
-                $table->addColumn('user_id', 'integer')
-                      ->addColumn('created', 'datetime')
-                      ->create();
-                if ($this->isMigratingUp()) {
-                    $table->insert([['user_id' => 1, 'created' => '2020-01-19 03:14:07']])
-                          ->save();
-                }
+            // create the table
+            $table = $this->table('user_logins');
+            $table->addColumn('user_id', 'integer')
+                  ->addColumn('created', 'datetime')
+                  ->create();
+            if ($this->isMigratingUp()) {
+                $table->insert([['user_id' => 1, 'created' => '2020-01-19 03:14:07']])
+                      ->save();
             }
         }
+    }
+
 
 The Up Method
 =============
@@ -159,574 +145,43 @@ This can be used to prevent the migration from being executed at this time. It a
 returns true by default. You can override it in your custom ``BaseMigration``
 implementation.
 
-Executing Queries
-=================
-
-Queries can be executed with the ``execute()`` and ``query()`` methods. The
-``execute()`` method returns the number of affected rows whereas the
-``query()`` method returns the result as a
-`CakePHP Statement <https://book.cakephp.org/5/en/orm/database-basics.html#interacting-with-statements>`_. Both methods
-accept an optional second parameter ``$params`` which is an array of elements,
-and if used will cause the underlying connection to use a prepared statement.
-
-.. code-block:: php
-
-        <?php
-
-        use Migrations\BaseMigration;
-
-        class MyNewMigration extends BaseMigration
-        {
-            /**
-             * Migrate Up.
-             */
-            public function up(): void
-            {
-                // execute()
-                $count = $this->execute('DELETE FROM users'); // returns the number of affected rows
-
-                // query()
-                $stmt = $this->query('SELECT * FROM users'); // returns PDOStatement
-                $rows = $stmt->fetchAll(); // returns the result as an array
-
-                // using prepared queries
-                $count = $this->execute('DELETE FROM users WHERE id = ?', [5]);
-                $stmt = $this->query('SELECT * FROM users WHERE id > ?', [5]); // returns PDOStatement
-                $rows = $stmt->fetchAll();
-            }
-
-            /**
-             * Migrate Down.
-             */
-            public function down(): void
-            {
-
-            }
-        }
-
-.. note::
-
-    These commands run using the PHP Data Objects (PDO) extension which
-    defines a lightweight, consistent interface for accessing databases
-    in PHP. Always make sure your queries abide with PDOs before using
-    the ``execute()`` command. This is especially important when using
-    DELIMITERs during insertion of stored procedures or triggers which
-    don't support DELIMITERs.
-
-.. note::
-
-    If you wish to execute multiple queries at once, you may not also use the prepared
-    variant of these functions. When using prepared queries, PDO can only execute
-    them one at a time.
-
-.. warning::
-
-    When using ``execute()`` or ``query()`` with a batch of queries, PDO doesn't
-    throw an exception if there is an issue with one or more of the queries
-    in the batch.
-
-    As such, the entire batch is assumed to have passed without issue.
-
-    If Migrations was to iterate any potential result sets, looking to see if one
-    had an error, then Migrations would be denying access to all the results as there
-    is no facility in PDO to get a previous result set
-    `nextRowset() <https://php.net/manual/en/pdostatement.nextrowset.php>`_ -
-    but no ``previousSet()``).
-
-    So, as a consequence, due to the design decision in PDO to not throw
-    an exception for batched queries, Migrations is unable to provide the fullest
-    support for error handling when batches of queries are supplied.
-
-    Fortunately though, all the features of PDO are available, so multiple batches
-    can be controlled within the migration by calling upon
-    `nextRowset() <https://php.net/manual/en/pdostatement.nextrowset.php>`_
-    and examining `errorInfo <https://php.net/manual/en/pdostatement.errorinfo.php>`_.
-
-Fetching Rows
-=============
-
-There are two methods available to fetch rows. The ``fetchRow()`` method will
-fetch a single row, whilst the ``fetchAll()`` method will return multiple rows.
-Both methods accept raw SQL as their only parameter.
-
-.. code-block:: php
-
-        <?php
-
-        use Migrations\BaseMigration;
-
-        class MyNewMigration extends BaseMigration
-        {
-            /**
-             * Migrate Up.
-             */
-            public function up(): void
-            {
-                // fetch a user
-                $row = $this->fetchRow('SELECT * FROM users');
-
-                // fetch an array of messages
-                $rows = $this->fetchAll('SELECT * FROM messages');
-            }
-
-            /**
-             * Migrate Down.
-             */
-            public function down(): void
-            {
-
-            }
-        }
-
-Inserting Data
-==============
-
-Migrations makes it easy to insert data into your tables. Whilst this feature is
-intended for the :doc:`seed feature <seeding>`, you are also free to use the
-insert methods in your migrations.
-
-.. code-block:: php
-
-        <?php
-
-        use Migrations\BaseMigration;
-
-        class NewStatus extends BaseMigration
-        {
-            /**
-             * Migrate Up.
-             */
-            public function up(): void
-            {
-                $table = $this->table('status');
-
-                // inserting only one row
-                $singleRow = [
-                    'id'    => 1,
-                    'name'  => 'In Progress'
-                ];
-
-                $table->insert($singleRow)->saveData();
-
-                // inserting multiple rows
-                $rows = [
-                    [
-                      'id'    => 2,
-                      'name'  => 'Stopped'
-                    ],
-                    [
-                      'id'    => 3,
-                      'name'  => 'Queued'
-                    ]
-                ];
-
-                $table->insert($rows)->saveData();
-            }
-
-            /**
-             * Migrate Down.
-             */
-            public function down(): void
-            {
-                $this->execute('DELETE FROM status');
-            }
-        }
-
-.. note::
-
-    You cannot use the insert methods inside a `change()` method. Please use the
-    `up()` and `down()` methods.
-
 Working With Tables
 ===================
 
-The Table object is one of the most useful APIs provided by Migrations. It allows
-you to easily manipulate database tables using PHP code. You can retrieve an
-instance of the Table object by calling the ``table()`` method from within
-your database migration.
+The Table object enables you to easily manipulate database tables using PHP
+code. You can retrieve an instance of the Table object by calling the
+``table()`` method from within your database migration::
 
-.. code-block:: php
+    <?php
 
-        <?php
+    use Migrations\BaseMigration;
 
-        use Migrations\BaseMigration;
-
-        class MyNewMigration extends BaseMigration
+    class MyNewMigration extends BaseMigration
+    {
+        /**
+         * Migrate Up.
+         */
+        public function up(): void
         {
-            /**
-             * Migrate Up.
-             */
-            public function up(): void
-            {
-                $table = $this->table('tableName');
-            }
-
-            /**
-             * Migrate Down.
-             */
-            public function down(): void
-            {
-
-            }
+            $table = $this->table('tableName');
         }
+
+        /**
+         * Migrate Down.
+         */
+        public function down(): void
+        {
+
+        }
+    }
 
 You can then manipulate this table using the methods provided by the Table
 object.
 
-Saving Changes
---------------
+.. _adding-columns:
 
-When working with the Table object, Migrations stores certain operations in a
-pending changes cache. Once you have made the changes you want to the table,
-you must save them. To perform this operation, Migrations provides three methods,
-``create()``, ``update()``, and ``save()``. ``create()`` will first create
-the table and then run the pending changes. ``update()`` will just run the
-pending changes, and should be used when the table already exists. ``save()``
-is a helper function that checks first if the table exists and if it does not
-will run ``create()``, else it will run ``update()``.
-
-As stated above, when using the ``change()`` migration method, you should always
-use ``create()`` or ``update()``, and never ``save()`` as otherwise migrating
-and rolling back may result in different states, due to ``save()`` calling
-``create()`` when running migrate and then ``update()`` on rollback. When
-using the ``up()``/``down()`` methods, it is safe to use either ``save()`` or
-the more explicit methods.
-
-When in doubt with working with tables, it is always recommended to call
-the appropriate function and commit any pending changes to the database.
-
-.. _creating-a-table::
-
-Creating a Table
-----------------
-
-Creating a table is really easy using the Table object. Let's create a table to
-store a collection of users.
-
-.. code-block:: php
-
-        <?php
-
-        use Migrations\BaseMigration;
-
-        class MyNewMigration extends BaseMigration
-        {
-            public function change(): void
-            {
-                $users = $this->table('users');
-                $users->addColumn('username', 'string', ['limit' => 20])
-                      ->addColumn('password', 'string', ['limit' => 40])
-                      ->addColumn('password_salt', 'string', ['limit' => 40])
-                      ->addColumn('email', 'string', ['limit' => 100])
-                      ->addColumn('first_name', 'string', ['limit' => 30])
-                      ->addColumn('last_name', 'string', ['limit' => 30])
-                      ->addColumn('created', 'datetime')
-                      ->addColumn('updated', 'datetime', ['null' => true])
-                      ->addIndex(['username', 'email'], ['unique' => true])
-                      ->create();
-            }
-        }
-
-Columns are added using the ``addColumn()`` method. We create a unique index
-for both the username and email columns using the ``addIndex()`` method.
-Finally calling ``create()`` commits the changes to the database.
-
-.. note::
-
-    Migrations automatically creates an auto-incrementing primary key column called ``id`` for every
-    table.
-
-The ``id`` option sets the name of the automatically created identity field, while the ``primary_key``
-option selects the field or fields used for primary key. ``id`` will always override the ``primary_key``
-option unless it's set to false. If you don't need a primary key set ``id`` to false without
-specifying a ``primary_key``, and no primary key will be created.
-
-To specify an alternate primary key, you can specify the ``primary_key`` option
-when accessing the Table object. Let's disable the automatic ``id`` column and
-create a primary key using two columns instead:
-
-.. code-block:: php
-
-        <?php
-
-        use Migrations\BaseMigration;
-
-        class MyNewMigration extends BaseMigration
-        {
-            public function change(): void
-            {
-                $table = $this->table('followers', ['id' => false, 'primary_key' => ['user_id', 'follower_id']]);
-                $table->addColumn('user_id', 'integer')
-                      ->addColumn('follower_id', 'integer')
-                      ->addColumn('created', 'datetime')
-                      ->create();
-            }
-        }
-
-Setting a single ``primary_key`` doesn't enable the ``AUTO_INCREMENT`` option.
-To simply change the name of the primary key, we need to override the default ``id`` field name:
-
-.. code-block:: php
-
-        <?php
-
-        use Migrations\BaseMigration;
-
-        class MyNewMigration extends BaseMigration
-        {
-            public function up(): void
-            {
-                $table = $this->table('followers', ['id' => 'user_id']);
-                $table->addColumn('follower_id', 'integer')
-                      ->addColumn('created', 'timestamp', ['default' => 'CURRENT_TIMESTAMP'])
-                      ->create();
-            }
-        }
-
-In addition, the MySQL adapter supports following options:
-
-========== ===========
-Option     Description
-========== ===========
-comment    set a text comment on the table
-row_format set the table row format
-engine     define table engine *(defaults to ``InnoDB``)*
-collation  define table collation *(defaults to ``utf8mb4_unicode_ci``)*
-signed     whether the primary key is ``signed``  *(defaults to ``false``)*
-limit      set the maximum length for the primary key
-========== ===========
-
-By default, the primary key is ``unsigned``.
-To simply set it to be signed just pass ``signed`` option with a ``true`` value:
-
-.. code-block:: php
-
-        <?php
-
-        use Migrations\BaseMigration;
-
-        class MyNewMigration extends BaseMigration
-        {
-            public function change(): void
-            {
-                $table = $this->table('followers', ['signed' => false]);
-                $table->addColumn('follower_id', 'integer')
-                      ->addColumn('created', 'timestamp', ['default' => 'CURRENT_TIMESTAMP'])
-                      ->create();
-            }
-        }
-
-
-The PostgreSQL adapter supports the following options:
-
-========= ===========
-Option    Description
-========= ===========
-comment   set a text comment on the table
-========= ===========
-
-To view available column types and options, see `Valid Column Types`_ for details.
-
-Determining Whether a Table Exists
-----------------------------------
-
-You can determine whether or not a table exists by using the ``hasTable()``
-method.
-
-.. code-block:: php
-
-        <?php
-
-        use Migrations\BaseMigration;
-
-        class MyNewMigration extends BaseMigration
-        {
-            /**
-             * Migrate Up.
-             */
-            public function up(): void
-            {
-                $exists = $this->hasTable('users');
-                if ($exists) {
-                    // do something
-                }
-            }
-
-            /**
-             * Migrate Down.
-             */
-            public function down(): void
-            {
-
-            }
-        }
-
-Dropping a Table
-----------------
-
-Tables can be dropped quite easily using the ``drop()`` method. It is a
-good idea to recreate the table again in the ``down()`` method.
-
-Note that like other methods in the ``Table`` class, ``drop`` also needs ``save()``
-to be called at the end in order to be executed. This allows Migrations to intelligently
-plan migrations when more than one table is involved.
-
-.. code-block:: php
-
-        <?php
-
-        use Migrations\BaseMigration;
-
-        class MyNewMigration extends BaseMigration
-        {
-            /**
-             * Migrate Up.
-             */
-            public function up(): void
-            {
-                $this->table('users')->drop()->save();
-            }
-
-            /**
-             * Migrate Down.
-             */
-            public function down(): void
-            {
-                $users = $this->table('users');
-                $users->addColumn('username', 'string', ['limit' => 20])
-                      ->addColumn('password', 'string', ['limit' => 40])
-                      ->addColumn('password_salt', 'string', ['limit' => 40])
-                      ->addColumn('email', 'string', ['limit' => 100])
-                      ->addColumn('first_name', 'string', ['limit' => 30])
-                      ->addColumn('last_name', 'string', ['limit' => 30])
-                      ->addColumn('created', 'datetime')
-                      ->addColumn('updated', 'datetime', ['null' => true])
-                      ->addIndex(['username', 'email'], ['unique' => true])
-                      ->save();
-            }
-        }
-
-Renaming a Table
-----------------
-
-To rename a table access an instance of the Table object then call the
-``rename()`` method.
-
-.. code-block:: php
-
-        <?php
-
-        use Migrations\BaseMigration;
-
-        class MyNewMigration extends BaseMigration
-        {
-            /**
-             * Migrate Up.
-             */
-            public function up(): void
-            {
-                $table = $this->table('users');
-                $table
-                    ->rename('legacy_users')
-                    ->update();
-            }
-
-            /**
-             * Migrate Down.
-             */
-            public function down(): void
-            {
-                $table = $this->table('legacy_users');
-                $table
-                    ->rename('users')
-                    ->update();
-            }
-        }
-
-Changing the Primary Key
-------------------------
-
-To change the primary key on an existing table, use the ``changePrimaryKey()`` method.
-Pass in a column name or array of columns names to include in the primary key, or ``null`` to drop the primary key.
-Note that the mentioned columns must be added to the table, they will not be added implicitly.
-
-.. code-block:: php
-
-        <?php
-
-        use Migrations\BaseMigration;
-
-        class MyNewMigration extends BaseMigration
-        {
-            /**
-             * Migrate Up.
-             */
-            public function up(): void
-            {
-                $users = $this->table('users');
-                $users
-                    ->addColumn('username', 'string', ['limit' => 20, 'null' => false])
-                    ->addColumn('password', 'string', ['limit' => 40])
-                    ->save();
-
-                $users
-                    ->addColumn('new_id', 'integer', ['null' => false])
-                    ->changePrimaryKey(['new_id', 'username'])
-                    ->save();
-            }
-
-            /**
-             * Migrate Down.
-             */
-            public function down(): void
-            {
-
-            }
-        }
-
-Changing the Table Comment
---------------------------
-
-To change the comment on an existing table, use the ``changeComment()`` method.
-Pass in a string to set as the new table comment, or ``null`` to drop the existing comment.
-
-.. code-block:: php
-
-        <?php
-
-        use Migrations\BaseMigration;
-
-        class MyNewMigration extends BaseMigration
-        {
-            /**
-             * Migrate Up.
-             */
-            public function up(): void
-            {
-                $users = $this->table('users');
-                $users
-                    ->addColumn('username', 'string', ['limit' => 20])
-                    ->addColumn('password', 'string', ['limit' => 40])
-                    ->save();
-
-                $users
-                    ->changeComment('This is the table with users auth information, password should be encrypted')
-                    ->save();
-            }
-
-            /**
-             * Migrate Down.
-             */
-            public function down(): void
-            {
-
-            }
-        }
-
-.. _valid-column-types:
-
-Working With Columns
-====================
+Adding Columns
+==============
 
 Column types are specified as strings and can be one of:
 
@@ -824,10 +279,12 @@ Option   Description
 ======== ===========
 identity enable or disable automatic incrementing (if enabled, will set ``null: false`` if ``null`` option is not set)
 signed   enable or disable the ``unsigned`` option *(only applies to MySQL)*
-======== ===========
+========
 
-For Postgres, when using ``identity``, it will utilize the ``serial`` type appropriate for the integer size, so that
-``smallinteger`` will give you ``smallserial``, ``integer`` gives ``serial``, and ``biginteger`` gives ``bigserial``.
+For Postgres, when using ``identity``, it will utilize the ``serial`` type
+appropriate for the integer size, so that ``smallinteger`` will give you
+``smallserial``, ``integer`` gives ``serial``, and ``biginteger`` gives
+``bigserial``.
 
 For ``timestamp`` columns:
 
@@ -839,49 +296,52 @@ update   set an action to be triggered when the row is updated (use with ``CURRE
 timezone enable or disable the ``with time zone`` option for ``time`` and ``timestamp`` columns *(only applies to Postgres)*
 ======== ===========
 
-You can add ``created`` and ``updated`` timestamps to a table using the ``addTimestamps()`` method. This method accepts
-three arguments, where the first two allow setting alternative names for the columns while the third argument allows you to
-enable the ``timezone`` option for the columns. The defaults for these arguments are ``created``, ``updated``, and ``false``
-respectively. For the first and second argument, if you provide ``null``, then the default name will be used, and if you provide
-``false``, then that column will not be created. Please note that attempting to set both to ``false`` will throw a
-``\RuntimeException``. Additionally, you can use the ``addTimestampsWithTimezone()`` method, which is an alias to
-``addTimestamps()`` that will always set the third argument to ``true`` (see examples below). The ``created`` column will
-have a default set to ``CURRENT_TIMESTAMP``. For MySQL only, ``updated`` column will have update set to
-``CURRENT_TIMESTAMP``.
+You can add ``created`` and ``updated`` timestamps to a table using the
+``addTimestamps()`` method. This method accepts three arguments, where the first
+two allow setting alternative names for the columns while the third argument
+allows you to enable the ``timezone`` option for the columns. The defaults for
+these arguments are ``created``, ``updated``, and ``false`` respectively. For
+the first and second argument, if you provide ``null``, then the default name
+will be used, and if you provide ``false``, then that column will not be
+created. Please note that attempting to set both to ``false`` will throw
+a ``\RuntimeException``. Additionally, you can use the
+``addTimestampsWithTimezone()`` method, which is an alias to ``addTimestamps()``
+that will always set the third argument to ``true`` (see examples below). The
+``created`` column will have a default set to ``CURRENT_TIMESTAMP``. For MySQL
+only, ``updated`` column will have update set to
+``CURRENT_TIMESTAMP``::
 
-.. code-block:: php
+    <?php
 
-        <?php
+    use Migrations\BaseMigration;
 
-        use Migrations\BaseMigration;
-
-        class MyNewMigration extends BaseMigration
+    class MyNewMigration extends BaseMigration
+    {
+        /**
+         * Migrate Change.
+         */
+        public function change(): void
         {
-            /**
-             * Migrate Change.
-             */
-            public function change(): void
-            {
-                // Use defaults (without timezones)
-                $table = $this->table('users')->addTimestamps()->create();
-                // Use defaults (with timezones)
-                $table = $this->table('users')->addTimestampsWithTimezone()->create();
+            // Use defaults (without timezones)
+            $table = $this->table('users')->addTimestamps()->create();
+            // Use defaults (with timezones)
+            $table = $this->table('users')->addTimestampsWithTimezone()->create();
 
-                // Override the 'created' column name with 'recorded_at'.
-                $table = $this->table('books')->addTimestamps('recorded_at')->create();
+            // Override the 'created' column name with 'recorded_at'.
+            $table = $this->table('books')->addTimestamps('recorded_at')->create();
 
-                // Override the 'updated' column name with 'amended_at', preserving timezones.
-                // The two lines below do the same, the second one is simply cleaner.
-                $table = $this->table('books')->addTimestamps(null, 'amended_at', true)->create();
-                $table = $this->table('users')->addTimestampsWithTimezone(null, 'amended_at')->create();
+            // Override the 'updated' column name with 'amended_at', preserving timezones.
+            // The two lines below do the same, the second one is simply cleaner.
+            $table = $this->table('books')->addTimestamps(null, 'amended_at', true)->create();
+            $table = $this->table('users')->addTimestampsWithTimezone(null, 'amended_at')->create();
 
-                // Only add the created column to the table
-                $table = $this->table('books')->addTimestamps(null, false);
-                // Only add the updated column to the table
-                $table = $this->table('users')->addTimestamps(false);
-                // Note, setting both false will throw a \RuntimeError
-            }
+            // Only add the created column to the table
+            $table = $this->table('books')->addTimestamps(null, false);
+            // Only add the updated column to the table
+            $table = $this->table('users')->addTimestamps(false);
+            // Note, setting both false will throw a \RuntimeError
         }
+    }
 
 For ``boolean`` columns:
 
@@ -900,27 +360,18 @@ collation set collation that differs from table defaults *(only applies to MySQL
 encoding  set character set that differs from table defaults *(only applies to MySQL)*
 ========= ===========
 
-For foreign key definitions:
-
-========== ===========
-Option     Description
-========== ===========
-update     set an action to be triggered when the row is updated
-delete     set an action to be triggered when the row is deleted
-constraint set a name to be used by foreign key constraint
-deferrable define deferred constraint application (postgres only)
-========== ===========
-
-You can pass one or more of these options to any column with the optional
-third argument array.
-
 Limit Option and MySQL
 ----------------------
 
 When using the MySQL adapter, there are a couple things to consider when working with limits:
 
-- When using a ``string`` primary key or index on MySQL 5.7 or below, or the MyISAM storage engine, and the default charset of ``utf8mb4_unicode_ci``, you must specify a limit less than or equal to 191, or use a different charset.
-- Additional hinting of database column type can be made for ``integer``, ``text``, ``blob``, ``tinyblob``, ``mediumblob``, ``longblob`` columns. Using ``limit`` with one the following options will modify the column type accordingly:
+- When using a ``string`` primary key or index on MySQL 5.7 or below, or the
+  MyISAM storage engine, and the default charset of ``utf8mb4_unicode_ci``, you
+  must specify a limit less than or equal to 191, or use a different charset.
+- Additional hinting of database column type can be made for ``integer``,
+  ``text``, ``blob``, ``tinyblob``, ``mediumblob``, ``longblob`` columns. Using
+  ``limit`` with one the following options will modify the column type
+  accordingly:
 
 ============ ==============
 Limit        Column Type
@@ -940,361 +391,379 @@ INT_REGULAR  INT
 INT_BIG      BIGINT
 ============ ==============
 
-For ``binary`` or ``varbinary`` types, if limit is set greater than allowed 255 bytes, the type will be changed to the best matching blob type given the length.
+For ``binary`` or ``varbinary`` types, if limit is set greater than allowed 255
+bytes, the type will be changed to the best matching blob type given the
+length::
+
+    <?php
+
+    use Migrations\Db\Adapter\MysqlAdapter;
+
+    //...
+
+    $table = $this->table('cart_items');
+    $table->addColumn('user_id', 'integer')
+          ->addColumn('product_id', 'integer', ['limit' => MysqlAdapter::INT_BIG])
+          ->addColumn('subtype_id', 'integer', ['limit' => MysqlAdapter::INT_SMALL])
+          ->addColumn('quantity', 'integer', ['limit' => MysqlAdapter::INT_TINY])
+          ->create();
+
+Default values with expressions
+-------------------------------
+
+If you need to set a default to an expression, you can use a ``Literal`` to have
+the column's default value used without any quoting or escaping. This is helpful
+when you want to use a function as a default value::
+
+    use Migrations\BaseMigration;
+    use Migrations\Db\Literal;
+
+    class AddSomeColumns extends BaseMigration
+    {
+        public function change(): void
+        {
+            $this->table('users')
+                  ->addColumn('uniqid', 'uuid', [
+                      'default' => Literal::from('uuid_generate_v4()')
+                  ])
+                  ->create();
+        }
+    }
+
+.. _creating-a-table::
+
+Creating a Table
+----------------
+
+Creating a table is really easy using the Table object. Let's create a table to
+store a collection of users::
+
+    <?php
+
+    use Migrations\BaseMigration;
+
+    class MyNewMigration extends BaseMigration
+    {
+        public function change(): void
+        {
+            $users = $this->table('users');
+            $users->addColumn('username', 'string', ['limit' => 20])
+                  ->addColumn('password', 'string', ['limit' => 40])
+                  ->addColumn('password_salt', 'string', ['limit' => 40])
+                  ->addColumn('email', 'string', ['limit' => 100])
+                  ->addColumn('first_name', 'string', ['limit' => 30])
+                  ->addColumn('last_name', 'string', ['limit' => 30])
+                  ->addColumn('created', 'datetime')
+                  ->addColumn('updated', 'datetime', ['null' => true])
+                  ->addIndex(['username', 'email'], ['unique' => true])
+                  ->create();
+        }
+    }
+
+Columns are added using the ``addColumn()`` method. We create a unique index
+for both the username and email columns using the ``addIndex()`` method.
+Finally calling ``create()`` commits the changes to the database.
 
 .. note::
 
-    **Binary to BLOB Automatic Conversion**
+    Migrations automatically creates an auto-incrementing primary key column called ``id`` for every
+    table.
 
-    When you specify a ``binary`` or ``varbinary`` column with a ``limit`` exceeding 255 bytes,
-    MySQL cannot create a standard binary column (which has a 255 byte maximum). The migration
-    adapter automatically converts the type to the appropriate BLOB subtype:
+The ``id`` option sets the name of the automatically created identity field,
+while the ``primary_key`` option selects the field or fields used for primary
+key. ``id`` will always override the ``primary_key`` option unless it's set to
+false. If you don't need a primary key set ``id`` to false without specifying
+a ``primary_key``, and no primary key will be created.
 
-    .. code-block:: php
+To specify an alternate primary key, you can specify the ``primary_key`` option
+when accessing the Table object. Let's disable the automatic ``id`` column and
+create a primary key using two columns instead::
 
-        // This will automatically become LONGBLOB
-        $table->addColumn('file_content', 'binary', [
-            'limit' => MysqlAdapter::BLOB_LONG  // 4294967295 bytes
-        ]);
+    <?php
 
-        // This will automatically become MEDIUMBLOB
-        $table->addColumn('image_data', 'binary', [
-            'limit' => MysqlAdapter::BLOB_MEDIUM  // 16777215 bytes
-        ]);
+    use Migrations\BaseMigration;
 
-    Alternatively, you can use the blob types directly:
-
-    .. code-block:: php
-
-        $table->addColumn('file_content', 'longblob');
-        $table->addColumn('medium_data', 'mediumblob');
-        $table->addColumn('small_data', 'blob');
-        $table->addColumn('tiny_data', 'tinyblob');
-
-.. code-block:: php
-
-        <?php
-
-        use Migrations\Db\Adapter\MysqlAdapter;
-
-        //...
-
-        $table = $this->table('cart_items');
-        $table->addColumn('user_id', 'integer')
-              ->addColumn('product_id', 'integer', ['limit' => MysqlAdapter::INT_BIG])
-              ->addColumn('subtype_id', 'integer', ['limit' => MysqlAdapter::INT_SMALL])
-              ->addColumn('quantity', 'integer', ['limit' => MysqlAdapter::INT_TINY])
-              ->create();
-
-Custom Column Types & Default Values
-------------------------------------
-
-Some DBMS systems provide additional column types and default values that are specific to them.
-If you don't want to keep your migrations DBMS-agnostic you can use those custom types in your migrations
-through the ``\Migrations\Db\Literal::from`` method, which takes a string as its only argument, and returns an
-instance of ``\Migrations\Db\Literal``. When Migrations encounters this value as a column's type it knows not to
-run any validation on it and to use it exactly as supplied without escaping. This also works for ``default``
-values.
-
-You can see an example below showing how to add a ``citext`` column as well as a column whose default value
-is a function, in PostgreSQL. This method of preventing the built-in escaping is supported in all adapters.
-
-.. code-block:: php
-
-        <?php
-
-        use Migrations\BaseMigration;
-        use Migrations\Db\Literal;
-
-        class AddSomeColumns extends BaseMigration
+    class MyNewMigration extends BaseMigration
+    {
+        public function change(): void
         {
-            public function change(): void
-            {
-                $this->table('users')
-                      ->addColumn('username', Literal::from('citext'))
-                      ->addColumn('uniqid', 'uuid', [
-                          'default' => Literal::from('uuid_generate_v4()')
-                      ])
-                      ->addColumn('creation', 'timestamp', [
-                          'timezone' => true,
-                          'default' => Literal::from('now()')
-                      ])
-                      ->create();
-            }
+            $table = $this->table('followers', ['id' => false, 'primary_key' => ['user_id', 'follower_id']]);
+            $table->addColumn('user_id', 'integer')
+                  ->addColumn('follower_id', 'integer')
+                  ->addColumn('created', 'datetime')
+                  ->create();
         }
+    }
 
-Get a column list
------------------
+Setting a single ``primary_key`` doesn't enable the ``AUTO_INCREMENT`` option.
+To simply change the name of the primary key, we need to override the default ``id`` field name::
 
-To retrieve all table columns, simply create a ``table`` object and call ``getColumns()``
-method. This method will return an array of Column classes with basic info. Example below:
+    <?php
 
-.. code-block:: php
+    use Migrations\BaseMigration;
 
-        <?php
-
-        use Migrations\BaseMigration;
-
-        class ColumnListMigration extends BaseMigration
+    class MyNewMigration extends BaseMigration
+    {
+        public function up(): void
         {
-            /**
-             * Migrate Up.
-             */
-            public function up(): void
-            {
-                $columns = $this->table('users')->getColumns();
-                ...
-            }
-
-            /**
-             * Migrate Down.
-             */
-            public function down(): void
-            {
-                ...
-            }
+            $table = $this->table('followers', ['id' => 'user_id']);
+            $table->addColumn('follower_id', 'integer')
+                  ->addColumn('created', 'timestamp', ['default' => 'CURRENT_TIMESTAMP'])
+                  ->create();
         }
+    }
 
-Get a column by name
---------------------
+In addition, the MySQL adapter supports following options:
 
-To retrieve one table column, simply create a ``table`` object and call the ``getColumn()``
-method. This method will return a Column class with basic info or NULL when the column doesn't exist. Example below:
+========== ================ ===========
+Option     Platform         Description
+========== ================ ===========
+comment    MySQL, Postgres  set a text comment on the table
+collation  MySQL, SqlServer the default collation for a table if different than the database.
+row_format MySQL            set the table row format
+engine     MySQL            define table engine *(defaults to ``InnoDB``)*
+collation  MySQL            define table collation *(defaults to ``utf8mb4_unicode_ci``)*
+signed     MySQL            whether the primary key is ``signed``  *(defaults to ``false``)*
+limit      MySQL            set the maximum length for the primary key
+========== ================ ===========
 
-.. code-block:: php
+By default, the primary key is ``unsigned``.
+To simply set it to be signed just pass ``signed`` option with a ``true``
+value::
 
-        <?php
+    <?php
 
-        use Migrations\BaseMigration;
+    use Migrations\BaseMigration;
 
-        class ColumnListMigration extends BaseMigration
+    class MyNewMigration extends BaseMigration
+    {
+        public function change(): void
         {
-            /**
-             * Migrate Up.
-             */
-            public function up(): void
-            {
-                $column = $this->table('users')->getColumn('email');
-                ...
-            }
-
-            /**
-             * Migrate Down.
-             */
-            public function down(): void
-            {
-                ...
-            }
+            $table = $this->table('followers', ['signed' => false]);
+            $table->addColumn('follower_id', 'integer')
+                  ->addColumn('created', 'timestamp', ['default' => 'CURRENT_TIMESTAMP'])
+                  ->create();
         }
+    }
 
-Checking whether a column exists
---------------------------------
+If you need to create a table with a different collation than the database,
+use::
 
-You can check if a table already has a certain column by using the
-``hasColumn()`` method.
+    <?php
+    use Migrations\BaseMigration;
 
-.. code-block:: php
-
-        <?php
-
-        use Migrations\BaseMigration;
-
-        class MyNewMigration extends BaseMigration
+    class CreateCategoriesTable extends BaseMigration
+    {
+        public function change(): void
         {
-            /**
-             * Change Method.
-             */
-            public function change(): void
-            {
-                $table = $this->table('user');
-                $column = $table->hasColumn('username');
-
-                if ($column) {
-                    // do something
-                }
-
-            }
+            $table = $this
+                ->table('categories', [
+                    'collation' => 'latin1_german1_ci'
+                ])
+                ->addColumn('title', 'string')
+                ->create();
         }
+    }
+
+Note however this can only be done on table creation : there is currently no way
+of adding a column to an existing table with a different collation than the
+table or the database. Only ``MySQL`` and ``SqlServer`` supports this
+configuration key for the time being.
+
+To view available column types and options, see :ref:`adding-columns` for details.
+
+Saving Changes
+--------------
+
+When working with the Table object, Migrations stores certain operations in a
+pending changes cache. Once you have made the changes you want to the table,
+you must save them. To perform this operation, Migrations provides three methods,
+``create()``, ``update()``, and ``save()``. ``create()`` will first create
+the table and then run the pending changes. ``update()`` will just run the
+pending changes, and should be used when the table already exists. ``save()``
+is a helper function that checks first if the table exists and if it does not
+will run ``create()``, else it will run ``update()``.
+
+As stated above, when using the ``change()`` migration method, you should always
+use ``create()`` or ``update()``, and never ``save()`` as otherwise migrating
+and rolling back may result in different states, due to ``save()`` calling
+``create()`` when running migrate and then ``update()`` on rollback. When
+using the ``up()``/``down()`` methods, it is safe to use either ``save()`` or
+the more explicit methods.
+
+When in doubt with working with tables, it is always recommended to call
+the appropriate function and commit any pending changes to the database.
+
 
 Renaming a Column
 -----------------
 
 To rename a column, access an instance of the Table object then call the
-``renameColumn()`` method.
+``renameColumn()`` method::
 
-.. code-block:: php
+    <?php
 
-        <?php
+    use Migrations\BaseMigration;
 
-        use Migrations\BaseMigration;
-
-        class MyNewMigration extends BaseMigration
+    class MyNewMigration extends BaseMigration
+    {
+        /**
+         * Migrate Up.
+         */
+        public function up(): void
         {
-            /**
-             * Migrate Up.
-             */
-            public function up(): void
-            {
-                $table = $this->table('users');
-                $table->renameColumn('bio', 'biography')
-                      ->save();
-            }
-
-            /**
-             * Migrate Down.
-             */
-            public function down(): void
-            {
-                $table = $this->table('users');
-                $table->renameColumn('biography', 'bio')
-                       ->save();
-            }
+            $table = $this->table('users');
+            $table->renameColumn('bio', 'biography')
+                  ->save();
         }
+
+        /**
+         * Migrate Down.
+         */
+        public function down(): void
+        {
+            $table = $this->table('users');
+            $table->renameColumn('biography', 'bio')
+                   ->save();
+        }
+    }
 
 Adding a Column After Another Column
 ------------------------------------
 
-When adding a column with the MySQL adapter, you can dictate its position using the ``after`` option,
-where its value is the name of the column to position it after.
+When adding a column with the MySQL adapter, you can dictate its position using
+the ``after`` option, where its value is the name of the column to position it
+after::
 
-.. code-block:: php
+    <?php
 
-        <?php
+    use Migrations\BaseMigration;
 
-        use Migrations\BaseMigration;
-
-        class MyNewMigration extends BaseMigration
+    class MyNewMigration extends BaseMigration
+    {
+        /**
+         * Change Method.
+         */
+        public function change(): void
         {
-            /**
-             * Change Method.
-             */
-            public function change(): void
-            {
-                $table = $this->table('users');
-                $table->addColumn('city', 'string', ['after' => 'email'])
-                      ->update();
-            }
+            $table = $this->table('users');
+            $table->addColumn('city', 'string', ['after' => 'email'])
+                  ->update();
         }
+    }
 
-This would create the new column ``city`` and position it after the ``email`` column. The
-``\Migrations\Db\Adapter\MysqlAdapter::FIRST`` constant can be used to specify that the new column should be
-created as the first column in that table.
+This would create the new column ``city`` and position it after the ``email``
+column. The ``\Migrations\Db\Adapter\MysqlAdapter::FIRST`` constant can be used
+to specify that the new column should be created as the first column in that
+table.
 
 Dropping a Column
 -----------------
 
-To drop a column, use the ``removeColumn()`` method.
+To drop a column, use the ``removeColumn()`` method::
 
-.. code-block:: php
+    <?php
 
-        <?php
+    use Migrations\BaseMigration;
 
-        use Migrations\BaseMigration;
-
-        class MyNewMigration extends BaseMigration
+    class MyNewMigration extends BaseMigration
+    {
+        /**
+         * Migrate up.
+         */
+        public function up(): void
         {
-            /**
-             * Migrate up.
-             */
-            public function up(): void
-            {
-                $table = $this->table('users');
-                $table->removeColumn('short_name')
-                      ->save();
-            }
+            $table = $this->table('users');
+            $table->removeColumn('short_name')
+                  ->save();
         }
+    }
 
 
 Specifying a Column Limit
 -------------------------
 
-You can limit the maximum length of a column by using the ``limit`` option.
+You can limit the maximum length of a column by using the ``limit`` option::
 
-.. code-block:: php
+    <?php
 
-        <?php
+    use Migrations\BaseMigration;
 
-        use Migrations\BaseMigration;
-
-        class MyNewMigration extends BaseMigration
+    class MyNewMigration extends BaseMigration
+    {
+        /**
+         * Change Method.
+         */
+        public function change(): void
         {
-            /**
-             * Change Method.
-             */
-            public function change(): void
-            {
-                $table = $this->table('tags');
-                $table->addColumn('short_name', 'string', ['limit' => 30])
-                      ->update();
-            }
+            $table = $this->table('tags');
+            $table->addColumn('short_name', 'string', ['limit' => 30])
+                  ->update();
         }
+    }
 
 Changing Column Attributes
 --------------------------
 
 To change column type or options on an existing column, use the ``changeColumn()`` method.
-See :ref:`valid-column-types` and `Valid Column Options`_ for allowed values.
+See :ref:`valid-column-types` and `Valid Column Options`_ for allowed values::
 
-.. code-block:: php
+    <?php
 
-        <?php
+    use Migrations\BaseMigration;
 
-        use Migrations\BaseMigration;
-
-        class MyNewMigration extends BaseMigration
+    class MyNewMigration extends BaseMigration
+    {
+        /**
+         * Migrate Up.
+         */
+        public function up(): void
         {
-            /**
-             * Migrate Up.
-             */
-            public function up(): void
-            {
-                $users = $this->table('users');
-                $users->changeColumn('email', 'string', ['limit' => 255])
-                      ->save();
-            }
-
-            /**
-             * Migrate Down.
-             */
-            public function down(): void
-            {
-
-            }
+            $users = $this->table('users');
+            $users->changeColumn('email', 'string', ['limit' => 255])
+                  ->save();
         }
+
+        /**
+         * Migrate Down.
+         */
+        public function down(): void
+        {
+
+        }
+    }
 
 Working With Indexes
 --------------------
 
 To add an index to a table you can simply call the ``addIndex()`` method on the
-table object.
+table object::
 
-.. code-block:: php
+    <?php
 
-        <?php
+    use Migrations\BaseMigration;
 
-        use Migrations\BaseMigration;
-
-        class MyNewMigration extends BaseMigration
+    class MyNewMigration extends BaseMigration
+    {
+        /**
+         * Migrate Up.
+         */
+        public function up(): void
         {
-            /**
-             * Migrate Up.
-             */
-            public function up(): void
-            {
-                $table = $this->table('users');
-                $table->addColumn('city', 'string')
-                      ->addIndex(['city'])
-                      ->save();
-            }
-
-            /**
-             * Migrate Down.
-             */
-            public function down(): void
-            {
-
-            }
+            $table = $this->table('users');
+            $table->addColumn('city', 'string')
+                  ->addIndex(['city'])
+                  ->save();
         }
+
+        /**
+         * Migrate Down.
+         */
+        public function down(): void
+        {
+
+        }
+    }
 
 By default Migrations instructs the database adapter to create a simple index. We
 can pass an additional parameter ``unique`` to the ``addIndex()`` method to
@@ -1354,24 +823,22 @@ define indexes::
 
 
 The MySQL adapter also supports ``fulltext`` indexes. If you are using a version before 5.6 you must
-ensure the table uses the ``MyISAM`` engine.
+ensure the table uses the ``MyISAM`` engine::
 
-.. code-block:: php
+    <?php
 
-        <?php
+    use Migrations\BaseMigration;
 
-        use Migrations\BaseMigration;
-
-        class MyNewMigration extends BaseMigration
+    class MyNewMigration extends BaseMigration
+    {
+        public function change(): void
         {
-            public function change(): void
-            {
-                $table = $this->table('users', ['engine' => 'MyISAM']);
-                $table->addColumn('email', 'string')
-                      ->addIndex('email', ['type' => 'fulltext'])
-                      ->create();
-            }
+            $table = $this->table('users', ['engine' => 'MyISAM']);
+            $table->addColumn('email', 'string')
+                  ->addIndex('email', ['type' => 'fulltext'])
+                  ->create();
         }
+    }
 
 MySQL adapter supports setting the index length defined by limit option.
 When you are using a multi-column index, you are able to define each column index length.
@@ -1518,42 +985,48 @@ Working With Foreign Keys
 -------------------------
 
 Migrations has support for creating foreign key constraints on your database tables.
-Let's add a foreign key to an example table:
+Let's add a foreign key to an example table::
 
-.. code-block:: php
+    <?php
 
-        <?php
+    use Migrations\BaseMigration;
 
-        use Migrations\BaseMigration;
-
-        class MyNewMigration extends BaseMigration
+    class MyNewMigration extends BaseMigration
+    {
+        /**
+         * Migrate Up.
+         */
+        public function up(): void
         {
-            /**
-             * Migrate Up.
-             */
-            public function up(): void
-            {
-                $table = $this->table('tags');
-                $table->addColumn('tag_name', 'string')
-                      ->save();
+            $table = $this->table('tags');
+            $table->addColumn('tag_name', 'string')
+                  ->save();
 
-                $refTable = $this->table('tag_relationships');
-                $refTable->addColumn('tag_id', 'integer', ['null' => true])
-                         ->addForeignKey('tag_id', 'tags', 'id', ['delete'=> 'SET_NULL', 'update'=> 'NO_ACTION'])
-                         ->save();
+            $refTable = $this->table('tag_relationships');
+            $refTable->addColumn('tag_id', 'integer', ['null' => true])
+                    ->addForeignKey(
+                        'tag_id',
+                        'tags',
+                        'id',
+                        ['delete'=> 'SET_NULL', 'update'=> 'NO_ACTION'],
+                    )
+                    ->save();
 
-            }
-
-            /**
-             * Migrate Down.
-             */
-            public function down(): void
-            {
-
-            }
         }
 
-"On delete" and "On update" actions are defined with a 'delete' and 'update' options array. Possibles values are 'SET_NULL', 'NO_ACTION', 'CASCADE' and 'RESTRICT'.  If 'SET_NULL' is used then the column must be created as nullable with the option ``['null' => true]``.
+        /**
+         * Migrate Down.
+         */
+        public function down(): void
+        {
+
+        }
+    }
+
+The 'delete' and 'update' options allow you to define the ``ON UPDATE`` and ``ON
+DELETE`` behavior. Possibles values are 'SET_NULL', 'NO_ACTION', 'CASCADE' and
+'RESTRICT'.  If 'SET_NULL' is used then the column must be created as nullable
+with the option ``['null' => true]``.
 
 Foreign keys can be defined with arrays of columns to build constraints between
 tables with composite keys::
@@ -1577,12 +1050,23 @@ tables with composite keys::
                     [
                         'delete'=> 'NO_ACTION',
                         'update'=> 'NO_ACTION',
-                        'constraint' => 'user_follower_id'
+                        'constraint' => 'user_follower_id',
                     ]
                 )
                 ->save();
         }
     }
+
+The options parameter of ``addForeignKey()`` supports the following options:
+
+========== ===========
+Option     Description
+========== ===========
+update     set an action to be triggered when the row is updated
+delete     set an action to be triggered when the row is deleted
+constraint set a name to be used by foreign key constraint
+deferrable define deferred constraint application (postgres only)
+========== ===========
 
 Using the ``foreignKey()`` method provides a fluent builder to define a foreign
 key::
@@ -1615,361 +1099,398 @@ key::
 .. versionadded:: 4.6.0
    The ``foreignKey`` method was added.
 
-We can also easily check if a foreign key exists:
+We can also easily check if a foreign key exists::
 
-.. code-block:: php
+    <?php
 
-        <?php
+    use Migrations\BaseMigration;
 
-        use Migrations\BaseMigration;
-
-        class MyNewMigration extends BaseMigration
+    class MyNewMigration extends BaseMigration
+    {
+        /**
+         * Migrate Up.
+         */
+        public function up(): void
         {
-            /**
-             * Migrate Up.
-             */
-            public function up(): void
-            {
-                $table = $this->table('tag_relationships');
-                $exists = $table->hasForeignKey('tag_id');
-                if ($exists) {
-                    // do something
-                }
-            }
-
-            /**
-             * Migrate Down.
-             */
-            public function down(): void
-            {
-
+            $table = $this->table('tag_relationships');
+            $exists = $table->hasForeignKey('tag_id');
+            if ($exists) {
+                // do something
             }
         }
+
+        /**
+         * Migrate Down.
+         */
+        public function down(): void
+        {
+
+        }
+    }
 
 Finally, to delete a foreign key, use the ``dropForeignKey`` method.
 
-Note that like other methods in the ``Table`` class, ``dropForeignKey`` also needs ``save()``
-to be called at the end in order to be executed. This allows Migrations to intelligently
-plan migrations when more than one table is involved.
+Note that like other methods in the ``Table`` class, ``dropForeignKey`` also
+needs ``save()`` to be called at the end in order to be executed. This allows
+Migrations to intelligently plan migrations when more than one table is
+involved::
 
-.. code-block:: php
+    <?php
 
-        <?php
+    use Migrations\BaseMigration;
 
-        use Migrations\BaseMigration;
-
-        class MyNewMigration extends BaseMigration
+    class MyNewMigration extends BaseMigration
+    {
+        /**
+         * Migrate Up.
+         */
+        public function up(): void
         {
-            /**
-             * Migrate Up.
-             */
-            public function up(): void
-            {
-                $table = $this->table('tag_relationships');
-                $table->dropForeignKey('tag_id')->save();
-            }
+            $table = $this->table('tag_relationships');
+            $table->dropForeignKey('tag_id')->save();
+        }
 
-            /**
-             * Migrate Down.
-             */
-            public function down(): void
-            {
+        /**
+         * Migrate Down.
+         */
+        public function down(): void
+        {
 
+        }
+    }
+
+Determining Whether a Table Exists
+----------------------------------
+
+You can determine whether or not a table exists by using the ``hasTable()``
+method::
+
+    <?php
+
+    use Migrations\BaseMigration;
+
+    class MyNewMigration extends BaseMigration
+    {
+        /**
+         * Migrate Up.
+         */
+        public function up(): void
+        {
+            $exists = $this->hasTable('users');
+            if ($exists) {
+                // do something
             }
         }
+
+        /**
+         * Migrate Down.
+         */
+        public function down(): void
+        {
+
+        }
+    }
+
+Dropping a Table
+----------------
+
+Tables can be dropped quite easily using the ``drop()`` method. It is a
+good idea to recreate the table again in the ``down()`` method.
+
+Note that like other methods in the ``Table`` class, ``drop`` also needs ``save()``
+to be called at the end in order to be executed. This allows Migrations to intelligently
+plan migrations when more than one table is involved::
+
+    <?php
+
+    use Migrations\BaseMigration;
+
+    class MyNewMigration extends BaseMigration
+    {
+        /**
+         * Migrate Up.
+         */
+        public function up(): void
+        {
+            $this->table('users')->drop()->save();
+        }
+
+        /**
+         * Migrate Down.
+         */
+        public function down(): void
+        {
+            $users = $this->table('users');
+            $users->addColumn('username', 'string', ['limit' => 20])
+                  ->addColumn('password', 'string', ['limit' => 40])
+                  ->addColumn('password_salt', 'string', ['limit' => 40])
+                  ->addColumn('email', 'string', ['limit' => 100])
+                  ->addColumn('first_name', 'string', ['limit' => 30])
+                  ->addColumn('last_name', 'string', ['limit' => 30])
+                  ->addColumn('created', 'datetime')
+                  ->addColumn('updated', 'datetime', ['null' => true])
+                  ->addIndex(['username', 'email'], ['unique' => true])
+                  ->save();
+        }
+    }
+
+Renaming a Table
+----------------
+
+To rename a table access an instance of the Table object then call the
+``rename()`` method::
+
+    <?php
+
+    use Migrations\BaseMigration;
+
+    class MyNewMigration extends BaseMigration
+    {
+        /**
+         * Migrate Up.
+         */
+        public function up(): void
+        {
+            $table = $this->table('users');
+            $table
+                ->rename('legacy_users')
+                ->update();
+        }
+
+        /**
+         * Migrate Down.
+         */
+        public function down(): void
+        {
+            $table = $this->table('legacy_users');
+            $table
+                ->rename('users')
+                ->update();
+        }
+    }
+
+Changing the Primary Key
+------------------------
+
+To change the primary key on an existing table, use the ``changePrimaryKey()``
+method. Pass in a column name or array of columns names to include in the
+primary key, or ``null`` to drop the primary key. Note that the mentioned
+columns must be added to the table, they will not be added implicitly::
+
+    <?php
+
+    use Migrations\BaseMigration;
+
+    class MyNewMigration extends BaseMigration
+    {
+        /**
+         * Migrate Up.
+         */
+        public function up(): void
+        {
+            $users = $this->table('users');
+            $users
+                ->addColumn('username', 'string', ['limit' => 20, 'null' => false])
+                ->addColumn('password', 'string', ['limit' => 40])
+                ->save();
+
+            $users
+                ->addColumn('new_id', 'integer', ['null' => false])
+                ->changePrimaryKey(['new_id', 'username'])
+                ->save();
+        }
+
+        /**
+         * Migrate Down.
+         */
+        public function down(): void
+        {
+
+        }
+    }
+
+Creating Custom Primary Keys
+----------------------------
+
+You can specify a ``autoId`` property in the Migration class and set it to
+``false``, which will turn off the automatic ``id`` column creation. You will
+need to manually create the column that will be used as a primary key and add
+it to the table declaration::
+
+    <?php
+    use Migrations\BaseMigration;
+
+    class CreateProductsTable extends BaseMigration
+    {
+
+        public bool $autoId = false;
+
+        public function up(): void
+        {
+            $table = $this->table('products');
+            $table
+                ->addColumn('id', 'uuid')
+                ->addPrimaryKey('id')
+                ->addColumn('name', 'string')
+                ->addColumn('description', 'text')
+                ->create();
+        }
+    }
+
+The above will create a ``CHAR(36)`` ``id`` column that is also the primary key.
+
+When specifying a custom primary key on the command line, you must note
+it as the primary key in the id field, otherwise you may get an error
+regarding duplicate id fields, i.e.:
+
+.. code-block:: bash
+
+    bin/cake bake migration CreateProducts id:uuid:primary name:string description:text created modified
+
+
+All baked migrations and snapshot will use this new way when necessary.
+
+.. warning::
+
+    Dealing with primary key can only be done on table creation operations.
+    This is due to limitations for some database servers the plugin supports.
+
+Changing the Table Comment
+--------------------------
+
+To change the comment on an existing table, use the ``changeComment()`` method.
+Pass in a string to set as the new table comment, or ``null`` to drop the existing comment::
+
+    <?php
+
+    use Migrations\BaseMigration;
+
+    class MyNewMigration extends BaseMigration
+    {
+        /**
+         * Migrate Up.
+         */
+        public function up(): void
+        {
+            $users = $this->table('users');
+            $users
+                ->addColumn('username', 'string', ['limit' => 20])
+                ->addColumn('password', 'string', ['limit' => 40])
+                ->save();
+
+            $users
+                ->changeComment('This is the table with users auth information, password should be encrypted')
+                ->save();
+        }
+
+        /**
+         * Migrate Down.
+         */
+        public function down(): void
+        {
+
+        }
+    }
+
+Checking Columns
+================
+
+``BaseMigration`` also provides methods for introspecting the current schema,
+allowing you to conditionally make changes to schema, or read data.
+Schema is inspected **when the migration is run**.
+
+Get a column list
+-----------------
+
+To retrieve all table columns, simply create a ``table`` object and call
+``getColumns()`` method. This method will return an array of Column classes with
+basic info. Example below::
+
+    <?php
+
+    use Migrations\BaseMigration;
+
+    class ColumnListMigration extends BaseMigration
+    {
+        /**
+         * Migrate Up.
+         */
+        public function up(): void
+        {
+            $columns = $this->table('users')->getColumns();
+            ...
+        }
+
+        /**
+         * Migrate Down.
+         */
+        public function down(): void
+        {
+            ...
+        }
+    }
+
+Get a column by name
+--------------------
+
+To retrieve one table column, simply create a ``table`` object and call the
+``getColumn()`` method. This method will return a Column class with basic info
+or NULL when the column doesn't exist. Example below::
+
+    <?php
+
+    use Migrations\BaseMigration;
+
+    class ColumnListMigration extends BaseMigration
+    {
+        /**
+         * Migrate Up.
+         */
+        public function up(): void
+        {
+            $column = $this->table('users')->getColumn('email');
+            ...
+        }
+
+        /**
+         * Migrate Down.
+         */
+        public function down(): void
+        {
+            ...
+        }
+    }
+
+Checking whether a column exists
+--------------------------------
+
+You can check if a table already has a certain column by using the
+``hasColumn()`` method::
+
+    <?php
+
+    use Migrations\BaseMigration;
+
+    class MyNewMigration extends BaseMigration
+    {
+        /**
+         * Change Method.
+         */
+        public function change(): void
+        {
+            $table = $this->table('user');
+            $column = $table->hasColumn('username');
+
+            if ($column) {
+                // do something
+            }
+
+        }
+    }
+
 
 Changing templates
 ------------------
 
 See :ref:`custom-seed-migration-templates` for how to customize the templates
 used to generate migrations.
-
-
-Using the Query Builder
-=======================
-
-It is not uncommon to pair database structure changes with data changes. For example, you may want to
-migrate the data in a couple columns from the users to a newly created table. For this type of scenarios,
-Migrations provides access to a Query builder object, that you may use to execute complex ``SELECT``, ``UPDATE``,
-``INSERT`` or ``DELETE`` statements.
-
-The Query builder is provided by the `cakephp/database <https://github.com/cakephp/database>`_ project, and should
-be easy to work with as it resembles very closely plain SQL. Accesing the query builder is done by calling the
-``getQueryBuilder(string $type)`` function. The ``string $type`` options are `'select'`, `'insert'`, `'update'` and `'delete'`:
-
-
-.. code-block:: php
-
-        <?php
-
-        use Migrations\BaseMigration;
-
-        class MyNewMigration extends BaseMigration
-        {
-            /**
-             * Migrate Up.
-             */
-            public function up(): void
-            {
-                $builder = $this->getQueryBuilder('select');
-                $statement = $builder->select('*')->from('users')->execute();
-                var_dump($statement->fetchAll());
-            }
-        }
-
-Selecting Fields
-----------------
-
-Adding fields to the SELECT clause:
-
-
-.. code-block:: php
-
-        <?php
-        $builder->select(['id', 'title', 'body']);
-
-        // Results in SELECT id AS pk, title AS aliased_title, body ...
-        $builder->select(['pk' => 'id', 'aliased_title' => 'title', 'body']);
-
-        // Use a closure
-        $builder->select(function ($builder) {
-            return ['id', 'title', 'body'];
-        });
-
-
-Where Conditions
-----------------
-
-Generating conditions:
-
-.. code-block:: php
-
-        // WHERE id = 1
-        $builder->where(['id' => 1]);
-
-        // WHERE id > 1
-        $builder->where(['id >' => 1]);
-
-
-As you can see you can use any operator by placing it with a space after the field name. Adding multiple conditions is easy as well:
-
-
-.. code-block:: php
-
-        <?php
-        $builder->where(['id >' => 1])->andWhere(['title' => 'My Title']);
-
-        // Equivalent to
-        $builder->where(['id >' => 1, 'title' => 'My title']);
-
-        // WHERE id > 1 OR title = 'My title'
-        $builder->where(['OR' => ['id >' => 1, 'title' => 'My title']]);
-
-
-For even more complex conditions you can use closures and expression objects:
-
-.. code-block:: php
-
-        <?php
-        // Coditions are tied together with AND by default
-        $builder
-            ->select('*')
-            ->from('articles')
-            ->where(function ($exp) {
-                return $exp
-                    ->eq('author_id', 2)
-                    ->eq('published', true)
-                    ->notEq('spam', true)
-                    ->gt('view_count', 10);
-            });
-
-
-Which results in:
-
-.. code-block:: sql
-
-    SELECT * FROM articles
-    WHERE
-        author_id = 2
-        AND published = 1
-        AND spam != 1
-        AND view_count > 10
-
-
-Combining expressions is also possible:
-
-
-.. code-block:: php
-
-        <?php
-        $builder
-            ->select('*')
-            ->from('articles')
-            ->where(function ($exp) {
-                $orConditions = $exp->or_(['author_id' => 2])
-                    ->eq('author_id', 5);
-                return $exp
-                    ->not($orConditions)
-                    ->lte('view_count', 10);
-            });
-
-It generates:
-
-.. code-block:: sql
-
-    SELECT *
-    FROM articles
-    WHERE
-        NOT (author_id = 2 OR author_id = 5)
-        AND view_count <= 10
-
-
-When using the expression objects you can use the following methods to create conditions:
-
-* ``eq()`` Creates an equality condition.
-* ``notEq()`` Create an inequality condition
-* ``like()`` Create a condition using the ``LIKE`` operator.
-* ``notLike()`` Create a negated ``LIKE`` condition.
-* ``in()`` Create a condition using ``IN``.
-* ``notIn()`` Create a negated condition using ``IN``.
-* ``gt()`` Create a ``>`` condition.
-* ``gte()`` Create a ``>=`` condition.
-* ``lt()`` Create a ``<`` condition.
-* ``lte()`` Create a ``<=`` condition.
-* ``isNull()`` Create an ``IS NULL`` condition.
-* ``isNotNull()`` Create a negated ``IS NULL`` condition.
-
-
-Aggregates and SQL Functions
-----------------------------
-
-.. code-block:: php
-
-    <?php
-    // Results in SELECT COUNT(*) count FROM ...
-    $builder->select(['count' => $builder->func()->count('*')]);
-
-A number of commonly used functions can be created with the func() method:
-
-* ``sum()`` Calculate a sum. The arguments will be treated as literal values.
-* ``avg()`` Calculate an average. The arguments will be treated as literal values.
-* ``min()`` Calculate the min of a column. The arguments will be treated as literal values.
-* ``max()`` Calculate the max of a column. The arguments will be treated as literal values.
-* ``count()`` Calculate the count. The arguments will be treated as literal values.
-* ``concat()`` Concatenate two values together. The arguments are treated as bound parameters unless marked as literal.
-* ``coalesce()`` Coalesce values. The arguments are treated as bound parameters unless marked as literal.
-* ``dateDiff()`` Get the difference between two dates/times. The arguments are treated as bound parameters unless marked as literal.
-* ``now()`` Take either 'time' or 'date' as an argument allowing you to get either the current time, or current date.
-
-When providing arguments for SQL functions, there are two kinds of parameters you can use,
-literal arguments and bound parameters. Literal parameters allow you to reference columns or
-other SQL literals. Bound parameters can be used to safely add user data to SQL functions. For example:
-
-
-.. code-block:: php
-
-    <?php
-    // Generates:
-    // SELECT CONCAT(title, ' NEW') ...;
-    $concat = $builder->func()->concat([
-        'title' => 'literal',
-        ' NEW'
-    ]);
-    $query->select(['title' => $concat]);
-
-
-Getting Results out of a Query
-------------------------------
-
-Once you’ve made your query, you’ll want to retrieve rows from it. There are a few ways of doing this:
-
-
-.. code-block:: php
-
-    <?php
-    // Iterate the query
-    foreach ($builder as $row) {
-        echo $row['title'];
-    }
-
-    // Get the statement and fetch all results
-    $results = $builder->execute()->fetchAll('assoc');
-
-
-Creating an Insert Query
-------------------------
-
-Creating insert queries is also possible:
-
-
-.. code-block:: php
-
-    <?php
-    $builder = $this->getQueryBuilder('insert');
-    $builder
-        ->insert(['first_name', 'last_name'])
-        ->into('users')
-        ->values(['first_name' => 'Steve', 'last_name' => 'Jobs'])
-        ->values(['first_name' => 'Jon', 'last_name' => 'Snow'])
-        ->execute();
-
-
-For increased performance, you can use another builder object as the values for an insert query:
-
-.. code-block:: php
-
-    <?php
-
-    $namesQuery = $this->getQueryBuilder('select');
-    $namesQuery
-        ->select(['fname', 'lname'])
-        ->from('users')
-        ->where(['is_active' => true]);
-
-    $builder = $this->getQueryBuilder('insert');
-    $st = $builder
-        ->insert(['first_name', 'last_name'])
-        ->into('names')
-        ->values($namesQuery)
-        ->execute();
-
-    var_dump($st->lastInsertId('names', 'id'));
-
-
-The above code will generate:
-
-.. code-block:: sql
-
-    INSERT INTO names (first_name, last_name)
-        (SELECT fname, lname FROM USERS where is_active = 1)
-
-
-Creating an update Query
-------------------------
-
-Creating update queries is similar to both inserting and selecting:
-
-.. code-block:: php
-
-    <?php
-    $builder = $this->getQueryBuilder('update');
-    $builder
-        ->update('users')
-        ->set('fname', 'Snow')
-        ->where(['fname' => 'Jon'])
-        ->execute();
-
-
-Creating a Delete Query
------------------------
-
-Finally, delete queries:
-
-.. code-block:: php
-
-    <?php
-    $builder = $this->getQueryBuilder('delete');
-    $builder
-        ->delete('users')
-        ->where(['accepted_gdpr' => false])
-        ->execute();
