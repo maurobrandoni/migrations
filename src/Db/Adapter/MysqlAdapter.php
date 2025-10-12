@@ -480,6 +480,7 @@ class MysqlAdapter extends AbstractAdapter
             $type = 'timestamp';
             $length = $columnData['precision'] ?? $length;
         } elseif ($type === TableSchema::TYPE_BINARY) {
+            // TODO could rawType be removed? We should be able to use the abstract type and length only.
             // CakePHP returns BLOB columns as 'binary' with specific lengths
             // Check the raw MySQL type to distinguish BLOB from BINARY columns
             $rawType = $columnData['rawType'] ?? '';
