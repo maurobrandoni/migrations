@@ -831,7 +831,7 @@ can use to perform this operation:
     bin/cake schema_cache clear
 
 Alert of missing migrations
----------------------------
+===========================
 
 You can use the ``Migrations.PendingMigrations`` middleware in local development
 to alert developers about new migrations that have not been applied::
@@ -856,7 +856,7 @@ You can temporarily disable the migration check by adding
 ``skip-migration-check=1`` to the URL query string
 
 IDE autocomplete support
-------------------------
+========================
 
 The `IdeHelper plugin
 <https://github.com/dereuromark/cakephp-ide-helper>`__ can help
