@@ -843,6 +843,7 @@ class Column
             'timezone' => $this->getTimezone(),
             'comment' => $this->getComment(),
             'autoIncrement' => $this->getIdentity(),
+            'values' => $this->getValues(),
         ];
     }
 }

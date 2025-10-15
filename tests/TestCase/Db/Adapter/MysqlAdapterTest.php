@@ -493,6 +493,18 @@ class MysqlAdapterTest extends TestCase
         $this->assertFalse($this->adapter->hasColumn('ntable', 'address'));
     }
 
+    public function testCreateTableWithSetEnumTypes()
+    {
+        $table = new Table('enum_test', [], $this->adapter);
+        $table->addColumn('status', 'enum', ['values' => ['pending', 'active', 'archived']])
+              ->addColumn('kind', 'set', ['values' => ['a', 'b']])
+              ->save();
+
+        $this->assertTrue($this->adapter->hasTable('enum_test'));
+        $this->assertTrue($this->adapter->hasColumn('enum_test', 'status'));
+        $this->assertTrue($this->adapter->hasColumn('enum_test', 'kind'));
+    }
+
     #[RunInSeparateProcess]
     public function testUnsignedPksFeatureFlag()
     {
@@ -933,6 +945,150 @@ class MysqlAdapterTest extends TestCase
         $this->assertNull($rows[1]['Default']);
     }
 
+    public function testChangeColumnEnum()
+    {
+        $table = new Table('t', [], $this->adapter);
+        $table->addColumn('column1', 'string')
+              ->save();
+        $this->assertTrue($this->adapter->hasColumn('t', 'column1'));
+
+        $table->changeColumn('column1', 'enum', ['values' => ['a', 'b']])->save();
+        $this->assertTrue($this->adapter->hasColumn('t', 'column1'));
+
+        $rows = $this->adapter->fetchAll('SHOW COLUMNS FROM t');
+        $this->assertNull($rows[1]['Default']);
+        $this->assertEquals("enum('a','b')", $rows[1]['Type']);
+    }
+
+    public static function binaryToBlobAutomaticConversionData()
+    {
+        return [
+            // When creating binary with limit > 255, MySQL auto-converts to BLOB
+            // input limit, expected SQL type name, expected column limit after round-trip
+            [null, 'blob', MysqlAdapter::BLOB_REGULAR], // binary(null) becomes BLOB
+            [64, 'tinyblob', MysqlAdapter::BLOB_TINY], // binary(64) becomes TINYBLOB
+            [MysqlAdapter::BLOB_REGULAR - 20, 'mediumblob', MysqlAdapter::BLOB_MEDIUM],
+            [MysqlAdapter::BLOB_REGULAR, 'blob', MysqlAdapter::BLOB_REGULAR],
+            [MysqlAdapter::BLOB_REGULAR + 20, 'mediumblob', MysqlAdapter::BLOB_MEDIUM],
+            [MysqlAdapter::BLOB_MEDIUM, 'mediumblob', MysqlAdapter::BLOB_MEDIUM],
+            [MysqlAdapter::BLOB_MEDIUM + 20, 'longblob', MysqlAdapter::BLOB_LONG],
+            [MysqlAdapter::BLOB_LONG, 'longblob', MysqlAdapter::BLOB_LONG],
+        ];
+    }
+
+    #[DataProvider('binaryToBlobAutomaticConversionData')]
+    public function testBinaryToBlobAutomaticConversion(?int $limit, string $expectedType, ?int $expectedLimit)
+    {
+        $table = new Table('t', [], $this->adapter);
+        $table->addColumn('column1', 'binary', ['limit' => $limit])
+              ->save();
+        $columns = $table->getColumns();
+        $this->assertSame($expectedType, $columns[1]->getType());
+        $this->assertSame($expectedLimit, $columns[1]->getLimit());
+    }
+
+    public static function varbinaryToBlobAutomaticConversionData()
+    {
+        return [
+            // When creating varbinary with limit > 255, MySQL auto-converts to BLOB
+            // input limit, expected SQL type name, expected column limit after round-trip
+            [null, 'blob', MysqlAdapter::BLOB_REGULAR], // varbinary(null) becomes BLOB
+            [64, 'tinyblob', MysqlAdapter::BLOB_TINY], // varbinary(64) becomes TINYBLOB
+            [MysqlAdapter::BLOB_REGULAR - 20, 'mediumblob', MysqlAdapter::BLOB_MEDIUM],
+            [MysqlAdapter::BLOB_REGULAR, 'blob', MysqlAdapter::BLOB_REGULAR],
+            [MysqlAdapter::BLOB_REGULAR + 20, 'mediumblob', MysqlAdapter::BLOB_MEDIUM],
+            [MysqlAdapter::BLOB_MEDIUM, 'mediumblob', MysqlAdapter::BLOB_MEDIUM],
+            [MysqlAdapter::BLOB_MEDIUM + 20, 'longblob', MysqlAdapter::BLOB_LONG],
+            [MysqlAdapter::BLOB_LONG, 'longblob', MysqlAdapter::BLOB_LONG],
+        ];
+    }
+
+    #[DataProvider('varbinaryToBlobAutomaticConversionData')]
+    public function testVarbinaryToBlobAutomaticConversion(?int $limit, string $expectedType, ?int $expectedLimit)
+    {
+        $table = new Table('t', [], $this->adapter);
+        $table->addColumn('column1', 'varbinary', ['limit' => $limit])
+              ->save();
+        $columns = $table->getColumns();
+        $this->assertSame($expectedType, $columns[1]->getType());
+        $this->assertSame($expectedLimit, $columns[1]->getLimit());
+    }
+
+    public static function blobColumnsData()
+    {
+        return [
+          // BLOB columns with various limits - MySQL auto-selects appropriate BLOB subtype
+          // input type, expected SQL type, input limit, expected column limit after round-trip
+          // Tiny blobs
+          ['tinyblob', 'tinyblob', null, MysqlAdapter::BLOB_TINY],
+          ['tinyblob', 'tinyblob', MysqlAdapter::BLOB_TINY, MysqlAdapter::BLOB_TINY],
+          ['tinyblob', 'mediumblob', MysqlAdapter::BLOB_TINY + 20, MysqlAdapter::BLOB_MEDIUM],
+          ['tinyblob', 'mediumblob', MysqlAdapter::BLOB_MEDIUM, MysqlAdapter::BLOB_MEDIUM],
+          ['tinyblob', 'longblob', MysqlAdapter::BLOB_LONG, MysqlAdapter::BLOB_LONG],
+          // Regular blobs
+          ['blob', 'tinyblob', MysqlAdapter::BLOB_TINY, MysqlAdapter::BLOB_TINY],
+          ['blob', 'blob', null, MysqlAdapter::BLOB_REGULAR],
+          ['blob', 'blob', MysqlAdapter::BLOB_REGULAR, MysqlAdapter::BLOB_REGULAR],
+          ['blob', 'mediumblob', MysqlAdapter::BLOB_MEDIUM, MysqlAdapter::BLOB_MEDIUM],
+          ['blob', 'longblob', MysqlAdapter::BLOB_LONG, MysqlAdapter::BLOB_LONG],
+          // Medium blobs
+          ['mediumblob', 'tinyblob', MysqlAdapter::BLOB_TINY, MysqlAdapter::BLOB_TINY],
+          ['mediumblob', 'blob', MysqlAdapter::BLOB_REGULAR, MysqlAdapter::BLOB_REGULAR],
+          ['mediumblob', 'mediumblob', null, MysqlAdapter::BLOB_MEDIUM],
+          ['mediumblob', 'mediumblob', MysqlAdapter::BLOB_MEDIUM, MysqlAdapter::BLOB_MEDIUM],
+          ['mediumblob', 'longblob', MysqlAdapter::BLOB_LONG, MysqlAdapter::BLOB_LONG],
+          // Long blobs
+          ['longblob', 'tinyblob', MysqlAdapter::BLOB_TINY, MysqlAdapter::BLOB_TINY],
+          ['longblob', 'blob', MysqlAdapter::BLOB_REGULAR, MysqlAdapter::BLOB_REGULAR],
+          ['longblob', 'mediumblob', MysqlAdapter::BLOB_MEDIUM, MysqlAdapter::BLOB_MEDIUM],
+          ['longblob', 'longblob', null, MysqlAdapter::BLOB_LONG],
+          ['longblob', 'longblob', MysqlAdapter::BLOB_LONG, MysqlAdapter::BLOB_LONG],
+        ];
+    }
+
+    #[DataProvider('blobColumnsData')]
+    public function testblobColumns(string $type, string $expectedType, ?int $limit, ?int $expectedLimit)
+    {
+        $table = new Table('t', [], $this->adapter);
+        $table->addColumn('blob_col', $type, ['limit' => $limit])
+              ->save();
+        $columns = $table->getColumns();
+        $this->assertSame($expectedType, $columns[1]->getType());
+        $this->assertSame($expectedLimit, $columns[1]->getLimit());
+    }
+
+    public static function blobRoundTripData()
+    {
+        return [
+            // type, limit, expected type after round-trip, expected limit after round-trip
+            ['blob', null, 'blob', MysqlAdapter::BLOB_REGULAR],
+            ['blob', MysqlAdapter::BLOB_REGULAR, 'blob', MysqlAdapter::BLOB_REGULAR],
+            ['tinyblob', null, 'tinyblob', MysqlAdapter::BLOB_TINY],
+            ['mediumblob', null, 'mediumblob', MysqlAdapter::BLOB_MEDIUM],
+            ['longblob', null, 'longblob', MysqlAdapter::BLOB_LONG],
+        ];
+    }
+
+    #[DataProvider('blobRoundTripData')]
+    public function testBlobRoundTrip(string $type, ?int $limit, string $expectedType, int $expectedLimit)
+    {
+        // Create a table with a BLOB column
+        $table = new Table('blob_round_trip_test', [], $this->adapter);
+        $table->addColumn('blob_col', $type, ['limit' => $limit])
+              ->save();
+
+        // Read the column back from the database
+        $columns = $this->adapter->getColumns('blob_round_trip_test');
+
+        $blobColumn = $columns[1];
+        $this->assertNotNull($blobColumn, 'BLOB column not found');
+        $this->assertSame($expectedType, $blobColumn->getType(), 'Type mismatch after round-trip');
+        $this->assertSame($expectedLimit, $blobColumn->getLimit(), 'Limit mismatch after round-trip');
+
+        // Clean up
+        $this->adapter->dropTable('blob_round_trip_test');
+    }
+
     public function testTimestampInvalidLimit()
     {
         $this->adapter->connect();
@@ -975,7 +1131,7 @@ class MysqlAdapterTest extends TestCase
             ['column9', 'time', []],
             ['column10', 'timestamp', []],
             ['column11', 'date', []],
-            ['column12', 'binary', []],
+            ['column12', 'blob', []], // binary with no limit becomes BLOB in MySQL
             ['column13', 'boolean', ['comment' => 'Lorem ipsum']],
             ['column14', 'string', ['limit' => 10]],
             ['column16', 'geometry', []],
@@ -1625,6 +1781,40 @@ class MysqlAdapterTest extends TestCase
         $columnWithComment = $rows[1];
 
         $this->assertSame('column1', $columnWithComment['COLUMN_NAME'], "Didn't set column name correctly");
+        $this->assertEquals($comment, $columnWithComment['COLUMN_COMMENT'], "Didn't set column comment correctly");
+    }
+
+    public function testAddColumnEnum()
+    {
+        $table = new Table('t', [], $this->adapter);
+        $table->addColumn('column1', 'string')
+              ->save();
+        $this->assertTrue($this->adapter->hasColumn('t', 'column1'));
+
+        $table->addColumn('column2', 'enum', ['values' => ['a', 'b']])->save();
+        $this->assertTrue($this->adapter->hasColumn('t', 'column2'));
+
+        $comment = 'Comments from "column3"';
+        $table->addColumn('column3', 'enum', ['values' => ['c', 'd'], 'null' => false, 'default' => 'd', 'comment' => $comment])->save();
+        $this->assertTrue($this->adapter->hasColumn('t', 'column3'));
+
+        $rows = $this->adapter->fetchAll('SHOW COLUMNS FROM t');
+        $this->assertEquals("enum('a','b')", $rows[2]['Type']);
+        $this->assertEquals('YES', $rows[2]['Null']);
+        $this->assertNull($rows[2]['Default']);
+        $this->assertEquals("enum('c','d')", $rows[3]['Type']);
+        $this->assertEquals('NO', $rows[3]['Null']);
+        $this->assertEquals('d', $rows[3]['Default']);
+
+        $rows = $this->adapter->fetchAll(sprintf(
+            "SELECT COLUMN_NAME, COLUMN_COMMENT
+            FROM information_schema.columns
+            WHERE TABLE_SCHEMA='%s' AND TABLE_NAME='t'
+            ORDER BY ORDINAL_POSITION",
+            $this->config['database'],
+        ));
+        $columnWithComment = $rows[3];
+        $this->assertSame('column3', $columnWithComment['COLUMN_NAME'], "Didn't set column name correctly");
         $this->assertEquals($comment, $columnWithComment['COLUMN_COMMENT'], "Didn't set column comment correctly");
     }
 

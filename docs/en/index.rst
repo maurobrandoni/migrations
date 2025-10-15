@@ -1,20 +1,20 @@
 Migrations
 ##########
 
-Migrations is a plugin supported by the core team that helps you do schema
-changes in your database by writing PHP files that can be tracked using your
-version control system.
+Migrations is a plugin that lets you track changes to your database schema over
+time as PHP code that accompanies your application. This lets you ensure each
+environment your application runs in can has the appropriate schema by applying
+migrations.
 
-It allows you to evolve your database tables over time. Instead of writing
-schema modifications in SQL, this plugin allows you to use an intuitive set of
-methods to implement your database changes.
+Instead of writing schema modifications in SQL, this plugin allows you to
+define schema changes with a high-level database portable API.
 
 Installation
 ============
 
-By default Migrations is installed with the default application skeleton. If
+By default Migrations is installed with the application skeleton. If
 you've removed it and want to re-install it, you can do so by running the
-following from your application's ROOT directory (where composer.json file is
+following from your application's ROOT directory (where **composer.json** file is
 located):
 
 .. code-block:: bash
@@ -26,7 +26,7 @@ located):
 
 To use the plugin you'll need to load it in your application's
 **config/bootstrap.php** file. You can use `CakePHP's Plugin shell
-<https://book.cakephp.org/3.0/en/console-and-shells/plugin-shell.html>`__ to
+<https://book.cakephp.org/5/en/console-and-shells/plugin-shell.html>`__ to
 load and unload plugins from your **config/bootstrap.php**:
 
 .. code-block:: bash
@@ -38,34 +38,24 @@ adding the following statement::
 
     $this->addPlugin('Migrations');
 
-    // Prior to 3.6.0 you need to use Plugin::load()
-
 Additionally, you will need to configure the default database configuration for
 your application in your **config/app.php** file as explained in the `Database
 Configuration section
-<https://book.cakephp.org/3.0/en/orm/database-basics.html#database-configuration>`__.
+<https://book.cakephp.org/5/en/orm/database-basics.html#database-configuration>`__.
 
 Overview
 ========
 
-A migration is basically a single PHP file that describes the changes to operate
-to the database. A migration file can create or drop tables, add or remove
-columns, create indexes and even insert data into your database.
+A migration is a PHP file that describes the changes to apply to your database.
+A migration file can add, change or remove tables, columns, indexes and foreign keys.
 
-Here's an example of a migration::
+If we wanted to create a table, we could use a migration similar to this::
 
     <?php
     use Migrations\BaseMigration;
 
     class CreateProducts extends BaseMigration
     {
-        /**
-         * Change Method.
-         *
-         * More information on this method is available here:
-         * https://book.cakephp.org/migrations/3/en/writing-migrations.html#the-change-method
-         * @return void
-         */
         public function change(): void
         {
             $table = $this->table('products');
@@ -90,41 +80,27 @@ Here's an example of a migration::
         }
     }
 
-This migration will add a table to your database named ``products`` with the
-following column definitions:
+When applied, this migration will add a table to your database named
+``products`` with the following column definitions:
 
-- ``id`` column of type ``integer`` as primary key
+- ``id`` column of type ``integer`` as primary key. This column is added
+  implicitly, but you can customize the name and type if necessary.
 - ``name`` column of type ``string``
 - ``description`` column of type ``text``
 - ``created`` column of type ``datetime``
 - ``modified`` column of type ``datetime``
 
-.. tip::
-
-    The primary key column named ``id`` will be added **implicitly**.
-
 .. note::
 
-    Note that this file describes how the database will look **after**
-    applying the migration. At this point no ``products`` table exists in
-    your database, we have merely created a file that is able to both create
-    the ``products`` table with the specified columns as well as drop it
-    when a ``rollback`` operation of the migration is performed.
+    Migrations are not automatically applied, you can apply and rollback
+    migrations with CLI commands.
 
-Once the file has been created in the **config/Migrations** folder, you will be
-able to execute the following ``migrations`` command to create the table in
-your database:
+Once the file has been created in the **config/Migrations** folder, you can
+apply it:
 
 .. code-block:: bash
 
     bin/cake migrations migrate
-
-The following ``migrations`` command will perform a ``rollback`` and drop the
-table from your database:
-
-.. code-block:: bash
-
-    bin/cake migrations rollback
 
 Creating Migrations
 ===================
@@ -134,134 +110,56 @@ application. The name of the migration files are prefixed with the date in
 which they were created, in the format **YYYYMMDDHHMMSS_MigrationName.php**.
 Here are examples of migration filenames:
 
-* 20160121163850_CreateProducts.php
-* 20160210133047_AddRatingToProducts.php
+* **20160121163850_CreateProducts.php**
+* **20160210133047_AddRatingToProducts.php**
 
 The easiest way to create a migrations file is by using ``bin/cake bake
-migration`` CLI command.
+migration`` CLI command:
 
-See the :ref:`creating-a-table` section to learn more about using migrations to
-define tables.
+.. code-block:: bash
+
+   bin/cake bake migration CreateProducts
+
+This will create an empty migration that you can edit to add any columns,
+indexes and foreign keys you need. See the :ref:`creating-a-table` section to
+learn more about using migrations to define tables.
 
 .. note::
 
-    When using the ``bake`` option, you can still modify the migration before
-    running them if so desired.
+    Migrations need to be applied using ``bin/cake migrations migrate`` after
+    they have been created.
 
-Syntax
-------
+Migration file names
+--------------------
 
-The ``bake`` command syntax follows the form below:
+When generating a migration, you can follow one of the following patterns
+to have additional skeleton code generated:
 
-.. code-block:: bash
-
-    bin/cake bake migration CreateProducts name:string description:text created modified
-
-When using ``bake`` to create tables, add columns and so on, to your
-database, you will usually provide two things:
-
-* the name of the migration you will generate (``CreateProducts`` in our
-  example)
-* the columns of the table that will be added or removed in the migration
-  (``name:string description:text created modified`` in our example)
-
-Due to the conventions, not all schema changes can be performed via these shell
-commands.
-
-Additionally you can create an empty migrations file if you want full control
-over what needs to be executed, by omitting to specify a columns definition:
-
-.. code-block:: bash
-
-    bin/cake migrations create MyCustomMigration
-
-Migrations file name
-~~~~~~~~~~~~~~~~~~~~
-
-Migration names can follow any of the following patterns:
-
-* (``/^(Create)(.*)/``) Creates the specified table.
-* (``/^(Drop)(.*)/``) Drops the specified table.
+* ``/^(Create)(.*)/`` Creates the specified table.
+* ``/^(Drop)(.*)/`` Drops the specified table.
   Ignores specified field arguments
-* (``/^(Add).*(?:To)(.*)/``) Adds fields to the specified
+* ``/^(Add).*(?:To)(.*)/`` Adds fields to the specified
   table
-* (``/^(Remove).*(?:From)(.*)/``) Removes fields from the
+* ``/^(Remove).*(?:From)(.*)/`` Removes fields from the
   specified table
-* (``/^(Alter)(.*)/``) Alters the specified table. An alias
+* ``/^(Alter)(.*)/`` Alters the specified table. An alias
   for CreateTable and AddField.
-* (``/^(Alter).*(?:On)(.*)/``) Alters fields from the specified table.
+* ``/^(Alter).*(?:On)(.*)/`` Alters fields from the specified table.
 
 You can also use the ``underscore_form`` as the name for your migrations i.e.
 ``create_products``.
 
 .. warning::
 
-    Migration names are used as migration class names, and thus may collide with
+    Migration names are used as class names, and thus may collide with
     other migrations if the class names are not unique. In this case, it may be
     necessary to manually override the name at a later date, or simply change
     the name you are specifying.
 
-Columns definition
-~~~~~~~~~~~~~~~~~~
-
-When using columns in the command line, it may be handy to remember that they
-follow the following pattern::
-
-    fieldName:fieldType?[length]:indexType:indexName
-
-For instance, the following are all valid ways of specifying an email field:
-
-* ``email:string?``
-* ``email:string:unique``
-* ``email:string?[50]``
-* ``email:string:unique:EMAIL_INDEX``
-* ``email:string[120]:unique:EMAIL_INDEX``
-
-While defining decimal, the ``length`` can be defined to have precision and scale, separated by a comma.
-
-* ``amount:decimal[5,2]``
-* ``amount:decimal?[5,2]``
-
-The question mark following the fieldType will make the column nullable.
-
-The ``length`` parameter for the ``fieldType`` is optional and should always be
-written between bracket.
-
-Fields named ``created`` and ``modified``, as well as any field with a ``_at``
-suffix, will automatically be set to the type ``datetime``.
-
-Field types are those generically made available by CakePHP. Those
-can be:
-
-* string
-* text
-* integer
-* biginteger
-* float
-* decimal
-* datetime
-* timestamp
-* time
-* date
-* binary
-* boolean
-* uuid
-* geometry
-* point
-* linestring
-* polygon
-
-There are some heuristics to choosing fieldtypes when left unspecified or set to
-an invalid value. Default field type is ``string``:
-
-* id: integer
-* created, modified, updated: datetime
-* latitude, longitude (or short forms lat, lng): decimal
-
 Creating a table
 ----------------
 
-You can use ``bake`` to create a table:
+You can use ``bake migration`` to create a table:
 
 .. code-block:: bash
 
@@ -305,6 +203,62 @@ The command line above will generate a migration file that resembles::
         }
     }
 
+Column syntax
+-------------
+
+The ``bake migration`` command provides a compact syntax to define columns when
+generating a migration:
+
+.. code-block:: bash
+
+    bin/cake bake migration CreateProducts name:string description:text created modified
+
+You can use the column syntax when creating tables and adding columns. You can
+also edit the migration after generation to add or customize the columns
+
+Columns on the command line follow the following pattern::
+
+    fieldName:fieldType?[length]:indexType:indexName
+
+For instance, the following are all valid ways of specifying an email field:
+
+* ``email:string?``
+* ``email:string:unique``
+* ``email:string?[50]``
+* ``email:string:unique:EMAIL_INDEX``
+* ``email:string[120]:unique:EMAIL_INDEX``
+
+While defining decimal columns, the ``length`` can be defined to have precision
+and scale, separated by a comma.
+
+* ``amount:decimal[5,2]``
+* ``amount:decimal?[5,2]``
+
+Columns with a question mark after the fieldType will make the column nullable.
+
+The ``length`` part is optional and should always be written between bracket.
+
+Fields named ``created`` and ``modified``, as well as any field with a ``_at``
+suffix, will automatically be set to the type ``datetime``.
+
+There are some heuristics to choosing fieldtypes when left unspecified or set to
+an invalid value. Default field type is ``string``:
+
+* id: integer
+* created, modified, updated: datetime
+* latitude, longitude (or short forms lat, lng): decimal
+
+Additionally you can create an empty migrations file if you want full control
+over what needs to be executed, by omitting to specify a columns definition:
+
+.. code-block:: bash
+
+    bin/cake migrations create MyCustomMigration
+
+
+See :doc:`writing-migrations` for more information on how to use ``Table``
+objects to interact with tables and define schema changes.
+
 Adding columns to an existing table
 -----------------------------------
 
@@ -336,8 +290,8 @@ Executing the command line above will generate::
         }
     }
 
-Adding a column as index to a table
------------------------------------
+Adding a column with an index
+-----------------------------
 
 It is also possible to add indexes to columns:
 
@@ -364,45 +318,8 @@ will generate::
         }
     }
 
-Specifying field length
------------------------
-
-.. versionadded:: cakephp/migrations 1.4
-
-If you need to specify a field length, you can do it within brackets in the
-field type, ie:
-
-.. code-block:: bash
-
-    bin/cake bake migration AddFullDescriptionToProducts full_description:string[60]
-
-Executing the command line above will generate::
-
-    <?php
-    use Migrations\BaseMigration;
-
-    class AddFullDescriptionToProducts extends BaseMigration
-    {
-        public function change(): void
-        {
-            $table = $this->table('products');
-            $table->addColumn('full_description', 'string', [
-                'default' => null,
-                'limit' => 60,
-                'null' => false,
-            ])
-            ->update();
-        }
-    }
-
-If no length is specified, lengths for certain type of columns are defaulted:
-
-* string: 255
-* integer: 11
-* biginteger: 20
-
-Alter a column from a table
------------------------------------
+Altering a column
+-----------------
 
 In the same way, you can generate a migration to alter a column by using the
 command line, if the migration name is of the form "AlterXXXOnYYY":
@@ -426,8 +343,14 @@ will generate::
         }
     }
 
-Removing a column from a table
-------------------------------
+.. warning::
+
+    Changing the type of a column can result in data loss if the
+    current and target column type are not compatible. For example converting
+    a varchar to float.
+
+Removing a column
+-----------------
 
 In the same way, you can generate a migration to remove a column by using the
 command line, if the migration name is of the form "RemoveXXXFromYYY":
@@ -457,12 +380,12 @@ creates the file::
     `up` method. A corresponding `addColumn` call should be added to the
     `down` method.
 
-Generating migrations from an existing database
-===============================================
+Generating migration snapshots from an existing database
+========================================================
 
-If you are dealing with a pre-existing database and want to start using
+If you have a pre-existing database and want to start using
 migrations, or to version control the initial schema of your application's
-database, you can run the ``migration_snapshot`` command:
+database, you can run the ``bake migration_snapshot`` command:
 
 .. code-block:: bash
 
@@ -472,9 +395,8 @@ It will generate a migration file called **YYYYMMDDHHMMSS_Initial.php**
 containing all the create statements for all tables in your database.
 
 By default, the snapshot will be created by connecting to the database defined
-in the ``default`` connection configuration.
-If you need to bake a snapshot from a different datasource, you can use the
-``--connection`` option:
+in the ``default`` connection configuration. If you need to bake a snapshot from
+a different datasource, you can use the ``--connection`` option:
 
 .. code-block:: bash
 
@@ -488,8 +410,7 @@ defined the corresponding model classes by using the ``--require-table`` flag:
     bin/cake bake migration_snapshot Initial --require-table
 
 When using the ``--require-table`` flag, the shell will look through your
-application ``Table`` classes and will only add the model tables in the snapshot
-.
+application ``Table`` classes and will only add the model tables in the snapshot.
 
 If you want to generate a snapshot without marking it as migrated (for example,
 for use in unit tests), you can use the ``--generate-only`` flag:
@@ -520,27 +441,18 @@ to the snapshot of your plugin.
 Be aware that when you bake a snapshot, it is automatically added to the
 migrations log table as migrated.
 
-Generating a diff between two database states
-=============================================
+Generating a diff
+=================
 
-.. versionadded:: cakephp/migrations 1.6.0
-
-You can generate a migrations file that will group all the differences between
-two database states using the ``migration_diff`` bake template. To do so, you
-can use the following command:
+As migrations are applied and rolled back, the migrations plugin will generate
+a 'dump' file of your schema. If you make manual changes to your database schema
+outside of migrations, you can use ``bake migration_diff`` to generate
+a migration file that captures the difference between the current schema dump
+file and database schema. To do so, you can use the following command:
 
 .. code-block:: bash
 
     bin/cake bake migration_diff NameOfTheMigrations
-
-In order to have a point of comparison from your current database state, the
-migrations shell will generate a "dump" file after each ``migrate`` or
-``rollback`` call. The dump file is a file containing the full schema state of
-your database at a given point in time.
-
-Once a dump file is generated, every modifications you do directly in your
-database management system will be added to the migration file generated when
-you call the ``bake migration_diff`` command.
 
 By default, the diff will be created by connecting to the database defined
 in the ``default`` connection configuration.
@@ -566,13 +478,10 @@ and use the ``bake migration_diff`` command whenever you see fit.
 
 .. note::
 
-    The migrations shell can not detect column renamings.
+    Migration diff generation can not detect column renamings.
 
-The commands
-============
-
-``migrate`` : Applying Migrations
----------------------------------
+Applying Migrations
+===================
 
 Once you have generated or written your migration file, you need to execute the
 following command to apply the changes to your database:
@@ -602,10 +511,10 @@ following command to apply the changes to your database:
     # or ``-p`` for short
     bin/cake migrations migrate -p MyAwesomePlugin
 
-``rollback`` : Reverting Migrations
------------------------------------
+Reverting Migrations
+====================
 
-The Rollback command is used to undo previous migrations executed by this
+The rollback command is used to undo previous migrations executed by this
 plugin. It is the reverse action of the ``migrate`` command:
 
 .. code-block:: bash
@@ -621,8 +530,8 @@ plugin. It is the reverse action of the ``migrate`` command:
 You can also use the ``--source``, ``--connection`` and ``--plugin`` options
 just like for the ``migrate`` command.
 
-``status`` : Migrations Status
-------------------------------
+View Migrations Status
+======================
 
 The Status command prints a list of all migrations, along with their current
 status. You can use this command to determine which migrations have been run:
@@ -641,15 +550,12 @@ You can also output the results as a JSON formatted string using the
 You can also use the ``--source``, ``--connection`` and ``--plugin`` options
 just like for the ``migrate`` command.
 
-``mark_migrated`` : Marking a migration as migrated
----------------------------------------------------
-
-.. versionadded:: 1.4.0
+Marking a migration as migrated
+===============================
 
 It can sometimes be useful to mark a set of migrations as migrated without
-actually running them.
-In order to do this, you can use the ``mark_migrated`` command.
-The command works seamlessly as the other commands.
+actually running them. In order to do this, you can use the ``mark_migrated``
+command. The command works seamlessly as the other commands.
 
 You can mark all migrations as migrated using this command:
 
@@ -701,8 +607,8 @@ value. If you use it, it will mark all found migrations as migrated:
 
     bin/cake migrations mark_migrated all
 
-``seed`` : Seeding your database
---------------------------------
+Seeding your database
+=====================
 
 Seed classes are a good way to populate your database with default or starter
 data. They are also a great way to generate data for development environments.
@@ -710,11 +616,11 @@ data. They are also a great way to generate data for development environments.
 By default, seeds will be looked for in the ``config/Seeds/`` directory of
 your application. See the :doc:`seeding` for how to build and use seed classes.
 
-``dump`` : Generating a dump file for the diff baking feature
--------------------------------------------------------------
+Generating a dump file
+======================
 
-The Dump command creates a file to be used with the ``migration_diff`` bake
-template:
+The dump command creates a file to be used with the ``bake migration_diff``
+command:
 
 .. code-block:: bash
 
@@ -780,9 +686,6 @@ from drop & truncate operations.
 If you need to see additional debugging output from migrations are being run,
 you can enable a ``debug`` level logger.
 
-.. versionadded: 3.2.0
-    Migrator was added to complement the new fixtures in CakePHP 4.3.0.
-
 Using Migrations In Plugins
 ===========================
 
@@ -800,14 +703,11 @@ execution to the migrations relative to that plugin:
 Running Migrations in a non-shell environment
 =============================================
 
-.. versionadded:: cakephp/migrations 1.2.0
-
-Since the release of version 1.2 of the migrations plugin, you can run
-migrations from a non-shell environment, directly from an app, by using the new
-``Migrations`` class. This can be handy in case you are developing a plugin
-installer for a CMS for instance.
-The ``Migrations`` class allows you to run the following commands from the
-migrations shell:
+While typical usage of migrations is from the command line, you can also run
+migrations from a non-shell environment, by using
+``Migrations\Migrations`` class. This can be handy in case you are developing a plugin
+installer for a CMS for instance. The ``Migrations`` class allows you to run the
+following commands from the migrations shell:
 
 * migrate
 * rollback
@@ -894,167 +794,8 @@ Set them via Configure to enable (e.g. in ``config/app.php``)::
         'column_null_default' => true,
     ],
 
-Tips and tricks
-===============
-
-Creating Custom Primary Keys
-----------------------------
-
-If you need to avoid the automatic creation of the ``id`` primary key when
-adding new tables to the database, you can use the second argument of the
-``table()`` method::
-
-    <?php
-    use Migrations\BaseMigration;
-
-    class CreateProductsTable extends BaseMigration
-    {
-        public function change(): void
-        {
-            $table = $this->table('products', ['id' => false, 'primary_key' => ['id']]);
-            $table
-                  ->addColumn('id', 'uuid')
-                  ->addColumn('name', 'string')
-                  ->addColumn('description', 'text')
-                  ->create();
-        }
-    }
-
-The above will create a ``CHAR(36)`` ``id`` column that is also the primary key.
-
-.. note::
-
-    When specifying a custom primary key on the command line, you must note
-    it as the primary key in the id field, otherwise you may get an error
-    regarding duplicate id fields, i.e.:
-
-    .. code-block:: bash
-
-        bin/cake bake migration CreateProducts id:uuid:primary name:string description:text created modified
-
-Additionally, since Migrations 1.3, a new way to deal with primary key was
-introduced. To do so, your migration class should extend the new
-``Migrations\BaseMigration`` class.
-You can specify a ``autoId`` property in the Migration class and set it to
-``false``, which will turn off the automatic ``id`` column creation. You will
-need to manually create the column that will be used as a primary key and add
-it to the table declaration::
-
-    <?php
-    use Migrations\BaseMigration;
-
-    class CreateProductsTable extends BaseMigration
-    {
-
-        public bool $autoId = false;
-
-        public function up(): void
-        {
-            $table = $this->table('products');
-            $table
-                ->addColumn('id', 'integer', [
-                    'autoIncrement' => true,
-                    'limit' => 11
-                ])
-                ->addPrimaryKey('id')
-                ->addColumn('name', 'string')
-                ->addColumn('description', 'text')
-                ->create();
-        }
-    }
-
-Compared to the previous way of dealing with primary key, this method gives you
-the ability to have more control over the primary key column definition:
-unsigned or not, limit, comment, etc.
-
-All baked migrations and snapshot will use this new way when necessary.
-
-.. warning::
-
-    Dealing with primary key can only be done on table creation operations.
-    This is due to limitations for some database servers the plugin supports.
-
-Collations
-----------
-
-If you need to create a table with a different collation than the database
-default one, you can define it with the ``table()`` method, as an option::
-
-    <?php
-    use Migrations\BaseMigration;
-
-    class CreateCategoriesTable extends BaseMigration
-    {
-        public function change(): void
-        {
-            $table = $this
-                ->table('categories', [
-                    'collation' => 'latin1_german1_ci'
-                ])
-                ->addColumn('title', 'string', [
-                    'default' => null,
-                    'limit' => 255,
-                    'null' => false,
-                ])
-                ->create();
-        }
-    }
-
-Note however this can only be done on table creation : there is currently
-no way of adding a column to an existing table with a different collation than
-the table or the database.
-Only ``MySQL`` and ``SqlServer`` supports this configuration key for the time
-being.
-
-Updating columns name and using Table objects
----------------------------------------------
-
-If you use a CakePHP ORM Table object to manipulate values from your database
-along with renaming or removing a column, make sure you create a new instance of
-your Table object after the ``update()`` call. The Table object registry is
-cleared after an ``update()`` call in order to refresh the schema that is
-reflected and stored in the Table object upon instantiation.
-
-Migrations and Deployment
--------------------------
-
-If you use the plugin when deploying your application, be sure to clear the ORM
-cache so it renews the column metadata of your tables.  Otherwise, you might end
-up having errors about columns not existing when performing operations on those
-new columns.  The CakePHP Core includes a `Schema Cache Shell
-<https://book.cakephp.org/3.0/en/console-and-shells/schema-cache.html>`__ that
-you can use to perform this operation:
-
-.. code-block:: bash
-
-    // Prior to 3.6 use orm_cache
-    bin/cake schema_cache clear
-
-Renaming a table
-----------------
-
-The plugin gives you the ability to rename a table, using the ``rename()``
-method. In your migration file, you can do the following::
-
-    public function up(): void
-    {
-        $this->table('old_table_name')
-            ->rename('new_table_name')
-            ->update();
-    }
-
-    public function down(): void
-    {
-        $this->table('new_table_name')
-            ->rename('old_table_name')
-            ->update();
-    }
-
-
 Skipping the ``schema.lock`` file generation
---------------------------------------------
-
-.. versionadded:: cakephp/migrations 1.6.5
+============================================
 
 In order for the diff feature to work, a **.lock** file is generated everytime
 you migrate, rollback or bake a snapshot, to keep track of the state of your
@@ -1070,8 +811,27 @@ for instance when deploying on your production environment, by using the
 
     bin/cake bake migration_snapshot MyMigration --no-lock
 
+Deployment
+==========
+
+You should update your deployment scripts to run migrations when new code is
+deployed. Ideally you want to run migrations after the code is on your servers,
+but before the application code becomes active.
+
+After running migrations remember to clear the ORM cache so it renews the column
+metadata of your tables. Otherwise, you might end up having errors about
+columns not existing when performing operations on those new columns. The
+CakePHP Core includes a `Schema Cache Shell
+<https://book.cakephp.org/5/en/console-and-shells/schema-cache.html>`__ that you
+can use to perform this operation:
+
+.. code-block:: bash
+
+    bin/cake migration migrate
+    bin/cake schema_cache clear
+
 Alert of missing migrations
----------------------------
+===========================
 
 You can use the ``Migrations.PendingMigrations`` middleware in local development
 to alert developers about new migrations that have not been applied::
@@ -1096,7 +856,7 @@ You can temporarily disable the migration check by adding
 ``skip-migration-check=1`` to the URL query string
 
 IDE autocomplete support
-------------------------
+========================
 
 The `IdeHelper plugin
 <https://github.com/dereuromark/cakephp-ide-helper>`__ can help
