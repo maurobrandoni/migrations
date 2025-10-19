@@ -1233,4 +1233,47 @@ class Manager
     {
         $this->seeds = null;
     }
+
+    /**
+     * Cleanup missing migrations from the phinxlog table
+     *
+     * Removes entries from the phinxlog table for migrations that no longer exist
+     * in the migrations directory (marked as MISSING in status output).
+     *
+     * @return int The number of missing migrations removed
+     */
+    public function cleanupMissingMigrations(): int
+    {
+        $defaultMigrations = $this->getMigrations();
+        $env = $this->getEnvironment();
+        $versions = $env->getVersionLog();
+        $adapter = $env->getAdapter();
+
+        // Find missing migrations (those in phinxlog but not in filesystem)
+        $missingVersions = [];
+        foreach ($versions as $versionId => $versionInfo) {
+            if (!isset($defaultMigrations[$versionId])) {
+                $missingVersions[] = $versionId;
+            }
+        }
+
+        if (!$missingVersions) {
+            return 0;
+        }
+
+        // Remove missing migrations from phinxlog
+        $adapter->beginTransaction();
+        try {
+            $delete = $adapter->getDeleteBuilder()
+                ->from($env->getSchemaTableName())
+                ->where(['version IN' => $missingVersions]);
+            $delete->execute();
+            $adapter->commitTransaction();
+        } catch (Exception $e) {
+            $adapter->rollbackTransaction();
+            throw $e;
+        }
+
+        return count($missingVersions);
+    }
 }

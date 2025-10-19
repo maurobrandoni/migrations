@@ -1716,6 +1716,313 @@ You can check if a table already has a certain column by using the
     }
 
 
+        /**
+         * Migrate Down.
+         */
+        public function down(): void
+        {
+
+        }
+    }
+
+Dropping a Table
+----------------
+
+Tables can be dropped quite easily using the ``drop()`` method. It is a
+good idea to recreate the table again in the ``down()`` method.
+
+Note that like other methods in the ``Table`` class, ``drop`` also needs ``save()``
+to be called at the end in order to be executed. This allows Migrations to intelligently
+plan migrations when more than one table is involved::
+
+    <?php
+
+    use Migrations\BaseMigration;
+
+    class MyNewMigration extends BaseMigration
+    {
+        /**
+         * Migrate Up.
+         */
+        public function up(): void
+        {
+            $this->table('users')->drop()->save();
+        }
+
+        /**
+         * Migrate Down.
+         */
+        public function down(): void
+        {
+            $users = $this->table('users');
+            $users->addColumn('username', 'string', ['limit' => 20])
+                  ->addColumn('password', 'string', ['limit' => 40])
+                  ->addColumn('password_salt', 'string', ['limit' => 40])
+                  ->addColumn('email', 'string', ['limit' => 100])
+                  ->addColumn('first_name', 'string', ['limit' => 30])
+                  ->addColumn('last_name', 'string', ['limit' => 30])
+                  ->addColumn('created', 'datetime')
+                  ->addColumn('updated', 'datetime', ['null' => true])
+                  ->addIndex(['username', 'email'], ['unique' => true])
+                  ->save();
+        }
+    }
+
+Renaming a Table
+----------------
+
+To rename a table access an instance of the Table object then call the
+``rename()`` method::
+
+    <?php
+
+    use Migrations\BaseMigration;
+
+    class MyNewMigration extends BaseMigration
+    {
+        /**
+         * Migrate Up.
+         */
+        public function up(): void
+        {
+            $table = $this->table('users');
+            $table
+                ->rename('legacy_users')
+                ->update();
+        }
+
+        /**
+         * Migrate Down.
+         */
+        public function down(): void
+        {
+            $table = $this->table('legacy_users');
+            $table
+                ->rename('users')
+                ->update();
+        }
+    }
+
+Changing the Primary Key
+------------------------
+
+To change the primary key on an existing table, use the ``changePrimaryKey()``
+method. Pass in a column name or array of columns names to include in the
+primary key, or ``null`` to drop the primary key. Note that the mentioned
+columns must be added to the table, they will not be added implicitly::
+
+    <?php
+
+    use Migrations\BaseMigration;
+
+    class MyNewMigration extends BaseMigration
+    {
+        /**
+         * Migrate Up.
+         */
+        public function up(): void
+        {
+            $users = $this->table('users');
+            $users
+                ->addColumn('username', 'string', ['limit' => 20, 'null' => false])
+                ->addColumn('password', 'string', ['limit' => 40])
+                ->save();
+
+            $users
+                ->addColumn('new_id', 'integer', ['null' => false])
+                ->changePrimaryKey(['new_id', 'username'])
+                ->save();
+        }
+
+        /**
+         * Migrate Down.
+         */
+        public function down(): void
+        {
+
+        }
+    }
+
+Creating Custom Primary Keys
+----------------------------
+
+You can specify a ``autoId`` property in the Migration class and set it to
+``false``, which will turn off the automatic ``id`` column creation. You will
+need to manually create the column that will be used as a primary key and add
+it to the table declaration::
+
+    <?php
+    use Migrations\BaseMigration;
+
+    class CreateProductsTable extends BaseMigration
+    {
+
+        public bool $autoId = false;
+
+        public function up(): void
+        {
+            $table = $this->table('products');
+            $table
+                ->addColumn('id', 'uuid')
+                ->addPrimaryKey('id')
+                ->addColumn('name', 'string')
+                ->addColumn('description', 'text')
+                ->create();
+        }
+    }
+
+The above will create a ``CHAR(36)`` ``id`` column that is also the primary key.
+
+When specifying a custom primary key on the command line, you must note
+it as the primary key in the id field, otherwise you may get an error
+regarding duplicate id fields, i.e.:
+
+.. code-block:: bash
+
+    bin/cake bake migration CreateProducts id:uuid:primary name:string description:text created modified
+
+
+All baked migrations and snapshot will use this new way when necessary.
+
+.. warning::
+
+    Dealing with primary key can only be done on table creation operations.
+    This is due to limitations for some database servers the plugin supports.
+
+Changing the Table Comment
+--------------------------
+
+To change the comment on an existing table, use the ``changeComment()`` method.
+Pass in a string to set as the new table comment, or ``null`` to drop the existing comment::
+
+    <?php
+
+    use Migrations\BaseMigration;
+
+    class MyNewMigration extends BaseMigration
+    {
+        /**
+         * Migrate Up.
+         */
+        public function up(): void
+        {
+            $users = $this->table('users');
+            $users
+                ->addColumn('username', 'string', ['limit' => 20])
+                ->addColumn('password', 'string', ['limit' => 40])
+                ->save();
+
+            $users
+                ->changeComment('This is the table with users auth information, password should be encrypted')
+                ->save();
+        }
+
+        /**
+         * Migrate Down.
+         */
+        public function down(): void
+        {
+
+        }
+    }
+
+Checking Columns
+================
+
+``BaseMigration`` also provides methods for introspecting the current schema,
+allowing you to conditionally make changes to schema, or read data.
+Schema is inspected **when the migration is run**.
+
+Get a column list
+-----------------
+
+To retrieve all table columns, simply create a ``table`` object and call
+``getColumns()`` method. This method will return an array of Column classes with
+basic info. Example below::
+
+    <?php
+
+    use Migrations\BaseMigration;
+
+    class ColumnListMigration extends BaseMigration
+    {
+        /**
+         * Migrate Up.
+         */
+        public function up(): void
+        {
+            $columns = $this->table('users')->getColumns();
+            ...
+        }
+
+        /**
+         * Migrate Down.
+         */
+        public function down(): void
+        {
+            ...
+        }
+    }
+
+Get a column by name
+--------------------
+
+To retrieve one table column, simply create a ``table`` object and call the
+``getColumn()`` method. This method will return a Column class with basic info
+or NULL when the column doesn't exist. Example below::
+
+    <?php
+
+    use Migrations\BaseMigration;
+
+    class ColumnListMigration extends BaseMigration
+    {
+        /**
+         * Migrate Up.
+         */
+        public function up(): void
+        {
+            $column = $this->table('users')->getColumn('email');
+            ...
+        }
+
+        /**
+         * Migrate Down.
+         */
+        public function down(): void
+        {
+            ...
+        }
+    }
+
+Checking whether a column exists
+--------------------------------
+
+You can check if a table already has a certain column by using the
+``hasColumn()`` method::
+
+    <?php
+
+    use Migrations\BaseMigration;
+
+    class MyNewMigration extends BaseMigration
+    {
+        /**
+         * Change Method.
+         */
+        public function change(): void
+        {
+            $table = $this->table('user');
+            $column = $table->hasColumn('username');
+
+            if ($column) {
+                // do something
+            }
+
+        }
+    }
+
+
 Changing templates
 ------------------
 

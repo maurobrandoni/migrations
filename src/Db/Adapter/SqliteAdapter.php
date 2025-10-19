@@ -407,8 +407,8 @@ class SqliteAdapter extends AbstractAdapter
      */
     protected function parseDefaultValue(mixed $default, string $columnType): mixed
     {
-        if ($default === null) {
-            return null;
+        if (!is_string($default)) {
+            return $default;
         }
 
         // split the input into tokens
