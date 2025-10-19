@@ -10,6 +10,7 @@ namespace Migrations\Db\Adapter;
 
 use BadMethodCallException;
 use Cake\Database\Schema\TableSchema;
+use Cake\Database\Schema\TableSchemaInterface;
 use InvalidArgumentException;
 use Migrations\Db\AlterInstructions;
 use Migrations\Db\Expression;
@@ -435,9 +436,12 @@ PCRE_PATTERN;
         $defaultBare = rtrim(ltrim($defaultClean, $trimChars . '('), $trimChars . ')');
 
         // match the string against one of several patterns
-        if ($columnType === 'text' || $columnType === 'string') {
+        if ($columnType === TableSchemaInterface::TYPE_TEXT || $columnType === TableschemaInterface::TYPE_STRING) {
             // string literal
             return Literal::from($default);
+        } elseif ($columnType === TableSchemaInterface::TYPE_BOOLEAN) {
+            // boolean literal
+            return (int)filter_var($defaultClean, FILTER_VALIDATE_BOOLEAN);
         } elseif (preg_match('/^CURRENT_(?:DATE|TIME|TIMESTAMP)$/i', $default)) {
             // magic date or time
             return strtoupper($default);
@@ -458,9 +462,6 @@ PCRE_PATTERN;
         } elseif (preg_match('/^null$/i', $defaultBare)) {
             // null literal
             return null;
-        } elseif (preg_match('/^true|false$/i', $defaultBare)) {
-            // boolean literal
-            return filter_var($defaultClean, FILTER_VALIDATE_BOOLEAN);
         } else {
             // any other expression: return the expression with parentheses, but without comments
             return Expression::from($default);
