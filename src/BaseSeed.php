@@ -129,7 +129,14 @@ class BaseSeed implements SeedInterface
      */
     public function getName(): string
     {
-        return static::class;
+        $name = static::class;
+        if (str_starts_with($name, 'Migrations\BaseSeed@anonymous')) {
+            if (preg_match('#[/\\\\]([a-zA-Z0-9_]+)\.php:#', $name, $matches)) {
+                $name = $matches[1];
+            }
+        }
+
+        return $name;
     }
 
     /**

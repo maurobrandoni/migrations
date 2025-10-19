@@ -325,4 +325,23 @@ class SeedCommandTest extends TestCase
         $finalCount = $connection->execute('SELECT COUNT(*) FROM stores')->fetchColumn(0);
         $this->assertEquals($initialCount, $finalCount, 'Dry-run mode should not modify stores table');
     }
+
+    public function testSeederAnonymousClass(): void
+    {
+        $this->createTables();
+        $this->exec('migrations seed -c test --seed AnonymousStoreSeed');
+
+        $this->assertExitSuccess();
+        $this->assertOutputContains('AnonymousStoreSeed:</info> <comment>seeding');
+        $this->assertOutputContains('All Done');
+
+        /** @var \Cake\Database\Connection $connection */
+        $connection = ConnectionManager::get('test');
+        $query = $connection->execute('SELECT COUNT(*) FROM stores');
+        $this->assertEquals(2, $query->fetchColumn(0));
+
+        $result = $connection->execute('SELECT * FROM stores ORDER BY id')->fetchAll('assoc');
+        $this->assertEquals('anonymous_store', $result[0]['name']);
+        $this->assertEquals('other_store', $result[1]['name']);
+    }
 }
