@@ -8,6 +8,7 @@ use Cake\Console\TestSuite\StubConsoleInput;
 use Cake\Console\TestSuite\StubConsoleOutput;
 use Cake\Core\Configure;
 use Cake\Database\Connection;
+use Cake\Database\Driver\Mysql;
 use Cake\Datasource\ConnectionManager;
 use InvalidArgumentException;
 use Migrations\Db\Adapter\MysqlAdapter;
@@ -2327,10 +2328,7 @@ OUTPUT;
         $table->addColumn('price', 'decimal', ['precision' => 10, 'scale' => 2])
               ->create();
 
-        $checkConstraint = new CheckConstraint();
-        $checkConstraint->setName('price_positive')
-                       ->setExpression('price > 0');
-
+        $checkConstraint = new CheckConstraint('price_positive', 'price > 0');
         $this->adapter->addCheckConstraint($table->getTable(), $checkConstraint);
 
         $this->assertTrue($this->adapter->hasCheckConstraint('check_table', 'price_positive'));
@@ -2342,19 +2340,18 @@ OUTPUT;
         $table->addColumn('age', 'integer')
               ->create();
 
-        $checkConstraint = new CheckConstraint();
-        $checkConstraint->setExpression('age >= 18');
+        $checkConstraint = new CheckConstraint('', 'age >= 18');
 
         $this->adapter->addCheckConstraint($table->getTable(), $checkConstraint);
 
-        // The constraint should exist with an auto-generated name
-        $constraints = $this->adapter->fetchAll(sprintf(
-            "SELECT cc.CONSTRAINT_NAME FROM INFORMATION_SCHEMA.CHECK_CONSTRAINTS cc INNER JOIN INFORMATION_SCHEMA.TABLE_CONSTRAINTS tc ON cc.CONSTRAINT_SCHEMA = tc.CONSTRAINT_SCHEMA AND cc.CONSTRAINT_NAME = tc.CONSTRAINT_NAME WHERE tc.CONSTRAINT_SCHEMA = '%s' AND tc.TABLE_NAME = 'check_table2'",
-            $this->config['database'],
-        ));
+        $driver = $this->adapter->getConnection()->getDriver();
+        assert($driver instanceof Mysql);
 
+        $dialect = $driver->schemaDialect();
+        $constraints = $dialect->describeCheckConstraints('check_table2');
         $this->assertCount(1, $constraints);
-        $this->assertStringContainsString('check_table2_chk_', $constraints[0]['CONSTRAINT_NAME']);
+        $expected = $driver->isMariaDb() ? 'CONSTRAINT_1' : 'check_table2_chk_';
+        $this->assertStringContainsString($expected, $constraints[0]['name']);
     }
 
     public function testHasCheckConstraint()
@@ -2363,10 +2360,7 @@ OUTPUT;
         $table->addColumn('quantity', 'integer')
               ->create();
 
-        $checkConstraint = new CheckConstraint();
-        $checkConstraint->setName('quantity_positive')
-                       ->setExpression('quantity > 0');
-
+        $checkConstraint = new CheckConstraint('quantity_positive', 'quantity > 0');
         $this->assertFalse($this->adapter->hasCheckConstraint('check_table3', 'quantity_positive'));
 
         $this->adapter->addCheckConstraint($table->getTable(), $checkConstraint);
@@ -2380,10 +2374,7 @@ OUTPUT;
         $table->addColumn('price', 'decimal', ['precision' => 10, 'scale' => 2])
               ->create();
 
-        $checkConstraint = new CheckConstraint();
-        $checkConstraint->setName('price_check')
-                       ->setExpression('price BETWEEN 0 AND 1000');
-
+        $checkConstraint = new CheckConstraint('price_check', 'price BETWEEN 0 AND 1000');
         $this->adapter->addCheckConstraint($table->getTable(), $checkConstraint);
         $this->assertTrue($this->adapter->hasCheckConstraint('check_table4', 'price_check'));
 
@@ -2398,10 +2389,10 @@ OUTPUT;
               ->addColumn('status', 'string', ['limit' => 20])
               ->create();
 
-        $checkConstraint = new CheckConstraint();
-        $checkConstraint->setName('status_valid')
-                       ->setExpression("status IN ('active', 'inactive', 'pending')");
-
+        $checkConstraint = new CheckConstraint(
+            'status_valid',
+            "status IN ('active', 'inactive', 'pending')",
+        );
         $this->adapter->addCheckConstraint($table->getTable(), $checkConstraint);
         $this->assertTrue($this->adapter->hasCheckConstraint('check_table5', 'status_valid'));
 

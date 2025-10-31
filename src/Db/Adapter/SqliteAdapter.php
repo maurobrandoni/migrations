@@ -1517,28 +1517,9 @@ PCRE_PATTERN;
      */
     protected function getCheckConstraints(string $tableName): array
     {
-        $constraints = [];
-        $createSql = $this->getDeclaringSql($tableName);
+        $dialect = $this->getSchemaDialect();
 
-        // Parse CHECK constraints from CREATE TABLE statement
-        // Match CONSTRAINT name CHECK (expression) or just CHECK (expression)
-        $pattern = '/(?:CONSTRAINT\s+([^\s]+)\s+)?CHECK\s*\(([^)]+(?:\([^)]*\)[^)]*)*)\)/is';
-
-        if (preg_match_all($pattern, $createSql, $matches, PREG_SET_ORDER)) {
-            foreach ($matches as $index => $match) {
-                $name = !empty($match[1])
-                    ? trim($match[1], '"`[]')
-                    : 'check_' . $index;
-                $expression = trim($match[2]);
-
-                $constraints[] = [
-                    'name' => $name,
-                    'expression' => $expression,
-                ];
-            }
-        }
-
-        return $constraints;
+        return $dialect->describeCheckConstraints($tableName);
     }
 
     /**
@@ -1588,11 +1569,10 @@ PCRE_PATTERN;
         $instructions->addPostStep(function ($state) use ($constraintName) {
             // Remove the check constraint from the CREATE TABLE statement
             // Match CONSTRAINT name CHECK (expression) or just CHECK (expression)
-            $quotedName = preg_quote($this->possiblyQuotedIdentifierRegex($constraintName, false), '/');
+            $quotedName = $this->possiblyQuotedIdentifierRegex($constraintName, false);
             $pattern = "/,?\s*CONSTRAINT\s+{$quotedName}\s+CHECK\s*\([^)]+(?:\([^)]*\)[^)]*)*\)/is";
 
             $sql = preg_replace($pattern, '', (string)$state['createSQL'], 1);
-
             if ($sql) {
                 $this->execute($sql);
             }
