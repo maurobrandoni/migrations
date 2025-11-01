@@ -100,6 +100,8 @@ class Dump extends AbstractCommand
         $finder = new TableFinder($connectionName);
         $tables = $finder->getTablesToBake($collection, $options);
 
+        sort($tables);
+
         $dump = [];
         if ($tables) {
             foreach ($tables as $table) {
