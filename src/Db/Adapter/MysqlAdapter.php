@@ -30,9 +30,9 @@ class MysqlAdapter extends AbstractAdapter
      * @var string[]
      */
     protected static array $specificColumnTypes = [
-        self::PHINX_TYPE_YEAR,
-        self::PHINX_TYPE_JSON,
-        self::PHINX_TYPE_BINARYUUID,
+        self::TYPE_YEAR,
+        self::TYPE_JSON,
+        self::TYPE_BINARY_UUID,
         self::PHINX_TYPE_ENUM,
         self::PHINX_TYPE_SET,
         self::PHINX_TYPE_BLOB,
@@ -281,7 +281,7 @@ class MysqlAdapter extends AbstractAdapter
      */
     protected function mapColumnData(array $data): array
     {
-        if ($data['type'] == self::PHINX_TYPE_TEXT && $data['length'] !== null) {
+        if ($data['type'] == self::TYPE_TEXT && $data['length'] !== null) {
             $data['length'] = match ($data['length']) {
                 self::TEXT_LONG => TableSchema::LENGTH_LONG,
                 self::TEXT_MEDIUM => TableSchema::LENGTH_MEDIUM,
@@ -291,7 +291,7 @@ class MysqlAdapter extends AbstractAdapter
             };
         }
         $blobTypes = [
-            self::PHINX_TYPE_BINARY,
+            self::TYPE_BINARY,
             self::PHINX_TYPE_VARBINARY,
             self::PHINX_TYPE_BLOB,
             self::PHINX_TYPE_TINYBLOB,
@@ -322,7 +322,7 @@ class MysqlAdapter extends AbstractAdapter
                 };
             }
             $data['type'] = 'binary';
-        } elseif ($data['type'] === self::PHINX_TYPE_INTEGER) {
+        } elseif ($data['type'] === self::TYPE_INTEGER) {
             if (isset($data['length']) && $data['length'] === self::INT_BIG) {
                 $data['type'] = TableSchema::TYPE_BIGINTEGER;
                 unset($data['length']);
@@ -1105,7 +1105,7 @@ class MysqlAdapter extends AbstractAdapter
         $types = array_merge(parent::getColumnTypes(), static::$specificColumnTypes);
 
         if ($this->hasNativeUuid()) {
-            $types[] = self::PHINX_TYPE_NATIVEUUID;
+            $types[] = self::TYPE_NATIVE_UUID;
         }
 
         return $types;

@@ -972,10 +972,10 @@ abstract class AbstractAdapter implements AdapterInterface, DirectActionInterfac
     protected function getDefaultValueDefinition(mixed $default, ?string $columnType = null): string
     {
         $datetimeTypes = [
-            static::PHINX_TYPE_DATETIME,
-            static::PHINX_TYPE_TIMESTAMP,
-            static::PHINX_TYPE_TIME,
-            static::PHINX_TYPE_DATE,
+            static::TYPE_DATETIME,
+            static::TYPE_TIMESTAMP,
+            static::TYPE_TIME,
+            static::TYPE_DATE,
         ];
 
         if ($default instanceof Literal) {
@@ -990,7 +990,7 @@ abstract class AbstractAdapter implements AdapterInterface, DirectActionInterfac
             $default = $this->quoteString($default);
         } elseif (is_bool($default)) {
             $default = $this->castToBool($default);
-        } elseif ($default !== null && $columnType === static::PHINX_TYPE_BOOLEAN) {
+        } elseif ($default !== null && $columnType === static::TYPE_BOOLEAN) {
             $default = $this->castToBool((bool)$default);
         }
 
