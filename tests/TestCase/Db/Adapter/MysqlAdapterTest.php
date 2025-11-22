@@ -2446,10 +2446,10 @@ OUTPUT;
     public static function geometryTypeProvider()
     {
         return [
-            [MysqlAdapter::PHINX_TYPE_GEOMETRY, 'POINT(0 0)'],
-            [MysqlAdapter::PHINX_TYPE_POINT, 'POINT(0 0)'],
-            [MysqlAdapter::PHINX_TYPE_LINESTRING, 'LINESTRING(30 10,10 30,40 40)'],
-            [MysqlAdapter::PHINX_TYPE_POLYGON, 'POLYGON((30 10,40 40,20 40,10 20,30 10))'],
+            [MysqlAdapter::TYPE_GEOMETRY, 'POINT(0 0)'],
+            [MysqlAdapter::TYPE_POINT, 'POINT(0 0)'],
+            [MysqlAdapter::TYPE_LINESTRING, 'LINESTRING(30 10,10 30,40 40)'],
+            [MysqlAdapter::TYPE_POLYGON, 'POLYGON((30 10,40 40,20 40,10 20,30 10))'],
         ];
     }
 
@@ -2502,12 +2502,12 @@ OUTPUT;
     public static function defaultsCastAsExpressions()
     {
         return [
-            [MysqlAdapter::PHINX_TYPE_JSON, '{"a": true}'],
-            [MysqlAdapter::PHINX_TYPE_TEXT, 'abc'],
-            [MysqlAdapter::PHINX_TYPE_GEOMETRY, 'POINT(0 0)'],
-            [MysqlAdapter::PHINX_TYPE_POINT, 'POINT(0 0)'],
-            [MysqlAdapter::PHINX_TYPE_LINESTRING, 'LINESTRING(30 10,10 30,40 40)'],
-            [MysqlAdapter::PHINX_TYPE_POLYGON, 'POLYGON((30 10,40 40,20 40,10 20,30 10))'],
+            [MysqlAdapter::TYPE_JSON, '{"a": true}'],
+            [MysqlAdapter::TYPE_TEXT, 'abc'],
+            [MysqlAdapter::TYPE_GEOMETRY, 'POINT(0 0)'],
+            [MysqlAdapter::TYPE_POINT, 'POINT(0 0)'],
+            [MysqlAdapter::TYPE_LINESTRING, 'LINESTRING(30 10,10 30,40 40)'],
+            [MysqlAdapter::TYPE_POLYGON, 'POLYGON((30 10,40 40,20 40,10 20,30 10))'],
         ];
     }
 
@@ -2523,10 +2523,10 @@ OUTPUT;
     {
         if (
             $this->usingMariaDb() && in_array($type, [
-            MysqlAdapter::PHINX_TYPE_GEOMETRY,
-            MysqlAdapter::PHINX_TYPE_POINT,
-            MysqlAdapter::PHINX_TYPE_LINESTRING,
-            MysqlAdapter::PHINX_TYPE_POLYGON,
+            MysqlAdapter::TYPE_GEOMETRY,
+            MysqlAdapter::TYPE_POINT,
+            MysqlAdapter::TYPE_LINESTRING,
+            MysqlAdapter::TYPE_POLYGON,
             ])
         ) {
             $this->markTestSkipped('GIS is broken with MariaDB');
