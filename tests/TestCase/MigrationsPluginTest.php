@@ -12,12 +12,6 @@ use Migrations\MigrationsPlugin;
 
 class MigrationsPluginTest extends TestCase
 {
-    protected function tearDown(): void
-    {
-        parent::tearDown();
-        Configure::delete('Migrations.backend');
-    }
-
     /**
      * Test that builtin backend uses RollbackCommand
      */
