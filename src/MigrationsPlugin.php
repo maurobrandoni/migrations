@@ -82,6 +82,7 @@ class MigrationsPlugin extends BasePlugin
         if (Configure::read('Migrations.legacyTables') !== false) {
             $migrationClasses[] = UpgradeCommand::class;
         }
+
         $seedClasses = [
             SeedsEntryCommand::class,
             SeedCommand::class,

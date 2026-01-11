@@ -17,7 +17,6 @@ use ArrayAccess;
 use Cake\Core\Configure;
 use Cake\Database\Connection;
 use Cake\Database\Driver\Mysql;
-use Cake\Database\Driver\Sqlserver;
 use Cake\Database\Schema\CollectionInterface;
 use Cake\Database\Schema\TableSchemaInterface;
 use Cake\Utility\Hash;
@@ -398,12 +397,13 @@ class MigrationHelper extends Helper
         if (empty($columnOptions['autoIncrement'])) {
             unset($columnOptions['autoIncrement']);
         }
+        if (empty($columnOptions['collate'])) {
+            unset($columnOptions['collate']);
+        }
 
         // currently only MySQL supports the signed option
         $driver = $connection->getDriver();
         $isMysql = $driver instanceof Mysql;
-        $isSqlserver = $driver instanceof Sqlserver;
-
         if (!$isMysql) {
             unset($columnOptions['signed']);
         } elseif (isset($columnOptions['signed']) && $columnOptions['signed'] === true) {
@@ -412,9 +412,8 @@ class MigrationHelper extends Helper
             unset($columnOptions['signed']);
         }
 
-        if (($isMysql || $isSqlserver) && !empty($columnOptions['collate'])) {
-            // TODO deprecate this in 5.x
-            // Change keys due to Phinx using different naming for the collation
+        if (!empty($columnOptions['collate'])) {
+            // Phinx uses 'collation' not 'collate'
             $columnOptions['collation'] = $columnOptions['collate'];
             unset($columnOptions['collate']);
         }
