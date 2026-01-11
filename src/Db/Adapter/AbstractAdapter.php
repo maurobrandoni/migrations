@@ -37,6 +37,7 @@ use Migrations\Db\Action\DropTable;
 use Migrations\Db\Action\RemoveColumn;
 use Migrations\Db\Action\RenameColumn;
 use Migrations\Db\Action\RenameTable;
+use Migrations\Db\Action\SetPartitioning;
 use Migrations\Db\AlterInstructions;
 use Migrations\Db\InsertMode;
 use Migrations\Db\Literal;
@@ -45,7 +46,7 @@ use Migrations\Db\Table\CheckConstraint;
 use Migrations\Db\Table\Column;
 use Migrations\Db\Table\ForeignKey;
 use Migrations\Db\Table\Index;
-use Migrations\Db\Table\PartitionDefinition;
+use Migrations\Db\Table\Partition;
 use Migrations\Db\Table\TableMetadata;
 use Migrations\MigrationInterface;
 use Migrations\SeedInterface;
@@ -1550,32 +1551,6 @@ abstract class AbstractAdapter implements AdapterInterface, DirectActionInterfac
     abstract protected function getDropCheckConstraintInstructions(string $tableName, string $constraintName): AlterInstructions;
 
     /**
-     * Returns the instructions to add a partition to an existing partitioned table.
-     *
-     * @param \Migrations\Db\Table\TableMetadata $table The table
-     * @param \Migrations\Db\Table\PartitionDefinition $partition The partition definition to add
-     * @throws \RuntimeException If partitioning is not supported
-     * @return \Migrations\Db\AlterInstructions
-     */
-    protected function getAddPartitionInstructions(TableMetadata $table, PartitionDefinition $partition): AlterInstructions
-    {
-        throw new RuntimeException('Table partitioning is not supported by this adapter');
-    }
-
-    /**
-     * Returns the instructions to drop a partition from an existing partitioned table.
-     *
-     * @param string $tableName The table name
-     * @param string $partitionName The partition name to drop
-     * @throws \RuntimeException If partitioning is not supported
-     * @return \Migrations\Db\AlterInstructions
-     */
-    protected function getDropPartitionInstructions(string $tableName, string $partitionName): AlterInstructions
-    {
-        throw new RuntimeException('Table partitioning is not supported by this adapter');
-    }
-
-    /**
      * @inheritdoc
      */
     public function dropTable(string $tableName): void
@@ -1655,6 +1630,12 @@ abstract class AbstractAdapter implements AdapterInterface, DirectActionInterfac
     public function executeActions(TableMetadata $table, array $actions): void
     {
         $instructions = new AlterInstructions();
+
+        // Collect partition actions separately as they need special batching
+        /** @var \Migrations\Db\Table\PartitionDefinition[] $addPartitions */
+        $addPartitions = [];
+        /** @var string[] $dropPartitions */
+        $dropPartitions = [];
 
         foreach ($actions as $action) {
             switch (true) {
@@ -1764,17 +1745,19 @@ abstract class AbstractAdapter implements AdapterInterface, DirectActionInterfac
 
                 case $action instanceof AddPartition:
                     /** @var \Migrations\Db\Action\AddPartition $action */
-                    $instructions->merge($this->getAddPartitionInstructions(
-                        $table,
-                        $action->getPartition(),
-                    ));
+                    $addPartitions[] = $action->getPartition();
                     break;
 
                 case $action instanceof DropPartition:
                     /** @var \Migrations\Db\Action\DropPartition $action */
-                    $instructions->merge($this->getDropPartitionInstructions(
-                        $table->getName(),
-                        $action->getPartitionName(),
+                    $dropPartitions[] = $action->getPartitionName();
+                    break;
+
+                case $action instanceof SetPartitioning:
+                    /** @var \Migrations\Db\Action\SetPartitioning $action */
+                    $instructions->merge($this->getSetPartitioningInstructions(
+                        $table,
+                        $action->getPartition(),
                     ));
                     break;
 
@@ -1785,6 +1768,57 @@ abstract class AbstractAdapter implements AdapterInterface, DirectActionInterfac
             }
         }
 
+        // Handle batched partition operations
+        if ($addPartitions) {
+            $instructions->merge($this->getAddPartitionsInstructions($table, $addPartitions));
+        }
+        if ($dropPartitions) {
+            $instructions->merge($this->getDropPartitionsInstructions($table->getName(), $dropPartitions));
+        }
+
         $this->executeAlterSteps($table->getName(), $instructions);
+    }
+
+    /**
+     * Get instructions for adding multiple partitions to an existing table.
+     *
+     * This method handles batching multiple partition additions into a single
+     * ALTER TABLE statement where supported by the database.
+     *
+     * @param \Migrations\Db\Table\TableMetadata $table The table
+     * @param array<\Migrations\Db\Table\PartitionDefinition> $partitions The partitions to add
+     * @return \Migrations\Db\AlterInstructions
+     */
+    protected function getAddPartitionsInstructions(TableMetadata $table, array $partitions): AlterInstructions
+    {
+        throw new RuntimeException('Table partitioning is not supported by this adapter');
+    }
+
+    /**
+     * Get instructions for dropping multiple partitions from an existing table.
+     *
+     * This method handles batching multiple partition drops into a single
+     * ALTER TABLE statement where supported by the database.
+     *
+     * @param string $tableName The table name
+     * @param array<string> $partitionNames The partition names to drop
+     * @return \Migrations\Db\AlterInstructions
+     */
+    protected function getDropPartitionsInstructions(string $tableName, array $partitionNames): AlterInstructions
+    {
+        throw new RuntimeException('Table partitioning is not supported by this adapter');
+    }
+
+    /**
+     * Get instructions for adding partitioning to an existing table.
+     *
+     * @param \Migrations\Db\Table\TableMetadata $table The table
+     * @param \Migrations\Db\Table\Partition $partition The partition configuration
+     * @throws \RuntimeException If partitioning is not supported
+     * @return \Migrations\Db\AlterInstructions
+     */
+    protected function getSetPartitioningInstructions(TableMetadata $table, Partition $partition): AlterInstructions
+    {
+        throw new RuntimeException('Adding partitioning to existing tables is not supported by this adapter');
     }
 }
