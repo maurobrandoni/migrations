@@ -599,6 +599,72 @@ configuration key for the time being.
 
 To view available column types and options, see :ref:`adding-columns` for details.
 
+MySQL ALTER TABLE Options
+-------------------------
+
+.. versionadded:: 5.0.0
+    ``ALGORITHM`` and ``LOCK`` options were added in 5.0.0.
+
+When modifying tables in MySQL, you can control how the ALTER TABLE operation is
+performed using the ``algorithm`` and ``lock`` options. This is useful for performing
+zero-downtime schema changes on large tables in production environments.
+
+.. code-block:: php
+
+    <?php
+
+    use Migrations\BaseMigration;
+
+    class AddIndexToLargeTable extends BaseMigration
+    {
+        public function up(): void
+        {
+            $table = $this->table('large_table');
+            $table->addIndex(['status'], [
+                'name' => 'idx_status',
+            ]);
+            $table->update([
+                'algorithm' => 'INPLACE',
+                'lock' => 'NONE',
+            ]);
+        }
+    }
+
+Available ``algorithm`` values:
+
+============ ===========
+Algorithm    Description
+============ ===========
+DEFAULT      Let MySQL choose the algorithm (default behavior)
+INPLACE      Modify the table in place without copying data (when possible)
+COPY         Create a copy of the table with the changes (legacy method)
+INSTANT      Only modify metadata, no table rebuild (MySQL 8.0+, limited operations)
+============ ===========
+
+Available ``lock`` values:
+
+========= ===========
+Lock      Description
+========= ===========
+DEFAULT   Use minimal locking for the algorithm (default behavior)
+NONE      Allow concurrent reads and writes during the operation
+SHARED    Allow concurrent reads but block writes
+EXCLUSIVE Block all reads and writes during the operation
+========= ===========
+
+.. note::
+
+    Not all operations support all algorithm/lock combinations. MySQL will raise
+    an error if the requested combination is not possible for the operation.
+    The ``INSTANT`` algorithm is only available in MySQL 8.0+ and only for specific
+    operations like adding columns at the end of a table.
+
+.. warning::
+
+    Using ``ALGORITHM=INPLACE, LOCK=NONE`` does not guarantee zero-downtime for
+    all operations. Some operations may still require a table copy or exclusive lock.
+    Always test schema changes on a staging environment first.
+
 Table Partitioning
 ------------------
 

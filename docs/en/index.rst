@@ -3,7 +3,7 @@ Migrations
 
 Migrations is a plugin that lets you track changes to your database schema over
 time as PHP code that accompanies your application. This lets you ensure each
-environment your application runs in can has the appropriate schema by applying
+environment your application runs in has the appropriate schema by applying
 migrations.
 
 Instead of writing schema modifications in SQL, this plugin allows you to
@@ -468,8 +468,8 @@ for use in unit tests), you can use the ``--generate-only`` flag:
 
     bin/cake bake migration_snapshot Initial --generate-only
 
-This will create the migration file but will not add an entry to the phinxlog
-table, allowing you to move the file to a different location without causing
+This will create the migration file but will not add an entry to the migrations
+tracking table, allowing you to move the file to a different location without causing
 "MISSING" status issues.
 
 The same logic will be applied implicitly if you wish to bake a snapshot for a
@@ -603,15 +603,15 @@ Cleaning up missing migrations
 -------------------------------
 
 Sometimes migration files may be deleted from the filesystem but still exist
-in the phinxlog table. These migrations will be marked as **MISSING** in the
-status output. You can remove these entries from the phinxlog table using the
+in the migrations tracking table. These migrations will be marked as **MISSING** in the
+status output. You can remove these entries from the tracking table using the
 ``--cleanup`` option:
 
 .. code-block:: bash
 
     bin/cake migrations status --cleanup
 
-This will remove all migration entries from the phinxlog table that no longer
+This will remove all migration entries from the tracking table that no longer
 have corresponding migration files in the filesystem.
 
 Marking a migration as migrated
