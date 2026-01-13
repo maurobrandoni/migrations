@@ -23,6 +23,7 @@ use PDOException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Depends;
 use PHPUnit\Framework\TestCase;
+use RuntimeException;
 
 class PostgresAdapterTest extends TestCase
 {
@@ -2973,6 +2974,22 @@ OUTPUT;
         $table->insert([
             ['code' => 'ITEM1', 'name' => 'Different Name'],
         ])->save();
+    }
+
+    public function testInsertOrUpdateRequiresConflictColumns()
+    {
+        $table = new Table('currencies', [], $this->adapter);
+        $table->addColumn('code', 'string', ['limit' => 3])
+            ->addColumn('rate', 'decimal', ['precision' => 10, 'scale' => 4])
+            ->addIndex('code', ['unique' => true])
+            ->create();
+
+        // PostgreSQL requires conflictColumns for insertOrUpdate
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('PostgreSQL requires the $conflictColumns parameter');
+        $table->insertOrUpdate([
+            ['code' => 'USD', 'rate' => 1.0000],
+        ], ['rate'], [])->save();
     }
 
     public function testAddSinglePartitionToExistingTable()
