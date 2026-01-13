@@ -450,6 +450,88 @@ within your seed class and then use the ``insert()`` method to insert data:
     You must call the ``saveData()`` method to commit your data to the table.
     Migrations will buffer data until you do so.
 
+Upserting Data
+--------------
+
+.. versionadded:: 5.0.0
+    ``insertOrUpdate()`` and ``insertOrSkip()`` were added in 5.0.0.
+
+For seeds that may be run multiple times, you can use ``insertOrUpdate()`` to insert
+new records or update existing ones based on conflict columns. This is particularly
+useful for configuration or reference data that should always reflect certain values:
+
+.. code-block:: php
+
+    <?php
+
+    use Migrations\BaseSeed;
+
+    class ConfigSeed extends BaseSeed
+    {
+        public function run(): void
+        {
+            $data = [
+                [
+                    'key' => 'site_name',
+                    'value' => 'My Application',
+                ],
+                [
+                    'key' => 'maintenance_mode',
+                    'value' => 'false',
+                ],
+            ];
+
+            $settings = $this->table('settings');
+            // For PostgreSQL and SQLite, you must specify the conflict column(s)
+            $settings->insertOrUpdate($data, ['key'])
+                     ->saveData();
+
+            // For MySQL, conflict columns are optional (uses all unique constraints)
+            // $settings->insertOrUpdate($data)->saveData();
+        }
+    }
+
+.. note::
+
+    The ``$conflictColumns`` parameter behavior differs by database:
+
+    - **MySQL**: The parameter is ignored because MySQL's ``ON DUPLICATE KEY UPDATE``
+      automatically applies to all unique constraints.
+    - **PostgreSQL/SQLite**: The parameter is required and specifies which column(s)
+      to use for conflict detection.
+
+Insert or Skip
+~~~~~~~~~~~~~~
+
+If you want to insert records only when they don't already exist (without updating),
+use the ``insertOrSkip()`` method:
+
+.. code-block:: php
+
+    <?php
+
+    use Migrations\BaseSeed;
+
+    class DefaultRolesSeed extends BaseSeed
+    {
+        public function run(): void
+        {
+            $data = [
+                ['name' => 'admin', 'description' => 'Administrator'],
+                ['name' => 'user', 'description' => 'Regular User'],
+                ['name' => 'guest', 'description' => 'Guest User'],
+            ];
+
+            $roles = $this->table('roles');
+            // Skip inserting if a role with the same name already exists
+            $roles->insertOrSkip($data, ['name'])
+                  ->saveData();
+        }
+    }
+
+This is useful for seeding default data that should not overwrite any customizations
+made by users.
+
 Truncating Tables
 =================
 
