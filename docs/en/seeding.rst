@@ -450,61 +450,17 @@ within your seed class and then use the ``insert()`` method to insert data:
     You must call the ``saveData()`` method to commit your data to the table.
     Migrations will buffer data until you do so.
 
-Upserting Data
---------------
+Insert Modes
+============
 
-.. versionadded:: 5.0.0
-    ``insertOrUpdate()`` and ``insertOrSkip()`` were added in 5.0.0.
-
-For seeds that may be run multiple times, you can use ``insertOrUpdate()`` to insert
-new records or update existing ones based on conflict columns. This is particularly
-useful for configuration or reference data that should always reflect certain values:
-
-.. code-block:: php
-
-    <?php
-
-    use Migrations\BaseSeed;
-
-    class ConfigSeed extends BaseSeed
-    {
-        public function run(): void
-        {
-            $data = [
-                [
-                    'key' => 'site_name',
-                    'value' => 'My Application',
-                ],
-                [
-                    'key' => 'maintenance_mode',
-                    'value' => 'false',
-                ],
-            ];
-
-            $settings = $this->table('settings');
-            // For PostgreSQL and SQLite, you must specify the conflict column(s)
-            $settings->insertOrUpdate($data, ['key'])
-                     ->saveData();
-
-            // For MySQL, conflict columns are optional (uses all unique constraints)
-            // $settings->insertOrUpdate($data)->saveData();
-        }
-    }
-
-.. note::
-
-    The ``$conflictColumns`` parameter behavior differs by database:
-
-    - **MySQL**: The parameter is ignored because MySQL's ``ON DUPLICATE KEY UPDATE``
-      automatically applies to all unique constraints.
-    - **PostgreSQL/SQLite**: The parameter is required and specifies which column(s)
-      to use for conflict detection.
+In addition to the standard ``insert()`` method, Migrations provides specialized
+insert methods for handling conflicts with existing data.
 
 Insert or Skip
-~~~~~~~~~~~~~~
+--------------
 
-If you want to insert records only when they don't already exist (without updating),
-use the ``insertOrSkip()`` method:
+The ``insertOrSkip()`` method inserts rows but silently skips any that would
+violate a unique constraint:
 
 .. code-block:: php
 
@@ -512,25 +468,70 @@ use the ``insertOrSkip()`` method:
 
     use Migrations\BaseSeed;
 
-    class DefaultRolesSeed extends BaseSeed
+    class CurrencySeed extends BaseSeed
     {
         public function run(): void
         {
             $data = [
-                ['name' => 'admin', 'description' => 'Administrator'],
-                ['name' => 'user', 'description' => 'Regular User'],
-                ['name' => 'guest', 'description' => 'Guest User'],
+                ['code' => 'USD', 'name' => 'US Dollar'],
+                ['code' => 'EUR', 'name' => 'Euro'],
             ];
 
-            $roles = $this->table('roles');
-            // Skip inserting if a role with the same name already exists
-            $roles->insertOrSkip($data, ['name'])
-                  ->saveData();
+            $this->table('currencies')
+                ->insertOrSkip($data)
+                ->saveData();
         }
     }
 
-This is useful for seeding default data that should not overwrite any customizations
-made by users.
+Insert or Update (Upsert)
+-------------------------
+
+The ``insertOrUpdate()`` method performs an "upsert" operation - inserting new
+rows and updating existing rows that conflict on unique columns:
+
+.. code-block:: php
+
+    <?php
+
+    use Migrations\BaseSeed;
+
+    class ExchangeRateSeed extends BaseSeed
+    {
+        public function run(): void
+        {
+            $data = [
+                ['code' => 'USD', 'rate' => 1.0000],
+                ['code' => 'EUR', 'rate' => 0.9234],
+            ];
+
+            $this->table('exchange_rates')
+                ->insertOrUpdate($data, ['rate'], ['code'])
+                ->saveData();
+        }
+    }
+
+The method takes three arguments:
+
+- ``$data``: The rows to insert (same format as ``insert()``)
+- ``$updateColumns``: Which columns to update when a conflict occurs
+- ``$conflictColumns``: Which columns define uniqueness (must have a unique index)
+
+.. warning::
+
+    Database-specific behavior differences:
+
+    **MySQL**: Uses ``ON DUPLICATE KEY UPDATE``. The ``$conflictColumns`` parameter
+    is ignored because MySQL automatically applies the update to *all* unique
+    constraint violations on the table. Passing ``$conflictColumns`` will trigger
+    a warning. If your table has multiple unique constraints, be aware that a
+    conflict on *any* of them will trigger the update.
+
+    **PostgreSQL/SQLite**: Uses ``ON CONFLICT (...) DO UPDATE SET``. The
+    ``$conflictColumns`` parameter is required and specifies exactly which unique
+    constraint should trigger the update. A ``RuntimeException`` will be thrown
+    if this parameter is empty.
+
+    **SQL Server**: Not currently supported. Use separate insert/update logic.
 
 Truncating Tables
 =================
