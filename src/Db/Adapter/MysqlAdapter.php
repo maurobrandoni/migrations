@@ -305,7 +305,11 @@ class MysqlAdapter extends AbstractAdapter
                 $data['length'] = null;
             }
             $standardLengths = [TableSchema::LENGTH_TINY, TableSchema::LENGTH_MEDIUM, TableSchema::LENGTH_LONG];
-            if ($data['length'] !== null && !in_array($data['length'], $standardLengths, true)) {
+            if (
+                $data['length'] !== null &&
+                $data['length'] > TableSchema::LENGTH_TINY &&
+                !in_array($data['length'], $standardLengths, true)
+            ) {
                 foreach ($standardLengths as $bucket) {
                     if ($bucket < $data['length']) {
                         continue;
