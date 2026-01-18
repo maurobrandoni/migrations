@@ -17,6 +17,7 @@ use Migrations\Db\Table;
 use Migrations\Db\Table\CheckConstraint;
 use Migrations\Db\Table\Column;
 use Migrations\Db\Table\ForeignKey;
+use Migrations\Db\Table\Index;
 use Migrations\Db\Table\Partition;
 use PDO;
 use PDOException;
@@ -348,6 +349,27 @@ class MysqlAdapterTest extends TestCase
         $this->assertTrue($this->adapter->hasColumn('ztable', 'id'));
         $this->assertTrue($this->adapter->hasIndex('ztable', 'id'));
         $this->assertTrue($this->adapter->hasColumn('ztable', 'user_id'));
+    }
+
+    public function testCreateTableBinaryLengthWithIndex()
+    {
+        $table = new Table('ntable', [], $this->adapter);
+        $table
+            ->addColumn('file', 'binary', [
+                'default' => null,
+                'length' => 20,
+                'null' => true,
+            ])
+            ->addIndex(
+                (new Index())
+                    ->setColumns(['file'])
+                    ->setName('file_idx')
+                    ->setType('unique'),
+            )
+            ->create();
+        $this->assertTrue($this->adapter->hasColumn('ntable', 'id'));
+        $this->assertTrue($this->adapter->hasColumn('ntable', 'file'));
+        $this->assertTrue($this->adapter->hasIndex('ntable', 'file'));
     }
 
     /**
@@ -1224,8 +1246,11 @@ class MysqlAdapterTest extends TestCase
         return [
             // When creating binary with limit > 255, MySQL auto-converts to BLOB
             // input limit, expected SQL type name, expected column limit after round-trip
+            // For values smaller than 255, we preserve the length.
             [null, 'blob', MysqlAdapter::BLOB_REGULAR], // binary(null) becomes BLOB
-            [64, 'tinyblob', MysqlAdapter::BLOB_TINY], // binary(64) becomes TINYBLOB
+            [64, 'binary', 64], // binary(64) becomes binary(64)
+            [254, 'binary', 254], // binary(254) becomes binary(254)
+            [255, 'tinyblob', MysqlAdapter::BLOB_TINY], // binary(255) becomes TINYBLOB
             [MysqlAdapter::BLOB_REGULAR - 20, 'mediumblob', MysqlAdapter::BLOB_MEDIUM],
             [MysqlAdapter::BLOB_REGULAR, 'blob', MysqlAdapter::BLOB_REGULAR],
             [MysqlAdapter::BLOB_REGULAR + 20, 'mediumblob', MysqlAdapter::BLOB_MEDIUM],
@@ -1251,8 +1276,11 @@ class MysqlAdapterTest extends TestCase
         return [
             // When creating varbinary with limit > 255, MySQL auto-converts to BLOB
             // input limit, expected SQL type name, expected column limit after round-trip
+            // For values smaller than 255, we preserve the length.
             [null, 'blob', MysqlAdapter::BLOB_REGULAR], // varbinary(null) becomes BLOB
-            [64, 'tinyblob', MysqlAdapter::BLOB_TINY], // varbinary(64) becomes TINYBLOB
+            [64, 'binary', 64], // varbinary(64) becomes binary(64)
+            [254, 'binary', 254], // varbinary(254) becomes binary(254)
+            [255, 'tinyblob', MysqlAdapter::BLOB_TINY], // varbinary(255) becomes TINYBLOB
             [MysqlAdapter::BLOB_REGULAR - 20, 'mediumblob', MysqlAdapter::BLOB_MEDIUM],
             [MysqlAdapter::BLOB_REGULAR, 'blob', MysqlAdapter::BLOB_REGULAR],
             [MysqlAdapter::BLOB_REGULAR + 20, 'mediumblob', MysqlAdapter::BLOB_MEDIUM],
