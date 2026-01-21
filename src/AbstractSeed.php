@@ -17,6 +17,7 @@ use Migrations\Command\Phinx\Seed;
 use Phinx\Seed\AbstractSeed as BaseAbstractSeed;
 use Symfony\Component\Console\Input\ArgvInput;
 use Symfony\Component\Console\Input\InputInterface;
+use function Cake\Core\deprecationWarning;
 use function Cake\Core\pluginSplit;
 
 /**
@@ -34,6 +35,17 @@ abstract class AbstractSeed extends BaseAbstractSeed
      * @var \Symfony\Component\Console\Input\InputInterface
      */
     protected InputInterface $input;
+
+    /**
+     * Constructor
+     */
+    public function __construct()
+    {
+        deprecationWarning(
+            '4.5.0',
+            'Migrations\AbstractSeed is deprecated. Use Migrations\BaseSeed instead.',
+        );
+    }
 
     /**
      * Gives the ability to a seeder to call another seeder.
