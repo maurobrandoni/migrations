@@ -26,6 +26,7 @@ version_list = [
     {'name': '2.x', 'number': 'migrations/2', 'title': '2.x'},
     {'name': '3.x', 'number': 'migrations/3', 'title': '3.x'},
     {'name': '4.x', 'number': 'migrations/4', 'title': '4.x', 'current': True},
+    {'name': '5.x', 'number': 'migrations/5', 'title': '5.x'},
 ]
 
 # Languages available.
