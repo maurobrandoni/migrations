@@ -12,7 +12,7 @@ FROM ghcr.io/cakephp/docs-builder:runtime as runtime
 
 ENV LANGS="en fr ja pt ru"
 ENV SEARCH_SOURCE="/usr/share/nginx/html"
-ENV SEARCH_URL_PREFIX="/migrations/4"
+ENV SEARCH_URL_PREFIX="/migrations/5"
 
 COPY --from=builder /data/docs /data/docs
 COPY --from=builder /data/website /data/website
