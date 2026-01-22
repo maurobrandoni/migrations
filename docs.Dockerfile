@@ -5,12 +5,12 @@ COPY docs /data/docs
 
 RUN cd /data/docs-builder && \
   # In the future repeat website for each version
-  make website LANGS="en fr ja pt ru" SOURCE=/data/docs DEST=/data/website/
+  make website LANGS="en" SOURCE=/data/docs DEST=/data/website/
 
 # Build a small nginx container with just the static site in it.
 FROM ghcr.io/cakephp/docs-builder:runtime as runtime
 
-ENV LANGS="en fr ja pt ru"
+ENV LANGS="en"
 ENV SEARCH_SOURCE="/usr/share/nginx/html"
 ENV SEARCH_URL_PREFIX="/migrations/5"
 
