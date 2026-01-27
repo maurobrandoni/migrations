@@ -13,7 +13,10 @@ declare(strict_types=1);
  */
 namespace Migrations;
 
+use Phinx\Db\Adapter\AdapterInterface;
 use Phinx\Migration\AbstractMigration as BaseAbstractMigration;
+use Phinx\Migration\MigrationInterface;
+use function Cake\Core\deprecationWarning;
 
 /**
  * @deprecated 4.5.0 You should use Migrations\BaseMigration for new migrations.
@@ -31,6 +34,19 @@ class AbstractMigration extends BaseAbstractMigration
      * @var bool
      */
     public bool $autoId = true;
+
+    /**
+     * @inheritDoc
+     */
+    public function setAdapter(AdapterInterface $adapter): MigrationInterface
+    {
+        deprecationWarning(
+            '4.5.0',
+            'Migrations\AbstractMigration is deprecated. Use Migrations\BaseMigration instead.',
+        );
+
+        return parent::setAdapter($adapter);
+    }
 
     /**
      * Hook method to decide if this migration should use transactions
