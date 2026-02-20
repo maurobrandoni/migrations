@@ -274,6 +274,13 @@ class MysqlAdapter extends AbstractAdapter
      */
     protected function mapColumnData(array $data): array
     {
+        // Convert uuid to char(36) to ensure collation support.
+        // The dialect only adds COLLATE for text, char, and string types.
+        if ($data['type'] === self::PHINX_TYPE_UUID) {
+            $data['type'] = 'char';
+            $data['length'] = 36;
+        }
+
         if ($data['type'] == self::PHINX_TYPE_TEXT && $data['length'] !== null) {
             $data['length'] = match ($data['length']) {
                 self::TEXT_LONG => TableSchema::LENGTH_LONG,

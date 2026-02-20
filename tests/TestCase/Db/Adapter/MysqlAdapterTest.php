@@ -166,6 +166,29 @@ class MysqlAdapterTest extends TestCase
         $this->assertFalse($columns[0]->isSigned());
     }
 
+    public function testCreateTableWithColumnCollation()
+    {
+        $table = new Table\Table('custom_collation', ['id' => false, 'primary_key' => ['id'], 'collation' => 'utf8mb4_unicode_ci']);
+
+        $columnId = new Column();
+        $columnId
+            ->setName('id')
+            ->setType('uuid')
+            ->setCollation('ascii_general_ci')
+            ->setEncoding('ascii');
+        $columnName = new Column();
+        $columnName
+            ->setName('name')
+            ->setType('text');
+        $columns = [$columnId, $columnName];
+
+        $this->adapter->createTable($table, $columns);
+
+        $rows = $this->adapter->fetchAll('SHOW FULL COLUMNS FROM custom_collation');
+        $this->assertEquals('ascii_general_ci', $rows[0]['Collation']); // specified collation is set
+        $this->assertEquals('utf8mb4_unicode_ci', $rows[1]['Collation']); // if not specified uses table's collation
+    }
+
     public function testCreateTableWithComment()
     {
         $tableComment = 'Table comment';
