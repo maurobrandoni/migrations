@@ -3080,6 +3080,38 @@ OUTPUT;
         ])->save();
     }
 
+    public function testInsertOrUpdateWithEmptyConflictColumnsDoesNotWarn()
+    {
+        $table = new Table('currencies', [], $this->adapter);
+        $table->addColumn('code', 'string', ['limit' => 3])
+            ->addColumn('rate', 'decimal', ['precision' => 10, 'scale' => 4])
+            ->addIndex('code', ['unique' => true])
+            ->create();
+
+        $warning = null;
+        set_error_handler(function (int $errno, string $errstr) use (&$warning) {
+            $warning = $errstr;
+
+            return true;
+        }, E_USER_WARNING);
+
+        try {
+            $table->insertOrUpdate([
+                ['code' => 'USD', 'rate' => 1.0000],
+                ['code' => 'EUR', 'rate' => 0.9000],
+            ], ['rate'], [])->save();
+        } finally {
+            restore_error_handler();
+        }
+
+        $this->assertNull($warning, 'Empty conflictColumns should not trigger a warning for MySQL');
+
+        $rows = $this->adapter->fetchAll('SELECT * FROM currencies ORDER BY code');
+        $this->assertCount(2, $rows);
+        $this->assertEquals('0.9000', $rows[0]['rate']);
+        $this->assertEquals('1.0000', $rows[1]['rate']);
+    }
+
     public function testCreateTableWithRangeColumnsPartitioning()
     {
         // MySQL requires RANGE COLUMNS for DATE columns
