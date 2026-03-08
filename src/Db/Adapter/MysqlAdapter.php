@@ -977,7 +977,7 @@ class MysqlAdapter extends AbstractAdapter
     {
         $alter = sprintf(
             'ADD %s',
-            $this->getForeignKeySqlDefinition($foreignKey),
+            $this->getForeignKeySqlDefinition($foreignKey, $table->getName()),
         );
 
         return new AlterInstructions([$alter]);
@@ -1192,14 +1192,13 @@ class MysqlAdapter extends AbstractAdapter
      * Gets the MySQL Foreign Key Definition for an ForeignKey object.
      *
      * @param \Migrations\Db\Table\ForeignKey $foreignKey Foreign key
+     * @param string $tableName Table name for auto-generating constraint name
      * @return string
      */
-    protected function getForeignKeySqlDefinition(ForeignKey $foreignKey): string
+    protected function getForeignKeySqlDefinition(ForeignKey $foreignKey, string $tableName): string
     {
-        $def = '';
-        if ($foreignKey->getName()) {
-            $def .= ' CONSTRAINT ' . $this->quoteColumnName((string)$foreignKey->getName());
-        }
+        $constraintName = $foreignKey->getName() ?: ($tableName . '_' . implode('_', $foreignKey->getColumns()));
+        $def = ' CONSTRAINT ' . $this->quoteColumnName($constraintName);
         $columnNames = [];
         foreach ($foreignKey->getColumns() as $column) {
             $columnNames[] = $this->quoteColumnName($column);

@@ -1425,7 +1425,7 @@ PCRE_PATTERN;
         $tableName = $table->getName();
         $instructions->addPostStep(function ($state) use ($foreignKey, $tableName) {
             $this->execute('pragma foreign_keys = ON');
-            $sql = substr($state['createSQL'], 0, -1) . ',' . $this->getForeignKeySqlDefinition($foreignKey) . '); ';
+            $sql = substr($state['createSQL'], 0, -1) . ',' . $this->getForeignKeySqlDefinition($foreignKey, $tableName) . '); ';
 
             //Delete indexes from original table and recreate them in temporary table
             $schema = $this->getSchemaName($tableName, true)['schema'];
@@ -1670,14 +1670,13 @@ PCRE_PATTERN;
      * Gets the SQLite Foreign Key Definition for an ForeignKey object.
      *
      * @param \Migrations\Db\Table\ForeignKey $foreignKey Foreign key
+     * @param string $tableName Table name for auto-generating constraint name
      * @return string
      */
-    protected function getForeignKeySqlDefinition(ForeignKey $foreignKey): string
+    protected function getForeignKeySqlDefinition(ForeignKey $foreignKey, string $tableName): string
     {
-        $def = '';
-        if ($foreignKey->getName()) {
-            $def .= ' CONSTRAINT ' . $this->quoteColumnName((string)$foreignKey->getName());
-        }
+        $constraintName = $foreignKey->getName() ?: ($tableName . '_' . implode('_', $foreignKey->getColumns()));
+        $def = ' CONSTRAINT ' . $this->quoteColumnName($constraintName);
         $columnNames = [];
         foreach ($foreignKey->getColumns() as $column) {
             $columnNames[] = $this->quoteColumnName($column);
