@@ -72,7 +72,7 @@ class TheDiffSimpleMysql extends BaseMigration
                     ->setReferencedColumns('id')
                     ->setOnDelete('RESTRICT')
                     ->setOnUpdate('RESTRICT')
-                    ->setName('articles_ibfk_1')
+                    ->setName('articles_user_id')
             )
             ->update();
     }
