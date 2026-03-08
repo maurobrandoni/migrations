@@ -20,7 +20,6 @@ class TheDiffDefaultMysql extends BaseMigration
             ->removeIndexByName('UNIQUE_SLUG')
             ->removeIndexByName('rating_index')
             ->removeIndexByName('BY_NAME')
-            ->removeIndexByName('user_id')
             ->update();
 
         $this->table('articles')
@@ -126,10 +125,6 @@ class TheDiffDefaultMysql extends BaseMigration
                     ->setName('UNIQUE_SLUG')
             )
             ->addIndex(
-                $this->index('user_id')
-                    ->setName('articles_user_id')
-            )
-            ->addIndex(
                 $this->index('category_id')
                     ->setName('category_id')
             )
@@ -157,7 +152,6 @@ class TheDiffDefaultMysql extends BaseMigration
 
         $this->table('articles')
             ->removeIndexByName('UNIQUE_SLUG')
-            ->removeIndexByName('articles_user_id')
             ->removeIndexByName('category_id')
             ->removeIndexByName('rating_index')
             ->update();
@@ -212,10 +206,6 @@ class TheDiffDefaultMysql extends BaseMigration
             ->addIndex(
                 $this->index('name')
                     ->setName('BY_NAME')
-            )
-            ->addIndex(
-                $this->index('user_id')
-                    ->setName('user_id')
             )
             ->update();
 
