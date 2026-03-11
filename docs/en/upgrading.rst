@@ -130,6 +130,40 @@ insertOrSkip() for Seeds
 New ``insertOrSkip()`` method for seeds to insert records only if they don't already exist,
 making seeds more idempotent.
 
+Foreign Key Constraint Naming
+=============================
+
+Starting in 5.x, when you use ``addForeignKey()`` without providing an explicit constraint
+name, migrations will auto-generate a name using the pattern ``{table}_{columns}``.
+
+Previously, MySQL would auto-generate constraint names (like ``articles_ibfk_1``), while
+PostgreSQL and SQL Server used migrations-generated names. Now all adapters use the same
+consistent naming pattern.
+
+**Impact on existing migrations:**
+
+If you have existing migrations that use ``addForeignKey()`` without explicit names, and
+later migrations that reference those constraints by name (e.g., in ``dropForeignKey()``),
+the generated names may differ between old and new migrations. This could cause
+``dropForeignKey()`` to fail if it's looking for a name that doesn't exist.
+
+**Recommendations:**
+
+1. For new migrations, you can rely on auto-generated names or provide explicit names
+2. If you have rollback issues with existing migrations, you may need to update them
+   to use explicit constraint names
+3. The auto-generated names include conflict resolution - if ``{table}_{columns}`` already
+   exists, a counter suffix is added (``_2``, ``_3``, etc.)
+
+**Name length limits:**
+
+Auto-generated names are truncated to respect database limits:
+
+- MySQL: 61 characters (64 - 3 for counter suffix)
+- PostgreSQL: 60 characters (63 - 3)
+- SQL Server: 125 characters (128 - 3)
+- SQLite: No limit
+
 Migration File Compatibility
 ============================
 
