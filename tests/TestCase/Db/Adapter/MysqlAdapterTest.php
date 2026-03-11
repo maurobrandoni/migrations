@@ -1369,6 +1369,37 @@ class MysqlAdapterTest extends TestCase
         $this->adapter->dropTable('blob_round_trip_test');
     }
 
+    public static function textRoundTripData()
+    {
+        return [
+            // type, limit, expected type after round-trip, expected limit after round-trip
+            ['text', null, 'text', null],
+            ['text', MysqlAdapter::TEXT_TINY, 'text', MysqlAdapter::TEXT_TINY],
+            ['text', MysqlAdapter::TEXT_MEDIUM, 'text', MysqlAdapter::TEXT_MEDIUM],
+            ['text', MysqlAdapter::TEXT_LONG, 'text', MysqlAdapter::TEXT_LONG],
+        ];
+    }
+
+    #[DataProvider('textRoundTripData')]
+    public function testTextRoundTrip(string $type, ?int $limit, string $expectedType, ?int $expectedLimit)
+    {
+        // Create a table with a TEXT column
+        $table = new Table('text_round_trip_test', [], $this->adapter);
+        $table->addColumn('text_col', $type, ['limit' => $limit])
+              ->save();
+
+        // Read the column back from the database
+        $columns = $this->adapter->getColumns('text_round_trip_test');
+
+        $textColumn = $columns[1];
+        $this->assertNotNull($textColumn, 'TEXT column not found');
+        $this->assertSame($expectedType, $textColumn->getType(), 'Type mismatch after round-trip');
+        $this->assertSame($expectedLimit, $textColumn->getLimit(), 'Limit mismatch after round-trip');
+
+        // Clean up
+        $this->adapter->dropTable('text_round_trip_test');
+    }
+
     public function testTimestampInvalidLimit()
     {
         $this->adapter->connect();
@@ -3080,6 +3111,38 @@ OUTPUT;
         ])->save();
     }
 
+    public function testInsertOrUpdateWithEmptyConflictColumnsDoesNotWarn()
+    {
+        $table = new Table('currencies', [], $this->adapter);
+        $table->addColumn('code', 'string', ['limit' => 3])
+            ->addColumn('rate', 'decimal', ['precision' => 10, 'scale' => 4])
+            ->addIndex('code', ['unique' => true])
+            ->create();
+
+        $warning = null;
+        set_error_handler(function (int $errno, string $errstr) use (&$warning) {
+            $warning = $errstr;
+
+            return true;
+        }, E_USER_WARNING);
+
+        try {
+            $table->insertOrUpdate([
+                ['code' => 'USD', 'rate' => 1.0000],
+                ['code' => 'EUR', 'rate' => 0.9000],
+            ], ['rate'], [])->save();
+        } finally {
+            restore_error_handler();
+        }
+
+        $this->assertNull($warning, 'Empty conflictColumns should not trigger a warning for MySQL');
+
+        $rows = $this->adapter->fetchAll('SELECT * FROM currencies ORDER BY code');
+        $this->assertCount(2, $rows);
+        $this->assertEquals('0.9000', $rows[0]['rate']);
+        $this->assertEquals('1.0000', $rows[1]['rate']);
+    }
+
     public function testCreateTableWithRangeColumnsPartitioning()
     {
         // MySQL requires RANGE COLUMNS for DATE columns
@@ -3477,5 +3540,54 @@ OUTPUT;
         $rows = $this->adapter->fetchAll('SELECT * FROM combined_test WHERE created_year = 2024');
         $this->assertCount(1, $rows);
         $this->assertEquals('A description', $rows[0]['description']);
+    }
+
+    public function testBinaryColumnWithFixedOption(): void
+    {
+        $table = new Table('binary_fixed_test', [], $this->adapter);
+        $table->addColumn('hash', 'binary', ['limit' => 20, 'fixed' => true])
+            ->addColumn('data', 'binary', ['limit' => 20])
+            ->save();
+
+        $this->assertTrue($this->adapter->hasColumn('binary_fixed_test', 'hash'));
+        $this->assertTrue($this->adapter->hasColumn('binary_fixed_test', 'data'));
+
+        // Check that the fixed column is created as BINARY and the non-fixed as VARBINARY
+        $rows = $this->adapter->fetchAll('SHOW COLUMNS FROM binary_fixed_test');
+        $hashColumn = null;
+        $dataColumn = null;
+        foreach ($rows as $row) {
+            if ($row['Field'] === 'hash') {
+                $hashColumn = $row;
+            }
+            if ($row['Field'] === 'data') {
+                $dataColumn = $row;
+            }
+        }
+
+        $this->assertNotNull($hashColumn);
+        $this->assertNotNull($dataColumn);
+        $this->assertSame('binary(20)', $hashColumn['Type']);
+        $this->assertSame('varbinary(20)', $dataColumn['Type']);
+
+        // Verify the fixed attribute is reflected back
+        $columns = $this->adapter->getColumns('binary_fixed_test');
+        $hashCol = null;
+        $dataCol = null;
+        foreach ($columns as $col) {
+            if ($col->getName() === 'hash') {
+                $hashCol = $col;
+            }
+            if ($col->getName() === 'data') {
+                $dataCol = $col;
+            }
+        }
+
+        $this->assertNotNull($hashCol);
+        $this->assertNotNull($dataCol);
+        $this->assertSame('binary', $hashCol->getType());
+        $this->assertSame('binary', $dataCol->getType());
+        $this->assertTrue($hashCol->getFixed());
+        $this->assertNull($dataCol->getFixed());
     }
 }
