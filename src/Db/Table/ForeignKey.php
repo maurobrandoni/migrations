@@ -87,6 +87,19 @@ class ForeignKey extends DatabaseForeignKey
     }
 
     /**
+     * {@inheritDoc}
+     *
+     * Narrows the return type from the parent's ?array to array,
+     * since $columns is always initialized as [] in this class.
+     *
+     * @return array<string>
+     */
+    public function getColumns(): array
+    {
+        return $this->columns;
+    }
+
+    /**
      * Utility method that maps an array of index options to this object's methods.
      *
      * @param array<string, mixed> $options Options
@@ -246,7 +259,9 @@ class ForeignKey extends DatabaseForeignKey
      */
     public function getOnDelete(): ?string
     {
-        return $this->mapAction($this->getDelete());
+        $delete = $this->getDelete();
+
+        return $delete !== null ? $this->mapAction($delete) : null;
     }
 
     /**
@@ -271,6 +286,8 @@ class ForeignKey extends DatabaseForeignKey
      */
     public function getOnUpdate(): ?string
     {
-        return $this->mapAction($this->getUpdate());
+        $update = $this->getUpdate();
+
+        return $update !== null ? $this->mapAction($update) : null;
     }
 }

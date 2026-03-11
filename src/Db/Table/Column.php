@@ -182,9 +182,12 @@ class Column extends DatabaseColumn
     /**
      * Gets the column name.
      *
-     * @return string|null
+     * Narrows the return type from the parent's ?string to string,
+     * since $name is typed as string (not ?string) in this class.
+     *
+     * @return string
      */
-    public function getName(): ?string
+    public function getName(): string
     {
         return $this->name;
     }
@@ -234,7 +237,7 @@ class Column extends DatabaseColumn
      */
     public function getNull(): bool
     {
-        return $this->null;
+        return $this->null ?? false;
     }
 
     /**
@@ -782,10 +785,10 @@ class Column extends DatabaseColumn
      *
      * When true, binary columns will use BINARY(n) instead of VARBINARY(n).
      *
-     * @param bool $fixed Fixed
+     * @param bool|null $fixed Fixed
      * @return $this
      */
-    public function setFixed(bool $fixed)
+    public function setFixed(?bool $fixed)
     {
         $this->fixed = $fixed;
 

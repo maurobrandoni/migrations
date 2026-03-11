@@ -455,9 +455,9 @@ class PostgresAdapter extends AbstractAdapter
 
         $columnSql = $dialect->columnDefinitionSql($this->mapColumnData($newColumn->toArray()));
         // Remove the column name from $columnSql
-        $columnType = preg_replace('/^"?(?:[^"]+)"?\s+/', '', $columnSql);
+        $columnType = (string)preg_replace('/^"?(?:[^"]+)"?\s+/', '', $columnSql);
         // Remove generated clause
-        $columnType = preg_replace('/GENERATED (?:ALWAYS|BY DEFAULT) AS IDENTITY/', '', $columnType);
+        $columnType = (string)preg_replace('/GENERATED (?:ALWAYS|BY DEFAULT) AS IDENTITY/', '', $columnType);
 
         $sql = sprintf(
             'ALTER COLUMN %s TYPE %s',
@@ -483,10 +483,10 @@ class PostgresAdapter extends AbstractAdapter
             );
         }
         // NULL and DEFAULT cannot be set while changing column type
-        $sql = preg_replace('/ NOT NULL/', '', $sql);
-        $sql = preg_replace('/ DEFAULT NULL/', '', $sql);
+        $sql = (string)preg_replace('/ NOT NULL/', '', $sql);
+        $sql = (string)preg_replace('/ DEFAULT NULL/', '', $sql);
         // If it is set, DEFAULT is the last definition
-        $sql = preg_replace('/DEFAULT .*/', '', $sql);
+        $sql = (string)preg_replace('/DEFAULT .*/', '', $sql);
         if ($newColumn->getType() === 'boolean') {
             $sql .= sprintf(
                 ' USING (CASE WHEN %s IS NULL THEN NULL WHEN %s::int=0 THEN FALSE ELSE TRUE END)',
@@ -505,11 +505,12 @@ class PostgresAdapter extends AbstractAdapter
                 'ALTER COLUMN %s',
                 $quotedColumnName,
             );
-            if ($newColumn->isIdentity() && $newColumn->getGenerated() !== null) {
+            $generated = $newColumn->getGenerated();
+            if ($newColumn->isIdentity() && $generated !== null) {
                 if ($column->isIdentity()) {
-                    $sql .= sprintf(' SET GENERATED %s', (string)$newColumn->getGenerated());
+                    $sql .= sprintf(' SET GENERATED %s', $generated);
                 } else {
-                    $sql .= sprintf(' ADD GENERATED %s AS IDENTITY', (string)$newColumn->getGenerated());
+                    $sql .= sprintf(' ADD GENERATED %s AS IDENTITY', $generated);
                 }
             } else {
                 $sql .= ' DROP IDENTITY IF EXISTS';
@@ -546,12 +547,13 @@ class PostgresAdapter extends AbstractAdapter
         }
 
         // rename column
-        if ($columnName !== $newColumn->getName()) {
+        $newColumnName = $newColumn->getName();
+        if ($columnName !== $newColumnName) {
             $instructions->addPostStep(sprintf(
                 'ALTER TABLE %s RENAME COLUMN %s TO %s',
                 $this->quoteTableName($tableName),
                 $quotedColumnName,
-                $this->quoteColumnName((string)$newColumn->getName()),
+                $this->quoteColumnName($newColumnName),
             ));
         }
 
@@ -873,6 +875,7 @@ class PostgresAdapter extends AbstractAdapter
      */
     protected function getColumnCommentSqlDefinition(Column $column, string $tableName): string
     {
+        $columnName = $column->getName();
         $comment = (string)$column->getComment();
         // passing 'null' is to remove column comment
         $comment = strcasecmp($comment, 'NULL') !== 0
@@ -882,7 +885,7 @@ class PostgresAdapter extends AbstractAdapter
         return sprintf(
             'COMMENT ON COLUMN %s.%s IS %s;',
             $this->quoteTableName($tableName),
-            $this->quoteColumnName((string)$column->getName()),
+            $this->quoteColumnName($columnName),
             $comment,
         );
     }
@@ -923,9 +926,10 @@ class PostgresAdapter extends AbstractAdapter
         } else {
             $createIndexSentence .= '(%s)%s%s;';
         }
-        $where = (string)$index->getWhere();
-        if ($where) {
-            $where = ' WHERE ' . $where;
+        $where = '';
+        $whereClause = $index->getWhere();
+        if ($whereClause) {
+            $where = ' WHERE ' . $whereClause;
         }
 
         return sprintf(
@@ -956,9 +960,13 @@ class PostgresAdapter extends AbstractAdapter
         );
         $columnList = implode(', ', array_map($this->quoteColumnName(...), $foreignKey->getColumns()));
         $refColumnList = implode(', ', array_map($this->quoteColumnName(...), $foreignKey->getReferencedColumns()));
+        $referencedTable = $foreignKey->getReferencedTable();
+        if ($referencedTable === null) {
+            throw new InvalidArgumentException('Foreign key must have a referenced table.');
+        }
         $def = ' CONSTRAINT ' . $this->quoteColumnName($constraintName) .
         ' FOREIGN KEY (' . $columnList . ')' .
-        ' REFERENCES ' . $this->quoteTableName($foreignKey->getReferencedTable()) . ' (' . $refColumnList . ')';
+        ' REFERENCES ' . $this->quoteTableName($referencedTable) . ' (' . $refColumnList . ')';
         if ($foreignKey->getOnDelete()) {
             $def .= " ON DELETE {$foreignKey->getOnDelete()}";
         }
@@ -1327,7 +1335,7 @@ class PostgresAdapter extends AbstractAdapter
             }
             $quotedConflictColumns = array_map($this->quoteColumnName(...), $conflictColumns);
             $updates = [];
-            foreach ($updateColumns as $column) {
+            foreach ($updateColumns ?? [] as $column) {
                 $quotedColumn = $this->quoteColumnName($column);
                 $updates[] = $quotedColumn . ' = EXCLUDED.' . $quotedColumn;
             }

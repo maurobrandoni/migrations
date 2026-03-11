@@ -358,19 +358,21 @@ class Table
      */
     public function addColumn(string|Column $columnName, ?string $type = null, array $options = [])
     {
-        assert($columnName instanceof Column || $type !== null);
         if ($columnName instanceof Column) {
             $action = new AddColumn($this->table, $columnName);
+        } elseif ($type === null) {
+            throw new InvalidArgumentException('Column type must not be null when column name is a string.');
         } else {
             $action = new AddColumn($this->table, $this->getAdapter()->getColumnForType($columnName, $type, $options));
         }
 
         // Delegate to Adapters to check column type
-        if (!$this->getAdapter()->isValidColumnType($action->getColumn())) {
+        $column = $action->getColumn();
+        if (!$this->getAdapter()->isValidColumnType($column)) {
             throw new InvalidArgumentException(sprintf(
                 'An invalid column type "%s" was specified for column "%s".',
-                (string)$action->getColumn()->getType(),
-                (string)$action->getColumn()->getName(),
+                $column->getType(),
+                $column->getName(),
             ));
         }
 

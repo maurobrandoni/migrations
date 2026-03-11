@@ -89,7 +89,7 @@ class RecordingAdapter extends AdapterWrapper
                 case $command instanceof RenameColumn:
                     /** @var \Migrations\Db\Action\RenameColumn $command */
                     $column = clone $command->getColumn();
-                    $name = (string)$column->getName();
+                    $name = $column->getName();
                     $column->setName($command->getNewName());
                     $inverted->addAction(new RenameColumn($command->getTable(), $column, $name));
                     break;

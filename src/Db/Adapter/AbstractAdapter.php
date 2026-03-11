@@ -201,6 +201,9 @@ abstract class AbstractAdapter implements AdapterInterface, DirectActionInterfac
             $this->connection = $this->getOption('connection');
             $this->connect();
         }
+        if ($this->connection === null) {
+            throw new RuntimeException('Unable to establish database connection. Ensure a connection is configured.');
+        }
 
         return $this->connection;
     }
@@ -1687,17 +1690,19 @@ abstract class AbstractAdapter implements AdapterInterface, DirectActionInterfac
 
                 case $action instanceof DropForeignKey && $action->getForeignKey()->getName():
                     /** @var \Migrations\Db\Action\DropForeignKey $action */
+                    $fkName = (string)$action->getForeignKey()->getName();
                     $instructions->merge($this->getDropForeignKeyInstructions(
                         $table->getName(),
-                        (string)$action->getForeignKey()->getName(),
+                        $fkName,
                     ));
                     break;
 
                 case $action instanceof DropIndex && $action->getIndex()->getName():
                     /** @var \Migrations\Db\Action\DropIndex $action */
+                    $indexName = (string)$action->getIndex()->getName();
                     $instructions->merge($this->getDropIndexByNameInstructions(
                         $table->getName(),
-                        (string)$action->getIndex()->getName(),
+                        $indexName,
                     ));
                     break;
 
@@ -1720,7 +1725,7 @@ abstract class AbstractAdapter implements AdapterInterface, DirectActionInterfac
                     /** @var \Migrations\Db\Action\RemoveColumn $action */
                     $instructions->merge($this->getDropColumnInstructions(
                         $table->getName(),
-                        (string)$action->getColumn()->getName(),
+                        $action->getColumn()->getName(),
                     ));
                     break;
 
@@ -1728,7 +1733,7 @@ abstract class AbstractAdapter implements AdapterInterface, DirectActionInterfac
                     /** @var \Migrations\Db\Action\RenameColumn $action */
                     $instructions->merge($this->getRenameColumnInstructions(
                         $table->getName(),
-                        (string)$action->getColumn()->getName(),
+                        $action->getColumn()->getName(),
                         $action->getNewName(),
                     ));
                     break;
