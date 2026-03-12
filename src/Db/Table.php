@@ -19,10 +19,14 @@ use Migrations\Db\Action\ChangeColumn;
 use Migrations\Db\Action\ChangeComment;
 use Migrations\Db\Action\ChangePrimaryKey;
 use Migrations\Db\Action\CreateTable;
+use Migrations\Db\Action\CreateTrigger;
+use Migrations\Db\Action\CreateView;
 use Migrations\Db\Action\DropForeignKey;
 use Migrations\Db\Action\DropIndex;
 use Migrations\Db\Action\DropPartition;
 use Migrations\Db\Action\DropTable;
+use Migrations\Db\Action\DropTrigger;
+use Migrations\Db\Action\DropView;
 use Migrations\Db\Action\RemoveColumn;
 use Migrations\Db\Action\RenameColumn;
 use Migrations\Db\Action\RenameTable;
@@ -1016,6 +1020,87 @@ class Table
     }
 
     /**
+     * Creates a view.
+     *
+     * @param string $viewName View name
+     * @param string $definition SQL SELECT statement for the view
+     * @param array<string, mixed> $options View options
+     * @return $this
+     */
+    public function createView(string $viewName, string $definition, array $options = [])
+    {
+        $view = new Table\View(
+            $viewName,
+            $definition,
+            $options['replace'] ?? false,
+            $options['materialized'] ?? false,
+        );
+
+        $action = new Action\CreateView($this->table, $view);
+        $this->actions->addAction($action);
+
+        return $this;
+    }
+
+    /**
+     * Drops a view.
+     *
+     * @param string $viewName View name
+     * @param array<string, mixed> $options View options
+     * @return $this
+     */
+    public function dropView(string $viewName, array $options = [])
+    {
+        $action = new Action\DropView(
+            $this->table,
+            $viewName,
+            $options['materialized'] ?? false,
+        );
+        $this->actions->addAction($action);
+
+        return $this;
+    }
+
+    /**
+     * Creates a trigger on this table.
+     *
+     * @param string $triggerName Trigger name
+     * @param string|array<string> $event Event(s) that fire the trigger (INSERT, UPDATE, DELETE)
+     * @param string $definition Trigger body/definition
+     * @param array<string, mixed> $options Trigger options
+     * @return $this
+     */
+    public function createTrigger(string $triggerName, string|array $event, string $definition, array $options = [])
+    {
+        $trigger = new Table\Trigger(
+            $triggerName,
+            $options['timing'] ?? Table\Trigger::BEFORE,
+            $event,
+            $definition,
+            $options['forEach'] ?? true,
+        );
+
+        $action = new Action\CreateTrigger($this->table, $trigger);
+        $this->actions->addAction($action);
+
+        return $this;
+    }
+
+    /**
+     * Drops a trigger from this table.
+     *
+     * @param string $triggerName Trigger name
+     * @return $this
+     */
+    public function dropTrigger(string $triggerName)
+    {
+        $action = new Action\DropTrigger($this->table, $triggerName);
+        $this->actions->addAction($action);
+
+        return $this;
+    }
+
+    /**
      * Executes all the pending actions for this table
      *
      * @param bool $exists Whether the table existed prior to executing this method
@@ -1044,9 +1129,29 @@ class Table
         }
 
         // If the table does not exist, the last command in the chain needs to be
-        // a CreateTable action.
+        // a CreateTable action - unless we're ONLY creating views/triggers.
         if (!$exists) {
-            $this->actions->addAction(new CreateTable($this->table));
+            $actions = $this->actions->getActions();
+            $hasTableActions = false;
+            $hasViewOrTriggerActions = false;
+
+            foreach ($actions as $action) {
+                if (
+                    $action instanceof CreateView
+                    || $action instanceof DropView
+                    || $action instanceof CreateTrigger
+                    || $action instanceof DropTrigger
+                ) {
+                    $hasViewOrTriggerActions = true;
+                } else {
+                    $hasTableActions = true;
+                }
+            }
+
+            // Only skip CreateTable if we have ONLY view/trigger actions (and at least one)
+            if (!$hasViewOrTriggerActions || $hasTableActions || count($actions) === 0) {
+                $this->actions->addAction(new CreateTable($this->table));
+            }
         }
 
         $plan = new Plan($this->actions);

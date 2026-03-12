@@ -17,10 +17,14 @@ use Migrations\Db\Action\ChangeColumn;
 use Migrations\Db\Action\ChangeComment;
 use Migrations\Db\Action\ChangePrimaryKey;
 use Migrations\Db\Action\CreateTable;
+use Migrations\Db\Action\CreateTrigger;
+use Migrations\Db\Action\CreateView;
 use Migrations\Db\Action\DropForeignKey;
 use Migrations\Db\Action\DropIndex;
 use Migrations\Db\Action\DropPartition;
 use Migrations\Db\Action\DropTable;
+use Migrations\Db\Action\DropTrigger;
+use Migrations\Db\Action\DropView;
 use Migrations\Db\Action\RemoveColumn;
 use Migrations\Db\Action\RenameColumn;
 use Migrations\Db\Action\RenameTable;
@@ -88,6 +92,13 @@ class Plan
     protected array $columnRemoves = [];
 
     /**
+     * List of view and trigger operations
+     *
+     * @var \Migrations\Db\Plan\AlterTable[]
+     */
+    protected array $viewsAndTriggers = [];
+
+    /**
      * Constructor
      *
      * @param \Migrations\Db\Plan\Intent $intent All the actions that should be executed
@@ -111,6 +122,7 @@ class Plan
         $this->gatherIndexes($actions);
         $this->gatherConstraints($actions);
         $this->gatherPartitions($actions);
+        $this->gatherViewsAndTriggers($actions);
         $this->resolveConflicts();
     }
 
@@ -126,6 +138,7 @@ class Plan
             $this->constraints,
             $this->indexes,
             $this->partitions,
+            $this->viewsAndTriggers,
             $this->columnRemoves,
             $this->tableMoves,
         ];
@@ -141,6 +154,7 @@ class Plan
         return [
             $this->constraints,
             $this->tableMoves,
+            $this->viewsAndTriggers,
             $this->partitions,
             $this->indexes,
             $this->columnRemoves,
@@ -532,6 +546,34 @@ class Plan
             }
 
             $this->partitions[$name]->addAction($action);
+        }
+    }
+
+    /**
+     * Collects all view and trigger creation and drops from the given intent
+     *
+     * @param \Migrations\Db\Action\Action[] $actions The actions to parse
+     * @return void
+     */
+    protected function gatherViewsAndTriggers(array $actions): void
+    {
+        foreach ($actions as $action) {
+            if (
+                !($action instanceof CreateView)
+                && !($action instanceof DropView)
+                && !($action instanceof CreateTrigger)
+                && !($action instanceof DropTrigger)
+            ) {
+                continue;
+            }
+            $table = $action->getTable();
+            $name = $table->getName();
+
+            if (!isset($this->viewsAndTriggers[$name])) {
+                $this->viewsAndTriggers[$name] = new AlterTable($table);
+            }
+
+            $this->viewsAndTriggers[$name]->addAction($action);
         }
     }
 }
