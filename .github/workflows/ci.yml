@@ -3,10 +3,10 @@ name: CI
 on:
   push:
     branches:
-      - 3.x
       - 4.x
       - 4.next
       - 5.x
+      - 5.next
   pull_request:
     branches:
       - '*'
