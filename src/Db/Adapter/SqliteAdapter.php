@@ -1428,7 +1428,7 @@ PCRE_PATTERN;
         $tableName = $table->getName();
         $instructions->addPostStep(function ($state) use ($foreignKey, $tableName) {
             $this->execute('pragma foreign_keys = ON');
-            $sql = substr($state['createSQL'], 0, -1) . ',' . $this->getForeignKeySqlDefinition($foreignKey) . '); ';
+            $sql = substr($state['createSQL'], 0, -1) . ',' . $this->getForeignKeySqlDefinition($foreignKey, $tableName) . '); ';
 
             //Delete indexes from original table and recreate them in temporary table
             $schema = $this->getSchemaName($tableName, true)['schema'];
@@ -1673,15 +1673,13 @@ PCRE_PATTERN;
      * Gets the SQLite Foreign Key Definition for an ForeignKey object.
      *
      * @param \Migrations\Db\Table\ForeignKey $foreignKey Foreign key
+     * @param string $tableName Table name for auto-generating constraint name
      * @return string
      */
-    protected function getForeignKeySqlDefinition(ForeignKey $foreignKey): string
+    protected function getForeignKeySqlDefinition(ForeignKey $foreignKey, string $tableName): string
     {
-        $def = '';
-        $name = $foreignKey->getName();
-        if ($name) {
-            $def .= ' CONSTRAINT ' . $this->quoteColumnName($name);
-        }
+        $constraintName = $foreignKey->getName() ?: $this->getUniqueForeignKeyName($tableName, $foreignKey->getColumns());
+        $def = ' CONSTRAINT ' . $this->quoteColumnName($constraintName);
         $columnNames = [];
         foreach ($foreignKey->getColumns() as $column) {
             $columnNames[] = $this->quoteColumnName($column);
@@ -1704,6 +1702,31 @@ PCRE_PATTERN;
         }
 
         return $def;
+    }
+
+    /**
+     * Generate a unique foreign key constraint name.
+     *
+     * @param string $tableName Table name
+     * @param array<string> $columns Column names
+     * @return string
+     */
+    protected function getUniqueForeignKeyName(string $tableName, array $columns): string
+    {
+        $baseName = $tableName . '_' . implode('_', $columns);
+        $existingKeys = $this->getForeignKeys($tableName);
+        $existingNames = array_column($existingKeys, 'name');
+
+        if (!in_array($baseName, $existingNames, true)) {
+            return $baseName;
+        }
+
+        $counter = 2;
+        while (in_array($baseName . '_' . $counter, $existingNames, true)) {
+            $counter++;
+        }
+
+        return $baseName . '_' . $counter;
     }
 
     /**

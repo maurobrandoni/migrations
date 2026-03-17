@@ -16,7 +16,7 @@ class TheDiffDefaultMysql extends BaseMigration
     public function up(): void
     {
         $this->table('articles')
-            ->dropForeignKey([], 'articles_ibfk_1')
+            ->dropForeignKey([], 'articles_user_id')
             ->removeIndexByName('UNIQUE_SLUG')
             ->removeIndexByName('rating_index')
             ->removeIndexByName('BY_NAME')
@@ -86,7 +86,7 @@ class TheDiffDefaultMysql extends BaseMigration
             ])
             ->addIndex(
                 $this->index('user_id')
-                    ->setName('categories_ibfk_1')
+                    ->setName('categories_user_id')
             )
             ->addIndex(
                 $this->index('name')
@@ -99,9 +99,9 @@ class TheDiffDefaultMysql extends BaseMigration
                 $this->foreignKey('user_id')
                     ->setReferencedTable('users')
                     ->setReferencedColumns('id')
-                    ->setOnDelete('RESTRICT')
-                    ->setOnUpdate('RESTRICT')
-                    ->setName('categories_ibfk_1')
+                    ->setDelete('RESTRICT')
+                    ->setUpdate('RESTRICT')
+                    ->setName('categories_user_id')
             )
             ->update();
 
@@ -232,9 +232,9 @@ class TheDiffDefaultMysql extends BaseMigration
                 $this->foreignKey('user_id')
                     ->setReferencedTable('users')
                     ->setReferencedColumns('id')
-                    ->setOnDelete('CASCADE')
-                    ->setOnUpdate('CASCADE')
-                    ->setName('articles_ibfk_1')
+                    ->setDelete('CASCADE')
+                    ->setUpdate('CASCADE')
+                    ->setName('articles_user_id')
             )
             ->update();
 
