@@ -7,7 +7,7 @@ const toc_en = require("./toc_en.json");
 const versions = {
   text: "5.x",
   items: [
-    { text: "5.x (current)", link: "book.cakephp.org/migrations/5.x/", target: '_self' },
+    { text: "5.x (current)", link: "book.cakephp.org/migrations/5/", target: '_self' },
     { text: "4.x", link: "https://book.cakephp.org/migrations/4/", target: '_self' },
     { text: "3.x", link: "https://book.cakephp.org/migrations/3/", target: '_self' },
     { text: "2.x", link: "https://book.cakephp.org/migrations/2/", target: '_self' },
@@ -20,12 +20,12 @@ export default {
   srcDir: 'en',
   title: 'Migrations plugin',
   description: 'Migrations - CakePHP migrations Documentation',
-  base: "/5.x/",
+  base: '/migrations/5/',
   rewrites: {
     "en/:slug*": ":slug*",
   },
   sitemap: {
-    hostname: "https://book.cakephp.org/migrations/5.x/",
+    hostname: "https://book.cakephp.org/migrations/5/",
   },
   themeConfig: {
     socialLinks: [
