@@ -3127,6 +3127,282 @@ OUTPUT;
         $this->assertTrue($this->adapter->hasColumn('mixed_case', 'col2'));
     }
 
+    public function testAddColumnWithAlgorithmAndLockSqlContainsClause(): void
+    {
+        $table = new Table('col_sql_verify', [], $this->adapter);
+        $table->addColumn('col1', 'string')
+            ->create();
+
+        $this->io->level(ConsoleIo::VERBOSE);
+        $this->out->clear();
+
+        $table->addColumn('col2', 'string', [
+            'null' => true,
+            'algorithm' => MysqlAdapter::ALGORITHM_INPLACE,
+            'lock' => MysqlAdapter::LOCK_NONE,
+        ])->update();
+
+        $output = $this->out->output();
+        $this->assertStringContainsString('ALGORITHM=INPLACE', $output);
+        $this->assertStringContainsString('LOCK=NONE', $output);
+        $this->assertTrue($this->adapter->hasColumn('col_sql_verify', 'col2'));
+    }
+
+    public function testAddColumnWithFluentColumnBuilder(): void
+    {
+        $table = new Table('col_fluent', [], $this->adapter);
+        $table->addColumn('col1', 'string')
+            ->create();
+
+        $column = new Column();
+        $column->setName('col2')
+            ->setType('string')
+            ->setNull(true)
+            ->setAlgorithm(MysqlAdapter::ALGORITHM_INPLACE)
+            ->setLock(MysqlAdapter::LOCK_NONE);
+
+        $this->io->level(ConsoleIo::VERBOSE);
+        $this->out->clear();
+
+        $table->addColumn($column)->update();
+
+        $output = $this->out->output();
+        $this->assertStringContainsString('ALGORITHM=INPLACE', $output);
+        $this->assertStringContainsString('LOCK=NONE', $output);
+        $this->assertTrue($this->adapter->hasColumn('col_fluent', 'col2'));
+    }
+
+    public function testAddIndexWithAlgorithm(): void
+    {
+        $table = new Table('index_algo', [], $this->adapter);
+        $table->addColumn('email', 'string')
+            ->create();
+
+        $table->addIndex('email', [
+            'algorithm' => MysqlAdapter::ALGORITHM_INPLACE,
+        ])->update();
+
+        $this->assertTrue($this->adapter->hasIndex('index_algo', ['email']));
+    }
+
+    public function testAddIndexWithAlgorithmAndLock(): void
+    {
+        $table = new Table('index_algo_lock', [], $this->adapter);
+        $table->addColumn('email', 'string')
+            ->create();
+
+        $table->addIndex('email', [
+            'algorithm' => MysqlAdapter::ALGORITHM_INPLACE,
+            'lock' => MysqlAdapter::LOCK_NONE,
+        ])->update();
+
+        $this->assertTrue($this->adapter->hasIndex('index_algo_lock', ['email']));
+    }
+
+    public function testAddIndexWithAlgorithmCopy(): void
+    {
+        $table = new Table('index_copy', [], $this->adapter);
+        $table->addColumn('email', 'string')
+            ->create();
+
+        $table->addIndex('email', [
+            'algorithm' => MysqlAdapter::ALGORITHM_COPY,
+        ])->update();
+
+        $this->assertTrue($this->adapter->hasIndex('index_copy', ['email']));
+    }
+
+    public function testAddIndexWithAlgorithmMixedCase(): void
+    {
+        $table = new Table('index_case', [], $this->adapter);
+        $table->addColumn('email', 'string')
+            ->create();
+
+        $table->addIndex('email', [
+            'algorithm' => 'inplace',
+            'lock' => 'none',
+        ])->update();
+
+        $this->assertTrue($this->adapter->hasIndex('index_case', ['email']));
+    }
+
+    public function testAddIndexWithInvalidAlgorithmThrowsException(): void
+    {
+        $table = new Table('index_invalid_algo', [], $this->adapter);
+        $table->addColumn('email', 'string')
+            ->create();
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Invalid algorithm');
+
+        $table->addIndex('email', [
+            'algorithm' => 'INVALID',
+        ])->update();
+    }
+
+    public function testAddIndexWithInvalidLockThrowsException(): void
+    {
+        $table = new Table('index_invalid_lock', [], $this->adapter);
+        $table->addColumn('email', 'string')
+            ->create();
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Invalid lock');
+
+        $table->addIndex('email', [
+            'lock' => 'INVALID',
+        ])->update();
+    }
+
+    public function testAddIndexWithAlgorithmInstantAndExplicitLockThrowsException(): void
+    {
+        $table = new Table('index_instant_lock', [], $this->adapter);
+        $table->addColumn('email', 'string')
+            ->create();
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('ALGORITHM=INSTANT cannot be combined with LOCK=NONE');
+
+        $table->addIndex('email', [
+            'algorithm' => MysqlAdapter::ALGORITHM_INSTANT,
+            'lock' => MysqlAdapter::LOCK_NONE,
+        ])->update();
+    }
+
+    public function testBatchedIndexesWithSameAlgorithm(): void
+    {
+        $table = new Table('index_batch', [], $this->adapter);
+        $table->addColumn('email', 'string')
+            ->addColumn('name', 'string')
+            ->create();
+
+        $table->addIndex('email', [
+            'algorithm' => MysqlAdapter::ALGORITHM_INPLACE,
+            'lock' => MysqlAdapter::LOCK_NONE,
+        ])
+        ->addIndex('name', [
+            'algorithm' => MysqlAdapter::ALGORITHM_INPLACE,
+            'lock' => MysqlAdapter::LOCK_NONE,
+        ])
+        ->update();
+
+        $this->assertTrue($this->adapter->hasIndex('index_batch', ['email']));
+        $this->assertTrue($this->adapter->hasIndex('index_batch', ['name']));
+    }
+
+    public function testBatchedIndexesWithConflictingAlgorithmsThrowsException(): void
+    {
+        $table = new Table('index_batch_conflict', [], $this->adapter);
+        $table->addColumn('email', 'string')
+            ->addColumn('name', 'string')
+            ->create();
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Conflicting algorithm specifications');
+
+        $table->addIndex('email', [
+            'algorithm' => MysqlAdapter::ALGORITHM_INPLACE,
+        ])
+        ->addIndex('name', [
+            'algorithm' => MysqlAdapter::ALGORITHM_COPY,
+        ])
+        ->update();
+    }
+
+    public function testBatchedIndexesWithConflictingLocksThrowsException(): void
+    {
+        $table = new Table('index_lock_conflict', [], $this->adapter);
+        $table->addColumn('email', 'string')
+            ->addColumn('name', 'string')
+            ->create();
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Conflicting lock specifications');
+
+        $table->addIndex('email', [
+            'algorithm' => MysqlAdapter::ALGORITHM_INPLACE,
+            'lock' => MysqlAdapter::LOCK_NONE,
+        ])
+        ->addIndex('name', [
+            'algorithm' => MysqlAdapter::ALGORITHM_INPLACE,
+            'lock' => MysqlAdapter::LOCK_SHARED,
+        ])
+        ->update();
+    }
+
+    public function testAddFulltextIndexWithAlgorithmAndLock(): void
+    {
+        $table = new Table('index_fulltext_algo', [], $this->adapter);
+        $table->addColumn('content', 'text')
+            ->create();
+
+        $table->addIndex('content', [
+            'type' => 'fulltext',
+            'algorithm' => MysqlAdapter::ALGORITHM_INPLACE,
+            'lock' => MysqlAdapter::LOCK_SHARED,
+        ])->update();
+
+        $this->assertTrue($this->adapter->hasIndex('index_fulltext_algo', ['content']));
+    }
+
+    public function testAddFulltextIndexWithInstantAndLockThrowsException(): void
+    {
+        $table = new Table('index_fulltext_instant', [], $this->adapter);
+        $table->addColumn('content', 'text')
+            ->create();
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('ALGORITHM=INSTANT cannot be combined with LOCK=NONE');
+
+        $table->addIndex('content', [
+            'type' => 'fulltext',
+            'algorithm' => MysqlAdapter::ALGORITHM_INSTANT,
+            'lock' => MysqlAdapter::LOCK_NONE,
+        ])->update();
+    }
+
+    public function testAddIndexWithAlgorithmAndLockSqlContainsClause(): void
+    {
+        $table = new Table('idx_sql_verify', [], $this->adapter);
+        $table->addColumn('email', 'string')
+            ->create();
+
+        $this->io->level(ConsoleIo::VERBOSE);
+        $this->out->clear();
+
+        $table->addIndex('email', [
+            'algorithm' => MysqlAdapter::ALGORITHM_INPLACE,
+            'lock' => MysqlAdapter::LOCK_NONE,
+        ])->update();
+
+        $output = $this->out->output();
+        $this->assertStringContainsString('ALGORITHM=INPLACE', $output);
+        $this->assertStringContainsString('LOCK=NONE', $output);
+        $this->assertTrue($this->adapter->hasIndex('idx_sql_verify', ['email']));
+    }
+
+    public function testAddIndexWithFluentIndexBuilder(): void
+    {
+        $table = new Table('idx_fluent', [], $this->adapter);
+        $table->addColumn('email', 'string')
+            ->create();
+
+        $index = new Index();
+        $index->setColumns('email')
+            ->setAlgorithm(MysqlAdapter::ALGORITHM_INPLACE)
+            ->setLock(MysqlAdapter::LOCK_NONE);
+
+        $this->io->level(ConsoleIo::VERBOSE);
+        $this->out->clear();
+
+        $table->addIndex($index)->update();
+
+        $output = $this->out->output();
+        $this->assertStringContainsString('ALGORITHM=INPLACE', $output);
+        $this->assertStringContainsString('LOCK=NONE', $output);
+        $this->assertTrue($this->adapter->hasIndex('idx_fluent', ['email']));
+    }
+
     public function testInsertOrUpdateWithDuplicates(): void
     {
         $table = new Table('currencies', [], $this->adapter);
