@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace Migrations\Test\TestCase\Command;
 
+use Cake\Console\TestSuite\StubConsoleOutput;
 use Cake\Datasource\ConnectionManager;
 use Cake\Event\EventInterface;
 use Cake\Event\EventManager;
@@ -39,7 +40,7 @@ class ResetCommandTest extends TestCase
 
     protected function resetOutput(): void
     {
-        if ($this->_out instanceof \Cake\Console\TestSuite\StubConsoleOutput) {
+        if ($this->_out instanceof StubConsoleOutput) {
             $property = new ReflectionProperty($this->_out, '_out');
             $property->setValue($this->_out, []);
         }

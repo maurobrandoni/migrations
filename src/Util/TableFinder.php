@@ -17,6 +17,7 @@ use Cake\Core\App;
 use Cake\Core\Plugin as CorePlugin;
 use Cake\Database\Schema\CollectionInterface;
 use Cake\Datasource\ConnectionManager;
+use Cake\ORM\Association;
 use Cake\ORM\TableRegistry;
 use ReflectionClass;
 
@@ -178,7 +179,7 @@ class TableFinder
         $table = TableRegistry::getTableLocator()->get($className);
         foreach ($table->associations()->keys() as $key) {
             $association = $table->associations()->get($key);
-            if ($association instanceof \Cake\ORM\Association && $association->type() === 'belongsToMany') {
+            if ($association instanceof Association && $association->type() === 'belongsToMany') {
                 /** @var \Cake\ORM\Association\BelongsToMany $belongsToMany */
                 $belongsToMany = $association;
                 $tables[] = $belongsToMany->junction()->getTable();
