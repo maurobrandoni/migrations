@@ -43,9 +43,6 @@ class SqlserverAdapter extends AbstractAdapter
         self::TYPE_NATIVE_UUID,
     ];
 
-    /**
-     * @var string
-     */
     protected string $schema = 'dbo';
 
     /**
@@ -228,7 +225,7 @@ class SqlserverAdapter extends AbstractAdapter
         // passing 'null' is to remove column comment
         $currentComment = $this->getColumnComment($tableName, $columnName);
 
-        $comment = strcasecmp((string)$column->getComment(), 'NULL') !== 0 ? $this->quoteString((string)$column->getComment()) : '\'\'';
+        $comment = strcasecmp((string)$column->getComment(), 'NULL') !== 0 ? $this->quoteString((string)$column->getComment()) : "''";
         $command = $currentComment === null ? 'sp_addextendedproperty' : 'sp_updateextendedproperty';
 
         return sprintf(
@@ -336,7 +333,7 @@ class SqlserverAdapter extends AbstractAdapter
         $row = $this->query($sql, $params)->fetch('assoc');
 
         if ($row) {
-            return trim($row['comment']);
+            return trim((string)$row['comment']);
         }
 
         return null;
@@ -416,13 +413,13 @@ class SqlserverAdapter extends AbstractAdapter
     protected function getRenameColumnInstructions(string $tableName, string $columnName, string $newColumnName): AlterInstructions
     {
         if (!$this->hasColumn($tableName, $columnName)) {
-            throw new InvalidArgumentException("The specified column does not exist: $columnName");
+            throw new InvalidArgumentException('The specified column does not exist: ' . $columnName);
         }
 
         $instructions = new AlterInstructions();
 
-        $oldConstraintName = "DF_{$tableName}_{$columnName}";
-        $newConstraintName = "DF_{$tableName}_{$newColumnName}";
+        $oldConstraintName = sprintf('DF_%s_%s', $tableName, $columnName);
+        $newConstraintName = sprintf('DF_%s_%s', $tableName, $newColumnName);
         $sql = sprintf(
             'IF (OBJECT_ID(%s, \'D\') IS NOT NULL)
 BEGIN
@@ -435,7 +432,7 @@ END',
         $instructions->addPostStep($sql);
 
         $instructions->addPostStep(sprintf(
-            'EXECUTE sp_rename %s, %s, N\'COLUMN\'',
+            "EXECUTE sp_rename %s, %s, N'COLUMN'",
             $this->quoteString($tableName . '.' . $columnName),
             $this->quoteString($newColumnName),
         ));
@@ -452,15 +449,11 @@ END',
      */
     protected function getChangeDefault(string $tableName, Column $newColumn): AlterInstructions
     {
-        $constraintName = "DF_{$tableName}_{$newColumn->getName()}";
+        $constraintName = sprintf('DF_%s_%s', $tableName, $newColumn->getName());
         $default = $newColumn->getDefault();
         $instructions = new AlterInstructions();
 
-        if ($default === null) {
-            $default = 'DEFAULT NULL';
-        } else {
-            $default = ltrim($this->getDefaultValueDefinition($default, (string)$newColumn->getType()));
-        }
+        $default = $default === null ? 'DEFAULT NULL' : ltrim($this->getDefaultValueDefinition($default, $newColumn->getType()));
 
         if (!$default) {
             return $instructions;
@@ -492,7 +485,7 @@ END',
             }
         }
         if ($oldColumn === null) {
-            throw new InvalidArgumentException("Unknown column {$columnName} cannot be changed.");
+            throw new InvalidArgumentException(sprintf('Unknown column %s cannot be changed.', $columnName));
         }
 
         $changeDefault =
@@ -522,8 +515,9 @@ END',
             $this->quoteTableName($tableName),
             $dialect->columnDefinitionSql($columnData),
         );
-        $alterColumn = preg_replace('/DEFAULT NULL/', '', $alterColumn);
-        $instructions->addPostStep((string)$alterColumn);
+        $alterColumn = (string)preg_replace('/DEFAULT NULL/', '', $alterColumn);
+
+        $instructions->addPostStep($alterColumn);
 
         // change column comment if needed
         if ($newColumn->getComment()) {
@@ -605,7 +599,7 @@ ORDER BY IC.[key_ordinal]';
         $rows = $this->query($sql, $params)->fetchAll('assoc');
         $columns = [];
         foreach ($rows as $row) {
-            $columns[] = strtolower($row['column_name']);
+            $columns[] = strtolower((string)$row['column_name']);
         }
 
         return $columns;
@@ -646,7 +640,7 @@ ORDER BY IC.[key_ordinal]';
         }
 
         $indexes = $this->getIndexes($tableName);
-        $columns = array_map('strtolower', $columns);
+        $columns = array_map(strtolower(...), $columns);
         $instructions = new AlterInstructions();
 
         foreach ($indexes as $index) {
@@ -876,7 +870,7 @@ DROP DATABASE %s;',
             $indexName = sprintf('%s_%s', $parts['table'], implode('_', $columnNames));
         }
         $order = $index->getOrder() ?? [];
-        $columnNames = array_map(function ($columnName) use ($order) {
+        $columnNames = array_map(function (string $columnName) use ($order): string {
             $ret = '[' . $columnName . ']';
             if (isset($order[$columnName])) {
                 $ret .= ' ' . $order[$columnName];
@@ -925,10 +919,10 @@ DROP DATABASE %s;',
         }
         $def .= ' REFERENCES ' . $this->quoteTableName($referencedTable) . ' (' . $refColumnList . ')';
         if ($foreignKey->getOnDelete()) {
-            $def .= " ON DELETE {$foreignKey->getOnDelete()}";
+            $def .= ' ON DELETE ' . $foreignKey->getOnDelete();
         }
         if ($foreignKey->getOnUpdate()) {
-            $def .= " ON UPDATE {$foreignKey->getOnUpdate()}";
+            $def .= ' ON UPDATE ' . $foreignKey->getOnUpdate();
         }
 
         return $def;
@@ -1051,7 +1045,7 @@ DROP DATABASE %s;',
     {
         $schema = $this->getGlobalSchemaName();
         $table = $tableName;
-        if (strpos($tableName, '.') !== false) {
+        if (str_contains($tableName, '.')) {
             [$schema, $table] = explode('.', $tableName);
         }
 
@@ -1154,7 +1148,7 @@ DROP DATABASE %s;',
                     if ($v instanceof Literal) {
                         $placeholder = (string)$v;
                     }
-                    if ($placeholder == '?') {
+                    if ($placeholder === '?') {
                         if ($v instanceof DateTime) {
                             $vals[] = $v->toDateTimeString();
                         } elseif ($v instanceof Date) {

@@ -58,30 +58,16 @@ use RuntimeException;
  */
 class Table
 {
-    /**
-     * @var \Migrations\Db\Table\TableMetadata
-     */
     protected TableMetadata $table;
 
-    /**
-     * @var \Migrations\Db\Adapter\AdapterInterface|null
-     */
     protected ?AdapterInterface $adapter = null;
 
-    /**
-     * @var \Migrations\Db\Plan\Intent
-     */
     protected Intent $actions;
 
-    /**
-     * @var array
-     */
     protected array $data = [];
 
     /**
      * Insert mode for data operations
-     *
-     * @var \Migrations\Db\InsertMode|null
      */
     protected ?InsertMode $insertMode = null;
 
@@ -118,7 +104,7 @@ class Table
         $this->table = new TableMetadata($name, $options);
         $this->actions = new Intent();
 
-        if ($adapter !== null) {
+        if ($adapter instanceof AdapterInterface) {
             $this->setAdapter($adapter);
         }
     }
@@ -174,7 +160,7 @@ class Table
      */
     public function getAdapter(): AdapterInterface
     {
-        if (!$this->adapter) {
+        if (!$this->adapter instanceof AdapterInterface) {
             throw new RuntimeException('There is no database adapter set yet, cannot proceed');
         }
 
@@ -188,7 +174,11 @@ class Table
      */
     public function hasPendingActions(): bool
     {
-        return count($this->actions->getActions()) > 0 || count($this->data) > 0;
+        if ($this->actions->getActions() !== []) {
+            return true;
+        }
+
+        return $this->data !== [];
     }
 
     /**
@@ -284,7 +274,7 @@ class Table
     {
         $columns = array_filter(
             $this->getColumns(),
-            function ($column) use ($name) {
+            function (Column $column) use ($name): bool {
                 return $column->getName() === $name;
             },
         );
@@ -379,7 +369,7 @@ class Table
             throw new InvalidArgumentException(sprintf(
                 'An invalid column type "%s" was specified for column "%s".',
                 $column->getType(),
-                $column->getName(),
+                (string)$column->getName(),
             ));
         }
 
@@ -468,13 +458,13 @@ class Table
             if ($newColumnType === null) {
                 if (!$this->hasColumn($columnName)) {
                     throw new RuntimeException(
-                        "Cannot preserve column type for '$columnName' - column does not exist in table '{$this->getName()}'",
+                        sprintf("Cannot preserve column type for '%s' - column does not exist in table '%s'", $columnName, $this->getName()),
                     );
                 }
                 $existingColumn = $this->getColumn($columnName);
-                if ($existingColumn === null) {
+                if (!$existingColumn instanceof Column) {
                     throw new RuntimeException(
-                        "Cannot retrieve column definition for '$columnName' in table '{$this->getName()}'",
+                        sprintf("Cannot retrieve column definition for '%s' in table '%s'", $columnName, $this->getName()),
                     );
                 }
                 $newColumnType = $existingColumn->getType();
@@ -483,7 +473,7 @@ class Table
             if ($preserveUnspecified && $this->hasColumn($columnName)) {
                 // Get existing column definition
                 $existingColumn = $this->getColumn($columnName);
-                if ($existingColumn !== null) {
+                if ($existingColumn instanceof Column) {
                     // Merge existing attributes with new ones
                     $options = $this->mergeColumnOptions($existingColumn, $newColumnType, $options);
                 }
@@ -591,7 +581,7 @@ class Table
         if ($columns instanceof ForeignKey) {
             $action = new AddForeignKey($this->table, $columns);
         } else {
-            if (!$referencedTable) {
+            if ($referencedTable === null) {
                 throw new InvalidArgumentException('Referenced table is required');
             }
             $action = AddForeignKey::build($this->table, $columns, $referencedTable, $referencedColumns, $options);
@@ -699,7 +689,7 @@ class Table
     public function addPartition(string $name, mixed $value = null, array $options = [])
     {
         $partition = $this->table->getPartition();
-        if ($partition === null) {
+        if (!$partition instanceof Partition) {
             throw new RuntimeException('Must call partitionBy() before addPartition()');
         }
 
@@ -760,15 +750,15 @@ class Table
      */
     public function addTimestamps(string|false|null $createdAt = 'created', string|false|null $updatedAt = 'updated', bool $withTimezone = false)
     {
-        $createdAt = $createdAt ?? 'created';
-        $updatedAt = $updatedAt ?? 'updated';
+        $createdAt ??= 'created';
+        $updatedAt ??= 'updated';
 
         if (!$createdAt && !$updatedAt) {
             throw new RuntimeException('Cannot set both created_at and updated_at columns to false');
         }
         $timestampConfig = (bool)Configure::read('Migrations.add_timestamps_use_datetime');
         $timestampType = 'timestamp';
-        if ($timestampConfig === true) {
+        if ($timestampConfig) {
             $timestampType = 'datetime';
         }
 
@@ -831,7 +821,7 @@ class Table
             return $this;
         }
 
-        if (count($data) > 0) {
+        if ($data !== []) {
             $this->data[] = $data;
         }
 
@@ -904,7 +894,7 @@ class Table
     public function create(): void
     {
         $options = $this->getTable()->getOptions();
-        if ((!isset($options['id']) || $options['id'] === false) && !empty($this->primaryKey)) {
+        if ((!isset($options['id']) || $options['id'] === false) && (isset($this->primaryKey) && !in_array($this->primaryKey, ['', '0', []], true))) {
             $options['primary_key'] = (array)$this->primaryKey;
             $this->filterPrimaryKey($options);
         }
@@ -947,14 +937,14 @@ class Table
 
         /** @var \Cake\Collection\Collection $columnsCollection */
         $columnsCollection = (new Collection($this->actions->getActions()))
-            ->filter(function ($action) {
+            ->filter(function ($action): bool {
                 return $action instanceof AddColumn;
             })
             ->map(function ($action) {
                 /** @var \Migrations\Db\Action\ChangeColumn|\Migrations\Db\Action\RenameColumn|\Migrations\Db\Action\RemoveColumn|\Migrations\Db\Action\AddColumn $action */
                 return $action->getColumn();
             });
-        $primaryKeyColumns = $columnsCollection->filter(function (Column $columnDef, $key) use ($primaryKey) {
+        $primaryKeyColumns = $columnsCollection->filter(function (Column $columnDef, $key) use ($primaryKey): bool {
             return isset($primaryKey[$columnDef->getName()]);
         })->toArray();
 
@@ -1170,7 +1160,7 @@ class Table
         // If table exists and has partition configuration, create SetPartitioning action
         if ($exists) {
             $partition = $this->table->getPartition();
-            if ($partition !== null && $partition->getDefinitions()) {
+            if ($partition instanceof Partition && $partition->getDefinitions()) {
                 $this->actions->addAction(new SetPartitioning($this->table, $partition));
             }
         }
@@ -1217,8 +1207,8 @@ class Table
     protected function mergeColumnOptions(Column $existingColumn, string $newColumnType, array $options): array
     {
         // Determine if type is changing
-        $newTypeString = (string)$newColumnType;
-        $existingTypeString = (string)$existingColumn->getType();
+        $newTypeString = $newColumnType;
+        $existingTypeString = $existingColumn->getType();
         $typeChanging = $newTypeString !== $existingTypeString;
 
         // Build array of existing column attributes
