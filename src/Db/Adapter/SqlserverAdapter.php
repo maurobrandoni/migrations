@@ -297,7 +297,7 @@ class SqlserverAdapter extends AbstractAdapter
         foreach ($rows as $row) {
             $constraintName = $this->quoteColumnName($row['constraint_name']);
             $tableName = $this->quoteTableName($row['table_name']);
-            $this->execute("ALTER TABLE {$tableName} DROP CONSTRAINT {$constraintName}");
+            $this->execute(sprintf('ALTER TABLE %s DROP CONSTRAINT %s', $tableName, $constraintName));
         }
     }
 

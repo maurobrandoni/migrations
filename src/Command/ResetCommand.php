@@ -55,7 +55,7 @@ class ResetCommand extends Command
      * @param \Cake\Console\ConsoleOptionParser $parser The option parser to configure
      * @return \Cake\Console\ConsoleOptionParser
      */
-    public function buildOptionParser(ConsoleOptionParser $parser): ConsoleOptionParser
+    protected function buildOptionParser(ConsoleOptionParser $parser): ConsoleOptionParser
     {
         $parser->setDescription([
             'Drop all tables and re-run all migrations.',
@@ -116,7 +116,7 @@ class ResetCommand extends Command
         // Get tables to drop
         $tablesToDrop = $this->getTablesToDrop($connection);
 
-        if (empty($tablesToDrop)) {
+        if ($tablesToDrop === []) {
             $io->out('<info>No tables to drop.</info>');
             $io->out('');
             $io->out('Running migrations...');
@@ -204,7 +204,7 @@ class ResetCommand extends Command
 
         try {
             foreach ($tables as $table) {
-                $io->verbose("Dropping table: {$table}");
+                $io->verbose('Dropping table: ' . $table);
                 $adapter->dropTable($table);
             }
         } finally {
@@ -248,12 +248,12 @@ class ResetCommand extends Command
         $manager = $factory->createManager($io);
         $config = $manager->getConfig();
 
-        $io->verbose('<info>using connection</info> ' . (string)$args->getOption('connection'));
+        $io->verbose('<info>using connection</info> ' . $args->getOption('connection'));
         $io->verbose('<info>using paths</info> ' . $config->getMigrationPath());
 
         try {
             $start = microtime(true);
-            $manager->migrate(null, false, null);
+            $manager->migrate(null, false);
             $end = microtime(true);
         } catch (Throwable $e) {
             $io->err('<error>' . $e->getMessage() . '</error>');

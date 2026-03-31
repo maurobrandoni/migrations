@@ -14,8 +14,6 @@ class DropCheckConstraint extends Action
 {
     /**
      * The check constraint name to drop
-     *
-     * @var string
      */
     protected string $constraintName;
 

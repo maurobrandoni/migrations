@@ -90,7 +90,7 @@ class TableTest extends TestCase
         $table = new Table('ntable', [], $adapter);
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Column type must not be null when column name is a string.');
-        $table->addColumn('email', null);
+        $table->addColumn('email');
     }
 
     public function testAddColumnWithNoAdapterSpecified(): void

@@ -13,7 +13,7 @@ class ResetCommandTest extends TestCase
 {
     protected array $createdFiles = [];
 
-    public function setUp(): void
+    protected function setUp(): void
     {
         parent::setUp();
 
@@ -25,7 +25,7 @@ class ResetCommandTest extends TestCase
         EventManager::instance()->off('Migration.afterReset');
     }
 
-    public function tearDown(): void
+    protected function tearDown(): void
     {
         parent::tearDown();
         foreach ($this->createdFiles as $file) {
@@ -39,7 +39,7 @@ class ResetCommandTest extends TestCase
 
     protected function resetOutput(): void
     {
-        if ($this->_out) {
+        if ($this->_out instanceof \Cake\Console\TestSuite\StubConsoleOutput) {
             $property = new ReflectionProperty($this->_out, '_out');
             $property->setValue($this->_out, []);
         }

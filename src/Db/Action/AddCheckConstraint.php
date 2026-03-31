@@ -15,8 +15,6 @@ class AddCheckConstraint extends Action
 {
     /**
      * The check constraint to add
-     *
-     * @var \Migrations\Db\Table\CheckConstraint
      */
     protected CheckConstraint $checkConstraint;
 

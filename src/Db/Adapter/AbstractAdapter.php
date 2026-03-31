@@ -194,7 +194,7 @@ abstract class AbstractAdapter implements AdapterInterface, DirectActionInterfac
             $this->connection = $this->getOption('connection');
             $this->connect();
         }
-        if ($this->connection === null) {
+        if (!$this->connection instanceof \Cake\Database\Connection) {
             throw new RuntimeException('Unable to establish database connection. Ensure a connection is configured.');
         }
 

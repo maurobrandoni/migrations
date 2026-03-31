@@ -369,7 +369,7 @@ class Table
             throw new InvalidArgumentException(sprintf(
                 'An invalid column type "%s" was specified for column "%s".',
                 $column->getType(),
-                (string)$column->getName(),
+                $column->getName(),
             ));
         }
 
@@ -1186,7 +1186,7 @@ class Table
             }
 
             // Only skip CreateTable if we have ONLY view/trigger actions (and at least one)
-            if (!$hasViewOrTriggerActions || $hasTableActions || count($actions) === 0) {
+            if (!$hasViewOrTriggerActions || $hasTableActions || $actions === []) {
                 $this->actions->addAction(new CreateTable($this->table));
             }
         }

@@ -1124,7 +1124,7 @@ PCRE_PATTERN;
     {
         $instructions = $this->beginAlterByCopyTable($tableName);
 
-        $newColumnName = (string)$newColumn->getName();
+        $newColumnName = $newColumn->getName();
         $instructions->addPostStep(function (array $state) use ($columnName, $newColumn): array {
             $dialect = $this->getSchemaDialect();
             $sql = (string)preg_replace(

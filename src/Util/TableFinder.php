@@ -178,7 +178,7 @@ class TableFinder
         $table = TableRegistry::getTableLocator()->get($className);
         foreach ($table->associations()->keys() as $key) {
             $association = $table->associations()->get($key);
-            if ($association !== null && $association->type() === 'belongsToMany') {
+            if ($association instanceof \Cake\ORM\Association && $association->type() === 'belongsToMany') {
                 /** @var \Cake\ORM\Association\BelongsToMany $belongsToMany */
                 $belongsToMany = $association;
                 $tables[] = $belongsToMany->junction()->getTable();
