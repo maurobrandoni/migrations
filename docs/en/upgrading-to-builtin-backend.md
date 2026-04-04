@@ -140,19 +140,19 @@ To migrate from `phinxlog` tables to the new `cake_migrations` table:
 
 1. **Preview the upgrade** (dry run):
 
-    ``` bash
+    ```bash
     bin/cake migrations upgrade --dry-run
     ```
 
 2. **Run the upgrade**:
 
-    ``` bash
+    ```bash
     bin/cake migrations upgrade
     ```
 
 3. **Update your configuration**:
 
-    ``` php
+    ```php
     // config/app.php
     'Migrations' => [
         'legacyTables' => false,
@@ -163,7 +163,7 @@ To migrate from `phinxlog` tables to the new `cake_migrations` table:
     by default. Use `--drop-tables` to drop the `phinxlog`tables after
     verifying your migrations run correctly.
 
-    ``` bash
+    ```bash
     bin/cake migrations upgrade --drop-tables
     ```
 
