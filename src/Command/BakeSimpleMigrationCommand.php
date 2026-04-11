@@ -50,12 +50,12 @@ abstract class BakeSimpleMigrationCommand extends SimpleBakeCommand
     /**
      * Console IO
      */
-    protected ?ConsoleIo $io = null;
+    protected ConsoleIo $io;
 
     /**
      * Arguments
      */
-    protected ?Arguments $args = null;
+    protected Arguments $args;
 
     /**
      * @inheritDoc
