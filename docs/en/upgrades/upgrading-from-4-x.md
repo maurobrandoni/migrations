@@ -103,12 +103,12 @@ $row = $stmt->fetch('assoc');
 
 Seeds are now tracked in a `cake_seeds` table by default, preventing accidental re-runs.
 Use `--force` to run a seed again, or `bin/cake seeds reset` to clear tracking.
-See [Database Seeding](seeding) for more details.
+See [Database Seeding](../guides/seeding) for more details.
 
 ### Check Constraints
 
 Support for database check constraints via `addCheckConstraint()`.
-See [Writing Migrations](writing-migrations) for usage details.
+See [Writing Migrations](../guides/writing-migrations) for usage details.
 
 ### MySQL ALTER Options
 
