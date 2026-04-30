@@ -739,6 +739,7 @@ class Table
                 /** @var \Phinx\Db\Action\ChangeColumn|\Phinx\Db\Action\RenameColumn|\Phinx\Db\Action\RemoveColumn|\Phinx\Db\Action\AddColumn $action */
                 return $action->getColumn();
             });
+        /** @var list<\Migrations\Db\Table\Column> $primaryKeyColumns */
         $primaryKeyColumns = $columnsCollection->filter(function (Column $columnDef, $key) use ($primaryKey) {
             return isset($primaryKey[$columnDef->getName()]);
         })->toArray();

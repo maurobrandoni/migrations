@@ -26,7 +26,7 @@
         "cakephp/cache": "^5.2.9",
         "cakephp/database": "^5.2.9",
         "cakephp/orm": "^5.2.9",
-        "robmorgan/phinx": "^0.16.10"
+        "robmorgan/phinx": "0.16.10"
     },
     "require-dev": {
         "cakephp/bake": "^3.3",
