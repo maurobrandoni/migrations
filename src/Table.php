@@ -211,6 +211,7 @@ class Table extends BaseTable
                 /** @var \Phinx\Db\Action\ChangeColumn|\Phinx\Db\Action\RenameColumn|\Phinx\Db\Action\RemoveColumn|\Phinx\Db\Action\AddColumn $action */
                 return $action->getColumn();
             });
+        /** @var list<\Phinx\Db\Table\Column> $primaryKeyColumns */
         $primaryKeyColumns = $columnsCollection->filter(function (Column $columnDef, $key) use ($primaryKey) {
             return isset($primaryKey[$columnDef->getName()]);
         })->toArray();
