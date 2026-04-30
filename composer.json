@@ -37,7 +37,7 @@
         "cakephp/bake": "If you want to generate migrations.",
         "dereuromark/cakephp-ide-helper": "If you want to have IDE suggest/autocomplete when creating migrations."
     },
-    "minimum-stability": "dev",
+    "minimum-stability": "stable",
     "prefer-stable": true,
     "autoload": {
         "psr-4": {
