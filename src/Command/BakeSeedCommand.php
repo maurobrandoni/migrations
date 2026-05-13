@@ -116,8 +116,7 @@ class BakeSeedCommand extends SimpleBakeCommand
         if ($arguments->getOption('data')) {
             $limit = (int)$arguments->getOption('limit');
 
-            /** @var string $fields */
-            $fields = $arguments->getOption('fields') ?: '*';
+            $fields = (string)$arguments->getOption('fields') ?: '*';
             if ($fields !== '*') {
                 $fields = explode(',', $fields);
             }
@@ -173,7 +172,7 @@ class BakeSeedCommand extends SimpleBakeCommand
      * @param \Cake\Console\ConsoleOptionParser $parser Option parser to update.
      * @return \Cake\Console\ConsoleOptionParser
      */
-    public function buildOptionParser(ConsoleOptionParser $parser): ConsoleOptionParser
+    protected function buildOptionParser(ConsoleOptionParser $parser): ConsoleOptionParser
     {
         $parser = parent::buildOptionParser($parser);
 
@@ -214,6 +213,7 @@ class BakeSeedCommand extends SimpleBakeCommand
         $lines = explode("\n", $content);
 
         $inString = false;
+        $removeKeys = [];
 
         foreach ($lines as $k => &$line) {
             if ($k === 0) {
@@ -237,7 +237,7 @@ class BakeSeedCommand extends SimpleBakeCommand
                     $tabCount--;
                 } elseif (preg_match("/^\d+\s\=\>\s$/", $line)) {
                     // Mark '0 =>' kind of lines to remove
-                    $line = false;
+                    $removeKeys[] = $k;
                     continue;
                 }
 
@@ -264,10 +264,9 @@ class BakeSeedCommand extends SimpleBakeCommand
         }
         unset($line);
 
-        // Remove marked lines
-        $lines = array_filter($lines, function ($line): bool {
-            return $line !== false;
-        });
+        foreach ($removeKeys as $key) {
+            unset($lines[$key]);
+        }
 
         return implode("\n", $lines);
     }
