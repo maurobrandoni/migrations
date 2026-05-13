@@ -841,7 +841,7 @@ abstract class AbstractAdapter implements AdapterInterface, DirectActionInterfac
      * Generates the SQL for a bulk insert.
      *
      * @param \Migrations\Db\Table\TableMetadata $table The table to insert into
-     * @param array $rows The rows to insert
+     * @param array<int, array<string, mixed>> $rows The rows to insert
      * @param \Migrations\Db\InsertMode|null $mode Insert mode
      * @param array<string>|null $updateColumns Columns to update on upsert conflict
      * @param array<string>|null $conflictColumns Columns that define uniqueness for upsert (unused in MySQL)
@@ -859,15 +859,15 @@ abstract class AbstractAdapter implements AdapterInterface, DirectActionInterfac
             $this->getInsertPrefix($mode),
             $this->quoteTableName($table->getName()),
         );
-        $current = current($rows);
-        $keys = array_keys($current);
+        $current = (array)current($rows);
+        $keys = array_map(strval(...), array_keys($current));
 
         $sql .= '(' . implode(', ', array_map($this->quoteColumnName(...), $keys)) . ') VALUES ';
 
         $upsertClause = $this->getUpsertClause($mode, $updateColumns, $conflictColumns);
 
         if ($this->isDryRunEnabled()) {
-            $values = array_map(function ($row): string {
+            $values = array_map(function (array $row): string {
                 return '(' . implode(', ', array_map($this->quoteValue(...), $row)) . ')';
             }, $rows);
 
