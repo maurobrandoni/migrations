@@ -3,8 +3,13 @@
 # using dockerfile instead of herokuish
 FROM ubuntu:22.04
 
+ARG DEBIAN_FRONTEND=noninteractive
+ENV TZ=Etc/UTC
+
 # Add basic tools
-RUN apt-get update && \
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && \
+  echo $TZ > /etc/timezone && \
+  apt-get update && \
   apt-get install -y build-essential \
     software-properties-common \
     curl \
@@ -12,7 +17,7 @@ RUN apt-get update && \
     libxml2 \
     libffi-dev \
     libssl-dev && \
-  LC_ALL=C.UTF-8 add-apt-repository ppa:ondrej/php && \
+  LC_ALL=C.UTF-8 add-apt-repository -y ppa:ondrej/php && \
   apt-get update && \
   apt-get install -y php8.1-cli php8.1-mbstring php8.1-xml php8.1-zip php8.1-intl php8.1-opcache php8.1-sqlite &&\
   apt-get clean &&\
