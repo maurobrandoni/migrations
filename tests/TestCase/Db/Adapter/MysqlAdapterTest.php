@@ -895,10 +895,7 @@ class MysqlAdapterTest extends TestCase
     }
 
     /**
-     * Reads the character set MySQL actually stored for a column.
-     *
-     * `SHOW FULL COLUMNS` only exposes the collation, which cannot distinguish an
-     * explicit `CHARACTER SET` from one inherited from the table default.
+     * SHOW FULL COLUMNS only exposes the collation, so read the character set from information_schema.
      */
     protected function fetchColumnEncoding(string $table, string $column): ?string
     {

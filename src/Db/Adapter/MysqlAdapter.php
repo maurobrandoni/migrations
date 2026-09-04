@@ -466,8 +466,7 @@ class MysqlAdapter extends AbstractAdapter
      *
      * This method provides backwards compatibility for enum and set types
      * as userland migrations use those types, but they are not supported
-     * in cakephp/database. The `encoding` option is handled here for the
-     * same reason: cakephp/database has no per-column character set.
+     * in cakephp/database.
      *
      * @param \Cake\Database\Schema\SchemaDialect $dialect The dialect to use.
      * @param \Migrations\Db\Table\Column $column The column to get the SQL for.
@@ -497,47 +496,7 @@ class MysqlAdapter extends AbstractAdapter
             return $sql;
         }
 
-        $encoding = $column->getEncoding();
-        if ($encoding !== null) {
-            return $this->columnDefinitionSqlWithEncoding($dialect, $columnData, $encoding);
-        }
-
         return $dialect->columnDefinitionSql($this->mapColumnData($columnData));
-    }
-
-    /**
-     * Get the SQL fragment for a column that declares an explicit character set.
-     *
-     * cakephp/database renders no per-column character set, and MySQL requires
-     * `CHARACTER SET` to precede `COLLATE`, so the fragment cannot simply be appended
-     * to the generated definition. It is instead rendered with a placeholder collation,
-     * and the `CHARACTER SET`/`COLLATE` pair replaces the placeholder in that position.
-     *
-     * Types that cannot carry a character set never render a collation, so the
-     * placeholder is absent for them and their definition is returned unchanged.
-     *
-     * @param \Cake\Database\Schema\SchemaDialect $dialect The dialect to use.
-     * @param array<string, mixed> $columnData The column data to render.
-     * @param string $encoding The character set the column was declared with.
-     * @return string
-     */
-    protected function columnDefinitionSqlWithEncoding(
-        SchemaDialect $dialect,
-        array $columnData,
-        string $encoding,
-    ): string {
-        $collation = isset($columnData['collate']) ? (string)$columnData['collate'] : '';
-        $placeholder = '__migrations_encoding__';
-        $columnData['collate'] = $placeholder;
-
-        $sql = $dialect->columnDefinitionSql($this->mapColumnData($columnData));
-
-        $replacement = 'CHARACTER SET ' . $encoding;
-        if ($collation !== '') {
-            $replacement .= ' COLLATE ' . $collation;
-        }
-
-        return str_replace('COLLATE ' . $placeholder, $replacement, $sql);
     }
 
     /**
